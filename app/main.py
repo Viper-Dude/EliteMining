@@ -12162,12 +12162,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         from edsm_distance import get_distance_calculator
         from fleet_carrier_tracker import get_fleet_carrier_tracker
         from config import load_home_system, load_distance_calculator_systems, load_theme
-        
-        # Theme-aware background color
-        _dc_theme = load_theme()
-        _dc_bg = "#000000" if _dc_theme == "elite_orange" else "#1e1e1e"
-        
-        # Get calculator instance
+        from system_autocomplete import SystemAutocomplete
+        from ui.help_link import create_labelframe_title
+
+        _dc_colors = get_theme_colors(load_theme())
+        _dc_bg = _dc_colors["bg"]
+        px = self._scaled_px
+
         self.distance_calculator = get_distance_calculator()
         self.fc_tracker = get_fleet_carrier_tracker()
         self._distance_calculation_generation = 0
@@ -12177,338 +12178,172 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._distance_refresh_generation = 0
         self._distance_refresh_running = False
         self._distance_values = {}
-        
-        # Main container
+
         main_container = ttk.Frame(frame)
         main_container.pack(fill="both", expand=True, padx=10, pady=10)
-        
-        # Configuration section (moved to top)
+
         config_frame = ttk.LabelFrame(main_container, padding=10)
         config_frame.pack(fill="x", pady=(0, 10))
-        from ui.help_link import create_labelframe_title
         config_frame.configure(labelwidget=create_labelframe_title(
             config_frame, t('distance_calculator.configuration'), "distance-calculator", t('distance_calculator.help_tooltip'), ToolTip))
 
-        # Configure column weights: label, input (limited expand), button, distance info, visits
-        config_frame.columnconfigure(0, weight=0, minsize=120)  # Label column (fixed)
-        config_frame.columnconfigure(1, weight=0, minsize=250)  # Input column (fixed width)
-        config_frame.columnconfigure(2, weight=0)  # Button column (fixed)
-        config_frame.columnconfigure(3, weight=1)  # Distance info column (expands)
-        config_frame.columnconfigure(4, weight=0, minsize=80)  # Visits column (fixed)
-        
-        # Current System Display (always updated, read-only)
-        row = 0
-        ttk.Label(config_frame, text=t('distance_calculator.current_system'), font=self._scaled_font(9, "bold")).grid(row=row, column=0, sticky="w", pady=3)
+        # Columns: label, system, distance info (expands), visits
+        config_frame.columnconfigure(0, minsize=px(120))
+        config_frame.columnconfigure(1, minsize=px(250))
+        config_frame.columnconfigure(2, weight=1)
+        config_frame.columnconfigure(3, minsize=px(80))
+
+        def location_row(row, label_key, widget, tooltip_key, bold=False):
+            ttk.Label(config_frame, text=t(label_key), font=self._scaled_font(9, "bold" if bold else "normal")).grid(row=row, column=0, sticky="w", pady=3)
+            widget.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
+            ToolTip(widget, t(tooltip_key))
+            info_frame = tk.Frame(config_frame, bg=_dc_bg)
+            info_frame.grid(row=row, column=2, sticky="w", padx=(5, 0), pady=3)
+            distance_label = tk.Label(info_frame, text="", font=self._scaled_font(9), fg="#ffcc00", bg=_dc_bg, anchor="w")
+            distance_label.pack(side="left")
+            sol_label = tk.Label(info_frame, text="", font=self._scaled_font(9), fg=_dc_colors["fg_muted"], bg=_dc_bg, anchor="w")
+            sol_label.pack(side="left", padx=(10, 0))
+            visits_label = tk.Label(config_frame, text="", font=self._scaled_font(9), fg="#ffcc00", bg=_dc_bg, anchor="e")
+            visits_label.grid(row=row, column=3, sticky="e", padx=(5, 0), pady=3)
+            return distance_label, sol_label, visits_label
+
         self.distance_current_system = tk.StringVar(value="---")
-        # Clear selection when current system updates (prevents auto-selection of readonly entry)
-        try:
-            self.distance_current_system.trace_add('write', lambda *args: (self.distance_current_display.selection_clear() if hasattr(self, 'distance_current_display') else None, self.import_btn.focus_set() if hasattr(self, 'import_btn') else None))
-        except Exception:
-            try:
-                self.distance_current_system.trace('w', lambda *args: (self.distance_current_display.selection_clear() if hasattr(self, 'distance_current_display') else None, self.import_btn.focus_set() if hasattr(self, 'import_btn') else None))
-            except Exception:
-                pass
-        current_display = tk.Entry(config_frame, textvariable=self.distance_current_system, 
-                                   bg="#2d2d2d", fg="#00ff00", font=self._scaled_font(9, "bold"),
-                       state="readonly", readonlybackground="#2d2d2d", takefocus=False)
-        current_display.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
-        ToolTip(current_display, t('tooltips.current_system'))
-        # Make the display available for selection-clear later
-        self.distance_current_display = current_display
-        # Avoid the Current System entry being selected when displayed
-        try:
-            current_display.bind('<Map>', lambda e: current_display.selection_clear())
-            current_display.bind('<Visibility>', lambda e: current_display.selection_clear())
-            current_display.bind('<FocusIn>', lambda e: current_display.selection_clear())
-        except Exception:
-            pass
-        # Remove highlight from Current System entry
-        config_frame.after(100, lambda: current_display.selection_clear())
-        
-        # Current system Sol distance label
-        self.current_sol_label = tk.Label(config_frame, text="", 
-                                         font=self._scaled_font(9), fg="#ffcc00", bg="#1e1e1e", anchor="w")
-        self.current_sol_label.grid(row=row, column=3, sticky="w", padx=(5, 0), pady=3)
-        
-        # Visits count label (separate column, aligned vertically)
-        self.distance_visits_label = tk.Label(config_frame, text="", 
-                                              font=self._scaled_font(9), fg="#ffcc00", bg="#1e1e1e", anchor="e")
-        self.distance_visits_label.grid(row=row, column=4, sticky="e", padx=(5, 0), pady=3)
-        
-        # Home System
-        row += 1
-        ttk.Label(config_frame, text=t('distance_calculator.home_system'), font=self._scaled_font(9)).grid(row=row, column=0, sticky="w", pady=3)
+        current_display = tk.Label(config_frame, textvariable=self.distance_current_system, fg="#00ff00", bg=_dc_bg,
+                                   font=self._scaled_font(9, "bold"), anchor="w", padx=px(3))
+        self.current_sol_label, _, self.distance_visits_label = location_row(
+            0, 'distance_calculator.current_system', current_display, 'tooltips.current_system', bold=True)
+
         self.distance_home_system = tk.StringVar(value=load_home_system())
-        home_entry = tk.Entry(config_frame, textvariable=self.distance_home_system, 
-                             bg="#2d2d2d", fg="#ffffff", font=self._scaled_font(9),
-                             insertbackground="#ffffff")
-        home_entry.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
-        ToolTip(home_entry, t('tooltips.home_system'))
-        # Autocomplete
-        from system_autocomplete import SystemAutocomplete
+        home_entry = tk.Entry(config_frame, textvariable=self.distance_home_system,
+                              bg="#2d2d2d", fg="#ffffff", font=self._scaled_font(9), insertbackground="#ffffff")
+        self.distance_to_home_label, self.home_sol_label, self.home_visits_label = location_row(
+            1, 'distance_calculator.home_system', home_entry, 'tooltips.home_system')
         self._ac_home = SystemAutocomplete(home_entry, self.distance_home_system, self)
         home_entry.bind("<Return>", lambda e: (self._ac_home.hide(), self._distance_set_home(e)))
         home_entry.bind('<FocusOut>', lambda e: (e.widget.selection_clear(), self._distance_set_home(e)))
-        
-        # Distance to Home (from current) and to Sol
-        home_info_frame = tk.Frame(config_frame, bg="#1e1e1e")
-        home_info_frame.grid(row=row, column=3, sticky="w", padx=(5, 0), pady=3)
-        
-        self.distance_to_home_label = tk.Label(home_info_frame, text="", 
-                                               font=self._scaled_font(9), fg="#ffcc00", bg="#1e1e1e", anchor="w")
-        self.distance_to_home_label.pack(side="left")
-        
-        self.home_sol_label = tk.Label(home_info_frame, text="", 
-                                       font=self._scaled_font(9), fg="#888888", bg="#1e1e1e", anchor="w")
-        self.home_sol_label.pack(side="left", padx=(10, 0))
-        
-        # Home visits label (column 4, aligned with current system visits)
-        self.home_visits_label = tk.Label(config_frame, text="", 
-                                          font=self._scaled_font(9), fg="#ffcc00", bg="#1e1e1e", anchor="e")
-        self.home_visits_label.grid(row=row, column=4, sticky="e", padx=(5, 0), pady=3)
-        
-        # Fleet Carrier System (auto-detected, read-only)
-        row += 1
-        ttk.Label(config_frame, text=t('distance_calculator.fleet_carrier'), font=self._scaled_font(9)).grid(row=row, column=0, sticky="w", pady=3)
-        self.distance_fc_system = tk.StringVar(value="")  # Will be auto-detected
-        fc_entry = tk.Entry(config_frame, textvariable=self.distance_fc_system, 
-                           bg="#2d2d2d", fg="#ffaa00", font=self._scaled_font(9),
-                           state="readonly", readonlybackground="#2d2d2d")
-        fc_entry.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
-        ToolTip(fc_entry, t('tooltips.fleet_carrier'))
-        
-        # Distance to FC (from current) and to Sol
-        fc_info_frame = tk.Frame(config_frame, bg="#1e1e1e")
-        fc_info_frame.grid(row=row, column=3, sticky="w", padx=(5, 0), pady=3)
-        
-        self.distance_to_fc_label = tk.Label(fc_info_frame, text="", 
-                                             font=self._scaled_font(9), fg="#ffcc00", bg="#1e1e1e", anchor="w")
-        self.distance_to_fc_label.pack(side="left")
-        
-        self.fc_sol_label = tk.Label(fc_info_frame, text="", 
-                                     font=self._scaled_font(9), fg="#888888", bg="#1e1e1e", anchor="w")
-        self.fc_sol_label.pack(side="left", padx=(10, 0))
-        
-        # FC visits label (column 4, aligned with other visits)
-        self.fc_visits_label = tk.Label(config_frame, text="", 
-                                        font=self._scaled_font(9), fg="#ffcc00", bg="#1e1e1e", anchor="e")
-        self.fc_visits_label.grid(row=row, column=4, sticky="e", padx=(5, 0), pady=3)
-        
-        # Refresh locations button (current system + FC)
-        row += 1
-        auto_fc_btn = create_action_button(config_frame, text=t('distance_calculator.refresh_locations'),
+
+        self.distance_fc_system = tk.StringVar(value="")
+        fc_display = tk.Label(config_frame, textvariable=self.distance_fc_system, fg="#ffffff", bg=_dc_bg,
+                              font=self._scaled_font(9), anchor="w", padx=px(3))
+        self.distance_to_fc_label, self.fc_sol_label, self.fc_visits_label = location_row(
+            2, 'distance_calculator.fleet_carrier', fc_display, 'tooltips.fleet_carrier')
+
+        self.distance_refresh_btn = create_action_button(config_frame, text=t('distance_calculator.refresh_locations'),
                                command=self._distance_refresh_locations,
                                bg="#2a3a4a", fg="#e0e0e0", activebackground="#3a4a5a",
                                activeforeground="#ffffff", relief="ridge", bd=1, cursor="hand2")
-        self.distance_refresh_btn = auto_fc_btn
-        auto_fc_btn.grid(row=row, column=0, columnspan=4, pady=(8, 0))
-        ToolTip(auto_fc_btn, t('tooltips.refresh_locations'))
-        
-        # Calculator section
+        self.distance_refresh_btn.grid(row=3, column=0, columnspan=4, pady=(8, 0))
+        ToolTip(self.distance_refresh_btn, t('tooltips.refresh_locations'))
+
         calc_frame = ttk.LabelFrame(main_container, text=t('distance_calculator.system_calculator'), padding=10)
         calc_frame.pack(fill="x", pady=(0, 10))
-        
-        # Configure column weights: label, input (fixed), buttons
-        calc_frame.columnconfigure(0, weight=0, minsize=80)   # Label column (fixed)
-        calc_frame.columnconfigure(1, weight=0, minsize=250)  # Input column (fixed width)
-        calc_frame.columnconfigure(2, weight=1)  # Button column (expands instead)
-        
-        # Load saved systems
-        saved_system_a, saved_system_b = load_distance_calculator_systems()
-        
-        # System A input
-        row = 0
-        ttk.Label(calc_frame, text=t('distance_calculator.system_a'), font=self._scaled_font(9)).grid(row=row, column=0, sticky="w", pady=3)
-        self.distance_system_a = tk.StringVar(value=saved_system_a)
-        self.distance_system_a.trace_add('write', self._invalidate_distance_calculation)
-        system_a_entry = tk.Entry(calc_frame, textvariable=self.distance_system_a, 
-                                  bg="#2d2d2d", fg="#ffffff", font=self._scaled_font(9),
-                                  insertbackground="#ffffff")
-        system_a_entry.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
-        system_a_entry.bind("<FocusOut>", lambda e: (self._save_distance_systems(), e.widget.selection_clear()))
-        # Autocomplete
-        self._ac_system_a = SystemAutocomplete(system_a_entry, self.distance_system_a, self)
-        system_a_entry.bind("<Return>", lambda e: (self._ac_system_a.hide(), self._calculate_distances()))
-        
-        use_current_btn = create_action_button(calc_frame, text=t('distance_calculator.use_current'), command=self._distance_use_current_system,
-                                   bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
-                                   activeforeground="#ffffff", relief="ridge", bd=1, 
-                                   cursor="hand2")
-        use_current_btn.grid(row=row, column=2, pady=3, padx=(5, 0), sticky="w")
-        ToolTip(use_current_btn, t('tooltips.use_current'))
-        
-        # System B input
-        row += 1
-        ttk.Label(calc_frame, text=t('distance_calculator.system_b'), font=self._scaled_font(9)).grid(row=row, column=0, sticky="w", pady=3)
-        self.distance_system_b = tk.StringVar(value=saved_system_b)
-        self.distance_system_b.trace_add('write', self._invalidate_distance_calculation)
-        system_b_entry = tk.Entry(calc_frame, textvariable=self.distance_system_b, 
-                                  bg="#2d2d2d", fg="#ffffff", font=self._scaled_font(9),
-                                  insertbackground="#ffffff")
-        system_b_entry.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
-        system_b_entry.bind("<FocusOut>", lambda e: (self._save_distance_systems(), e.widget.selection_clear()))
-        # Autocomplete
-        self._ac_system_b = SystemAutocomplete(system_b_entry, self.distance_system_b, self)
-        system_b_entry.bind("<Return>", lambda e: (self._ac_system_b.hide(), self._calculate_distances()))
-        
-        # Quick buttons for System B
-        buttons_frame = tk.Frame(calc_frame, bg="#1e1e1e")
-        buttons_frame.grid(row=row, column=2, pady=3, padx=(5, 0), sticky="w")
-        
-        use_home_btn = create_action_button(buttons_frame, text=t('distance_calculator.home'), command=self._distance_use_home,
-                                bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
-                                activeforeground="#ffffff", relief="ridge", bd=1, 
-                                cursor="hand2")
-        use_home_btn.pack(side="left", padx=(0, 2))
-        ToolTip(use_home_btn, t('tooltips.use_home'))
-        
-        use_fc_btn = create_action_button(buttons_frame, text=t('distance_calculator.fc'), command=self._distance_use_fc,
-                              bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
-                              activeforeground="#ffffff", relief="ridge", bd=1, 
-                              cursor="hand2")
-        use_fc_btn.pack(side="left")
-        ToolTip(use_fc_btn, t('tooltips.use_fc'))
-        
-        # Calculate button (or auto-calculate on change)
-        row += 1
-        calc_btn = tk.Button(calc_frame, text=t('distance_calculator.calculate_distance'), command=self._calculate_distances,
-                   bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
-                   activeforeground="#ffffff", relief="ridge", bd=1, padx=12, pady=4,
-                   font=self._scaled_font(9, "bold"), cursor="hand2")
-        compact_classic_button(calc_btn)
-        calc_btn.grid(row=row, column=0, columnspan=3, pady=(8, 3))
-        ToolTip(calc_btn, t('tooltips.calculate_distance'))
+        calc_frame.columnconfigure(0, minsize=px(80))
+        calc_frame.columnconfigure(1, minsize=px(250))
+        calc_frame.columnconfigure(2, weight=1)
 
-        # Set focus to the Calculate Distance button after UI is built
+        def system_row(row, side, value, buttons):
+            ttk.Label(calc_frame, text=t('distance_calculator.system_' + side), font=self._scaled_font(9)).grid(row=row, column=0, sticky="w", pady=3)
+            var = tk.StringVar(value=value)
+            var.trace_add('write', self._invalidate_distance_calculation)
+            entry = tk.Entry(calc_frame, textvariable=var, bg="#2d2d2d", fg="#ffffff",
+                             font=self._scaled_font(9), insertbackground="#ffffff")
+            entry.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
+            entry.bind("<FocusOut>", lambda e: (self._save_distance_systems(), e.widget.selection_clear()))
+            autocomplete = SystemAutocomplete(entry, var, self)
+            entry.bind("<Return>", lambda e: (autocomplete.hide(), self._calculate_distances()))
+            buttons_frame = tk.Frame(calc_frame, bg=_dc_bg)
+            buttons_frame.grid(row=row, column=2, pady=3, padx=(5, 0), sticky="w")
+            for text_key, tooltip_key, command in buttons:
+                btn = create_action_button(buttons_frame, text=t('distance_calculator.' + text_key), command=command,
+                                           bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
+                                           activeforeground="#ffffff", relief="ridge", bd=1, cursor="hand2")
+                btn.pack(side="left", padx=(0, 2))
+                ToolTip(btn, t('tooltips.' + tooltip_key))
+            return var, autocomplete
+
+        saved_system_a, saved_system_b = load_distance_calculator_systems()
+        self.distance_system_a, self._ac_system_a = system_row(0, 'a', saved_system_a, (
+            ('use_current', 'use_current', self._distance_use_current_system),))
+        self.distance_system_b, self._ac_system_b = system_row(1, 'b', saved_system_b, (
+            ('home', 'use_home', self._distance_use_home),
+            ('fc', 'use_fc', self._distance_use_fc)))
+
+        calc_btn = create_action_button(calc_frame, primary=True, text=t('distance_calculator.calculate_distance'),
+                                        command=self._calculate_distances)
+        calc_btn.grid(row=2, column=0, columnspan=3, pady=(8, 3))
+        ToolTip(calc_btn, t('tooltips.calculate_distance'))
         calc_frame.after(100, calc_btn.focus_set)
-        
-        # Status/Loading indicator
-        row += 1
-        self.distance_status_label = tk.Label(calc_frame, text="", 
-                                              font=self._scaled_font(8, "italic"), fg="#888888", bg=_dc_bg)
-        self.distance_status_label.grid(row=row, column=0, columnspan=2, pady=(0, 5))
-        
-        # Results section
+
+        self.distance_status_label = tk.Label(calc_frame, text="",
+                                              font=self._scaled_font(8, "italic"), fg=_dc_colors["fg_muted"], bg=_dc_bg)
+        self.distance_status_label.grid(row=3, column=0, columnspan=3, pady=(0, 5))
+
         results_frame = ttk.LabelFrame(main_container, text=t('distance_calculator.results'), padding=10)
-        results_frame.pack(fill="both", expand=True, pady=(0, 10))
-        
-        # Distance A ↔ B
-        row = 0
+        results_frame.pack(fill="x", pady=(0, 10))
+
         dist_row = tk.Frame(results_frame, bg=_dc_bg)
-        dist_row.grid(row=row, column=0, columnspan=2, sticky="ew", pady=(0, 10))
-        # Descriptive text (system names, gold)
-        self.distance_ab_label = tk.Label(dist_row, text=f"➤ {t('distance_calculator.distance')} A ↔ B:",
+        dist_row.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
+        self.distance_ab_label = tk.Label(dist_row, text='➤ ' + t('distance_calculator.distance'),
                                          font=self._scaled_font(11, "bold"), fg="#ffcc00", bg=_dc_bg, anchor="w")
         self.distance_ab_label.pack(side="left")
-        # Distance value (bright green) - sits right after the text
         self.distance_ab_value_label = tk.Label(dist_row, text="---",
                                          font=self._scaled_font(11, "bold"), fg="#66ff99", bg=_dc_bg, anchor="w")
         self.distance_ab_value_label.pack(side="left", padx=(15, 0))
-        
-        # Separator
-        row += 1
-        separator = tk.Frame(results_frame, height=1, bg="#444444")
-        separator.grid(row=row, column=0, columnspan=2, sticky="ew", pady=(0, 10))
-        
-        # System A Info with system name on same line (left column)
-        row += 1
-        self.distance_system_a_name = tk.Label(results_frame, text=t('distance_calculator.system_a_info') + " ---", 
-                                               font=self._scaled_font(9, "bold"), fg="#ffaa00", bg=_dc_bg, anchor="w")
-        self.distance_system_a_name.grid(row=row, column=0, sticky="w", padx=(0, 20), pady=(5, 0))
-        
-        # System B Info with system name on same line (right column)
-        self.distance_system_b_name = tk.Label(results_frame, text=t('distance_calculator.system_b_info') + " ---", 
-                                               font=self._scaled_font(9, "bold"), fg="#ffaa00", bg=_dc_bg, anchor="w")
-        self.distance_system_b_name.grid(row=row, column=1, sticky="w", pady=(5, 0))
-        
-        # Distance to Sol - side by side
-        row += 1
-        self.distance_a_sol_label = tk.Label(results_frame, text=t('distance_calculator.distance_to_sol') + " ---", 
-                                             font=self._scaled_font(9), fg="#ffffff", bg=_dc_bg, anchor="w")
-        self.distance_a_sol_label.grid(row=row, column=0, sticky="w", padx=(10, 20))
-        
-        self.distance_b_sol_label = tk.Label(results_frame, text=t('distance_calculator.distance_to_sol') + " ---", 
-                                             font=self._scaled_font(9), fg="#ffffff", bg=_dc_bg, anchor="w")
-        self.distance_b_sol_label.grid(row=row, column=1, sticky="w", padx=(10, 0))
-        
-        # Visits count - side by side
-        row += 1
-        self.distance_a_visits_label = tk.Label(results_frame, text=t('distance_calculator.visits') + " ---", 
-                                                font=self._scaled_font(9), fg="#ffffff", bg=_dc_bg, anchor="w")
-        self.distance_a_visits_label.grid(row=row, column=0, sticky="w", padx=(10, 20))
-        
-        self.distance_b_visits_label = tk.Label(results_frame, text=t('distance_calculator.visits') + " ---", 
-                                                font=self._scaled_font(9), fg="#ffffff", bg=_dc_bg, anchor="w")
-        self.distance_b_visits_label.grid(row=row, column=1, sticky="w", padx=(10, 0))
-        
-        # Coordinates - side by side
-        row += 1
-        self.distance_a_coords_label = tk.Label(results_frame, text=t('distance_calculator.coordinates') + " ---", 
-                                                font=self._scaled_font(9), fg="#ffffff", bg=_dc_bg, anchor="w")
-        self.distance_a_coords_label.grid(row=row, column=0, sticky="w", padx=(10, 20))
-        
-        self.distance_b_coords_label = tk.Label(results_frame, text=t('distance_calculator.coordinates') + " ---", 
-                                                font=self._scaled_font(9), fg="#ffffff", bg=_dc_bg, anchor="w")
-        self.distance_b_coords_label.grid(row=row, column=1, sticky="w", padx=(10, 0))
-        
+
+        tk.Frame(results_frame, height=1, bg="#444444").grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 10))
+
+        for column, side in enumerate(('a', 'b')):
+            name_label = tk.Label(results_frame, text=t('distance_calculator.system_' + side + '_info') + " ---",
+                                  font=self._scaled_font(9, "bold"), fg="#ffaa00", bg=_dc_bg, anchor="w")
+            name_label.grid(row=2, column=column, sticky="w", padx=(0, 20) if side == 'a' else 0, pady=(5, 0))
+            setattr(self, 'distance_system_' + side + '_name', name_label)
+            for row, (field, key) in enumerate(self._DISTANCE_RESULT_FIELDS, start=3):
+                label = tk.Label(results_frame, text=t('distance_calculator.' + key) + " ---",
+                                 font=self._scaled_font(9), fg="#ffffff", bg=_dc_bg, anchor="w")
+                label.grid(row=row, column=column, sticky="w", padx=(10, 20) if side == 'a' else (10, 0))
+                setattr(self, 'distance_' + side + '_' + field + '_label', label)
+
         results_frame.columnconfigure(0, weight=1)
         results_frame.columnconfigure(1, weight=1)
-        
-        # Auto-calculate on startup (delayed to allow init)
-        self.after(1000, self._distance_auto_calculate_on_startup)
-    
-    def _distance_auto_calculate_on_startup(self):
+
+        self.after(1000, self._distance_load_carrier_on_startup)
+
+    _DISTANCE_RESULT_FIELDS = (('sol', 'distance_to_sol'), ('visits', 'visits_label'), ('coords', 'coordinates'))
+
+    def _distance_load_carrier_on_startup(self):
         carrier = self.fc_tracker.carrier_data or {}
         if carrier.get('system'):
             self.distance_fc_system.set(carrier['system'])
         self._update_home_fc_distances()
 
+    def _distance_fill(self, autocomplete, var, value):
+        autocomplete.suppress()
+        var.set(value)
+        autocomplete.unsuppress()
+        autocomplete.hide()
+
     def _distance_use_current_system(self):
-        """Fill System A with current system"""
-        try:
-            # Get current system from centralized source
-            current_system = self.get_current_system()
-            
-            if current_system:
-                self._ac_system_a.suppress()
-                self.distance_system_a.set(current_system)
-                self._ac_system_a.unsuppress()
-                self._ac_system_a.hide()
-                self.distance_status_label.config(text=t('distance_calculator.using_current').format(system=current_system), fg="#4da6ff")
-                # Update Home/FC distances
-                self._update_home_fc_distances()
-            else:
-                from app_utils import centered_message
-                centered_message(self, t('distance_calculator.current_system'), t('distance_calculator.no_current'))
-                self.distance_status_label.config(text=t('distance_calculator.no_current'), fg="#ffaa00")
-        except Exception as e:
-            logging.getLogger('EliteMining').exception('Could not get current system')
-            self._show_distance_error(str(e))
-    
+        current_system = self.get_current_system()
+        if current_system:
+            self._distance_fill(self._ac_system_a, self.distance_system_a, current_system)
+            self._show_notice(self.distance_status_label, t('distance_calculator.using_current').format(system=current_system), fg="#4da6ff")
+        else:
+            self._show_notice(self.distance_status_label, t('distance_calculator.no_current'), fg="#ffaa00")
+
     def _distance_use_home(self):
-        """Fill System B with home system"""
         home = self.distance_home_system.get().strip()
         if home:
-            self._ac_system_b.suppress()
-            self.distance_system_b.set(home)
-            self._ac_system_b.unsuppress()
-            self._ac_system_b.hide()
+            self._distance_fill(self._ac_system_b, self.distance_system_b, home)
         else:
-            from app_utils import centered_message
-            centered_message(self, t('distance_calculator.home_system'), t('distance_calculator.no_home'))
-    
+            self._show_notice(self.distance_status_label, t('distance_calculator.no_home'), fg="#ffaa00")
+
     def _distance_use_fc(self):
-        """Fill System B with fleet carrier system"""
         fc = self.distance_fc_system.get().strip()
         if fc:
-            self._ac_system_b.suppress()
-            self.distance_system_b.set(fc)
-            self._ac_system_b.unsuppress()
-            self._ac_system_b.hide()
+            self._distance_fill(self._ac_system_b, self.distance_system_b, fc)
         else:
-            from app_utils import centered_message
-            centered_message(self, t('distance_calculator.fleet_carrier'), t('distance_calculator.no_carrier'))
-    
+            self._show_notice(self.distance_status_label, t('distance_calculator.no_carrier'), fg="#ffaa00")
+
     def _distance_set_home(self, event=None):
         from config import load_home_system, save_home_system
         home = self.distance_home_system.get().strip()
@@ -12568,13 +12403,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
             save_distance_calculator_systems(system_a, system_b)
         except Exception as e:
             logging.getLogger('EliteMining').exception('Could not save distance calculator systems')
-    
+
     def _invalidate_distance_calculation(self, *args):
         self._distance_calculation_generation += 1
 
     def _distance_coordinate_lookup(self, system_name, current_system, current_coords):
+        from edsm_distance import SOL_COORDS
         if system_name.casefold() == 'sol':
-            return dict(x=0.0, y=0.0, z=0.0)
+            return dict(SOL_COORDS)
         if current_system and system_name.casefold() == current_system.casefold() and current_coords is not None:
             return dict(zip(('x', 'y', 'z'), current_coords))
         user_db = getattr(getattr(self, 'cargo_monitor', None), 'user_db', None)
@@ -12592,6 +12428,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         return self.distance_calculator.get_system_coordinates(system_name)
 
     def _resolve_distance_systems(self, names, current_system, current_coords, is_cancelled):
+        from edsm_distance import SOL_COORDS
         results = {}
         user_db = getattr(getattr(self, 'cargo_monitor', None), 'user_db', None)
         for name in names:
@@ -12604,7 +12441,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             try:
                 info['coords'] = self._distance_coordinate_lookup(name, current_system, current_coords)
                 if info['coords'] is not None:
-                    info['sol_distance'] = self.distance_calculator.calculate_distance(info['coords'], dict(x=0, y=0, z=0))
+                    info['sol_distance'] = self.distance_calculator.calculate_distance(info['coords'], SOL_COORDS)
             except Exception as exc:
                 logging.getLogger('EliteMining').warning('Distance lookup failed for %s: %s', name, exc)
                 info['error'] = str(exc)
@@ -12624,14 +12461,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._save_distance_systems()
         for side, name in zip(('a', 'b'), names):
             getattr(self, 'distance_system_' + side + '_name').config(text=t('distance_calculator.system_' + side + '_info') + ' ' + (name or '---'))
-            for field, key in (('sol', 'distance_to_sol'), ('coords', 'coordinates'), ('visits', 'visits')):
+            for field, key in self._DISTANCE_RESULT_FIELDS:
                 getattr(self, 'distance_' + side + '_' + field + '_label').config(text=t('distance_calculator.' + key) + ' ---', fg='#ffffff')
-        self.distance_ab_label.config(text='➤ ' + t('distance_calculator.pair_label').format(a=names[0] or 'A', b=names[1] or 'B'), fg='#ffcc00')
         self.distance_ab_value_label.config(text='---', fg='#66ff99')
         if not any(names):
-            self.distance_status_label.config(text=t('distance_calculator.enter_system'), fg='#ffaa00')
+            self._show_notice(self.distance_status_label, t('distance_calculator.enter_system'), fg='#ffaa00')
             return
-        self.distance_status_label.config(text=t('distance_calculator.calculating'), fg='#4da6ff')
+        self._show_notice(self.distance_status_label, t('distance_calculator.calculating'), clear_after=0, fg='#4da6ff')
         current_system = getattr(self, 'current_system', None)
         current_coords = getattr(self, 'current_system_coords', None)
 
@@ -12668,7 +12504,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             getattr(self, 'distance_' + side + '_sol_label').config(text=t('distance_calculator.distance_to_sol') + f' {sol_distance:.2f} LY')
             getattr(self, 'distance_' + side + '_coords_label').config(text=t('distance_calculator.coordinates') + f" X: {coords['x']:.2f}, Y: {coords['y']:.2f}, Z: {coords['z']:.2f}")
             if info['visits'] is not None:
-                getattr(self, 'distance_' + side + '_visits_label').config(text=t('distance_calculator.visits') + f" {info['visits']}")
+                getattr(self, 'distance_' + side + '_visits_label').config(text=t('distance_calculator.visits_label') + f" {info['visits']}")
         if all(names) and found == 2:
             distance = self.distance_calculator.calculate_distance(*(results[name.casefold()]['coords'] for name in names))
             self.distance_ab_value_label.config(text=f'{distance:.2f} LY')
@@ -12678,25 +12514,17 @@ class App(tk.Tk, ColumnVisibilityMixin):
             key, color = 'distance_calculator.calculation_complete', '#00ff00'
         else:
             key, color = 'distance_calculator.coordinates_missing', '#ffaa00'
-        self.distance_status_label.config(text=t(key), fg=color)
+        self._show_notice(self.distance_status_label, t(key), fg=color)
 
     def _show_distance_error(self, error_msg: str):
         logging.getLogger('EliteMining').error('Distance calculation failed: %s', error_msg)
-        self.distance_status_label.config(text=t('distance_calculator.calculation_failed').format(error=error_msg), fg='#ff6666')
+        self._show_notice(self.distance_status_label, t('distance_calculator.calculation_failed').format(error=error_msg), fg='#ff6666')
 
-    def _refresh_visit_count(self, system_name):
-        """Refresh the visit count display for a system"""
-        if hasattr(self, 'distance_visits_label') and system_name:
-            visits_count = 0
-            if hasattr(self, 'cargo_monitor') and hasattr(self.cargo_monitor, 'user_db') and self.cargo_monitor.user_db:
-                try:
-                    visit_data = self.cargo_monitor.user_db.is_system_visited(system_name)
-                    if visit_data:
-                        visits_count = visit_data.get('visit_count', 0)
-                except:
-                    pass
-            self.distance_visits_label.config(text=f"{t('distance_calculator.visits_label')} {visits_count}")
-    
+    def _refresh_visit_count(self, system_name=None):
+        """Refresh the Configuration visit counts after a visit is recorded"""
+        if hasattr(self, 'distance_visits_label'):
+            self._update_home_fc_distances()
+
     def _update_home_fc_distances(self):
         self.after(0, self._schedule_distance_update)
 
@@ -12738,16 +12566,18 @@ class App(tk.Tk, ColumnVisibilityMixin):
         current_info = results.get(names[0].casefold(), {})
         current_coords = current_info.get('coords')
         sol = current_info.get('sol_distance')
-        self.current_sol_label.config(text=f"➤ {sol:.2f} {t('distance_calculator.from_sol')}" if sol is not None else '')
+        self.current_sol_label.config(text=f"{sol:.2f} {t('distance_calculator.from_sol')}" if sol is not None else '')
+        current_visits = current_info.get('visits')
+        self.distance_visits_label.config(text=t('distance_calculator.visits_label') + f' {current_visits}' if current_visits is not None else '')
         values = {'sol': sol}
         for kind, name in zip(('home', 'fc'), names[1:]):
             info = results.get(name.casefold(), {})
             coords = info.get('coords')
             distance = self.distance_calculator.calculate_distance(current_coords, coords)
             values[kind] = distance
-            getattr(self, 'distance_to_' + kind + '_label').config(text=f"➤ {distance:.2f} {t('distance_calculator.from_current')}" if distance is not None else '')
+            getattr(self, 'distance_to_' + kind + '_label').config(text=f"{distance:.2f} {t('distance_calculator.from_current')}" if distance is not None else '')
             sol_distance = info.get('sol_distance')
-            text = f"({t('distance_calculator.sol_distance')} {sol_distance:.2f} LY)" if sol_distance is not None else ''
+            text = f"({t('distance_calculator.sol_distance')} {sol_distance:.2f} LY)" if sol_distance is not None and name.casefold() != 'sol' else ''
             if info.get('error'):
                 text = t('distance_calculator.lookup_failed').format(system=name, error=info['error'])
             getattr(self, kind + '_sol_label').config(text=text)
@@ -14391,7 +14221,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         try:
             self.after(150, lambda: (self.ring_finder.system_entry.selection_clear() if hasattr(self, 'ring_finder') and hasattr(self.ring_finder, 'system_entry') else None))
             self.after(150, lambda: (self.sysfinder_ref_entry.selection_clear() if hasattr(self, 'sysfinder_ref_entry') else None))
-            self.after(150, lambda: (self.distance_current_display.selection_clear() if hasattr(self, 'distance_current_display') else None))
         except Exception:
             pass
         self.after(50, lambda: self.state("zoomed") if zoomed else None)
@@ -22112,8 +21941,7 @@ Your keybinds will need to be reconfigured manually."""
         # 2. Update distance calculator display
         if hasattr(self, 'distance_current_system'):
             self.distance_current_system.set(system_name)
-            # Trigger distance updates to home/FC
-            self.after(0, self._update_home_fc_distances)
+            self._update_home_fc_distances()
         
         # 3. Update Mining Analytics (prospector panel) session system
         if hasattr(self, 'prospector_panel') and hasattr(self.prospector_panel, 'session_system'):
@@ -22137,8 +21965,6 @@ Your keybinds will need to be reconfigured manually."""
         try:
             self.after(50, lambda: (self.ring_finder.system_entry.selection_clear() if hasattr(self, 'ring_finder') and hasattr(self.ring_finder, 'system_entry') else None))
             self.after(50, lambda: (self.sysfinder_ref_entry.selection_clear() if hasattr(self, 'sysfinder_ref_entry') else None))
-            self.after(50, lambda: (self.distance_current_display.selection_clear() if hasattr(self, 'distance_current_display') else None))
-            self.after(50, lambda: (self.import_btn.focus_set() if hasattr(self, 'import_btn') else None))
         except Exception:
             pass
         

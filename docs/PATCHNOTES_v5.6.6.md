@@ -10,11 +10,13 @@
 - Minimal % boxes are easier to read, and values you changed since the last preset save show in color.
 - Right-click on an announcement preset now opens a Load / Save / Rename menu, so you can't overwrite a preset by accident.
 - Tooltips now match the Modern themes.
+- Cleaner Distance Calculator layout with less repeated information.
 
 ## Bug Fixes
 
 - Fixed Announcements table columns snapping back when resized, and Minimal % boxes not following their column.
 - Fixed the mouse wheel changing Minimal % values by accident while scrolling the list. It now only changes a value after you click into the box.
+- Fixed Distance Calculator messages staying on screen and popups appearing when Home or Fleet Carrier was not set.
 
 
 
