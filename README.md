@@ -151,15 +151,24 @@ VoiceAttack must have plugin support enabled and the EliteAPI plugin activated:
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/voiceattack_plugin.png" width="900"><br>
 *Enable the EliteAPI plugin in VoiceAttack*
 
-### Preserving Keybinds During Updates (v4.76+)
-When a new VoiceAttack profile is available, EliteMining guides you through preserving your keybinds:
-1. Start EliteMining after updating
-2. Follow the on-screen prompt to export your current profile as XML
-3. Select the exported file
-4. Your keybinds will be automatically merged into the new profile
-5. Import the updated profile in VoiceAttack
+### Keeping Your Shortcuts During Profile Updates (v5.6.6+)
+When a new VoiceAttack profile is available, EliteMining copies your key, joystick and mouse shortcuts into it automatically. No profile export is needed.
+1. Start EliteMining after updating and click **Yes** on the profile update prompt
+2. If asked, close VoiceAttack and click **Yes**
+3. Check that the profile found is yours and click **Yes** to copy its shortcuts
+4. Open VoiceAttack, click **Import Profile** and select the file shown in the confirmation
+5. Select the new profile and delete the old EliteMining profile if you like
 
-**Manual method:** You can also export your profile beforehand (Profile → Export Profile, save as XML format) and use it during the merge process.
+The confirmation lists any shortcut that could not be carried over (for example, if a command was renamed or removed), so you know which ones to set again.
+
+**Run it again any time:** Settings → **Preserve / Re-apply Keybinds** copies your current shortcuts into the newest EliteMining profile file.
+
+**Fallback:** If EliteMining cannot read your shortcuts automatically, or finds more than one profile that could be yours, it asks you to export your current profile instead (Profile → Export Profile, save as *VoiceAttack Profile Expanded as XML*) and merges from that file.
+
+**Tips:**
+- Keep your profile name starting with "EliteMining" so it can be found automatically
+- Keep only one EliteMining profile in VoiceAttack to avoid the export fallback
+- Always check your key and joystick shortcuts after a profile update
 
 ### Adding Custom Commands
 
@@ -448,6 +457,8 @@ Search for nearby star systems with detailed status information. Perfect for fin
   - Right-click to copy system name or open in Inara/EDSM/Spansh
   - Double-click a System cell to open the system on Inara
   - **Use Current System** fills the reference system instantly
+
+**PowerPlay data in searches:** EliteMining has no access to Inara's data feed, so PowerPlay power and state come from EDDN (live reports from commanders visiting systems) and Spansh (which can lag behind the game and covers only Exploited, Fortified, Stronghold and Unoccupied). Expansion and Contested come from EDDN only. Systems you visit yourself update immediately, and double-clicking a row refreshes one system from Inara. Quiet systems may show outdated information or **No data**. See the [FAQ](FAQ.md).
 
 **Note:** The Elite Dangerous journal does not report the Unoccupied Powerplay state. The app infers this state when no controlling Power is present and updates it automatically when newer EDDN data becomes available.
 

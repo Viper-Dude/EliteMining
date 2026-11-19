@@ -151,6 +151,17 @@ PowerPlay data fills in instantly for systems you jump into yourself. For other 
 </details>
 
 <details>
+<summary><b>Where does PowerPlay data in searches come from, and why can it be wrong or missing?</b></summary>
+
+EliteMining has no access to Inara's data feed, so searches in Hotspots Finder, Star Systems and Commodity Market rely on two sources:
+
+- **EDDN** — live reports from commanders as they jump into systems. It is current, but only for systems someone has visited while EliteMining was running.
+- **Spansh** — fills in Exploited, Fortified, Stronghold and Unoccupied systems, but its data can lag behind the game. Expansion and Contested systems only come from EDDN.
+
+Systems you visit yourself update immediately. For a single system, double-click its row (or right-click → Open on Inara) to open Inara and refresh its PowerPlay info. A system can therefore show an out-of-date state or **No data ↗**, especially in quiet areas. The age shown next to the value, for example (3d), tells you how old it is.
+</details>
+
+<details>
 <summary><b>Why is commodity market data missing for some stations?</b></summary>
 
 Market data from EDDN is crowdsourced — it only appears once another commander has docked there and their client has broadcast the prices. Coverage can take hours or days to build up, especially for less-visited stations. Ardent and Spansh results fill the gap in the meantime, so you'll still get prices even before EDDN catches up.
