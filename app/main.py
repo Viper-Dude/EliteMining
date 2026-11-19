@@ -4897,6 +4897,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.thrust_upduration_var = tk.DoubleVar(value=1.5)
         self.thrust_closed_var = tk.DoubleVar(value=1.6)
         self.thrust_open_var = tk.DoubleVar(value=3.8)
+        self._ship_diff_widgets = []  # (widget, colour option, normal value, preset data paths[, only-if callable])
+        self._ship_diff_tint_pending = False
         
         # Announcement toggles (moved from TOGGLES to Text Overlay section)
         self.announcement_vars: Dict[str, tk.IntVar] = {name: tk.IntVar(value=0) for name in ANNOUNCEMENT_TOGGLES}
@@ -6502,6 +6504,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if cfg["fg"] is not None:
                 cb = ttk.Combobox(frame, values=FIREGROUPS, width=6, textvariable=self.tool_fg[tool], state="readonly")
                 cb.grid(row=row, column=1, sticky="w")
+                self._ship_diff_widgets.append((cb, "style", "TCombobox", (("Firegroups", tool, "fg"),)))
                 # Auto-save on change
                 self.tool_fg[tool].trace_add("write", lambda *args, t=tool: self._save_firegroup(t))
                 # Clear selection
@@ -6510,8 +6513,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 ttk.Label(frame, text="—").grid(row=row, column=1, sticky="w")
 
             if cfg["btn"] is not None:
-                tk.Radiobutton(frame, text=t('voiceattack.primary'), value=1, variable=self.tool_btn[tool], bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9), padx=4, pady=2, anchor="w").grid(row=row, column=2, sticky="w")
-                tk.Radiobutton(frame, text=t('voiceattack.secondary'), value=2, variable=self.tool_btn[tool], bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9), padx=4, pady=2, anchor="w").grid(row=row, column=3, sticky="w")
+                for btn_value, btn_text_key, btn_column in ((1, 'voiceattack.primary', 2), (2, 'voiceattack.secondary', 3)):
+                    radio = tk.Radiobutton(frame, text=t(btn_text_key), value=btn_value, variable=self.tool_btn[tool], bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9), padx=4, pady=2, anchor="w")
+                    radio.grid(row=row, column=btn_column, sticky="w")
+                    # Only the selected button is coloured, so it shows what the new choice is
+                    self._ship_diff_widgets.append((radio, "fg", "#ffffff", (("Firegroups", tool, "btn"),),
+                                                    lambda var=self.tool_btn[tool], v=btn_value: var.get() == v))
                 # Auto-save on change
                 self.tool_btn[tool].trace_add("write", lambda *args, t=tool: self._save_fire_button(t))
             else:
@@ -7371,11 +7378,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if self.current_theme in ('modern', 'modern_slate', 'modern_orange'):
                     _ann_field_bg, _ann_field_btn = modern_color("#14171B"), modern_color("#262C34")
                     _ann_field_border, _ann_field_focus = modern_color("#343B44"), modern_color("#FF9A32")
-                    _ann_diff_fg = modern_color("#FF9A32")
                 else:
                     _ann_field_bg, _ann_field_btn, _ann_field_border = "#151515", "#2d2d2d", "#444444"
                     _ann_field_focus = "#ff8c00" if self.current_theme == "elite_orange" else "#7fb2e5"
-                    _ann_diff_fg = "#ffffff" if self.current_theme == "elite_orange" else "#ffcc00"
+                _ann_diff_fg = self._preset_diff_fg()
 
                 # Values changed since the active preset was last saved or loaded get an
                 # accent colour (no active preset = no tint). Deferred so bulk changes
@@ -10394,6 +10400,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.after(150, self._update_prospector_dependencies)
         self.after(150, lambda: self._update_pulsewave_dependency(reset_value=False))
         self.after(150, self._update_fsdjump_dependencies)
+        self._ship_register_diff_widgets(scrollable_frame)
 
     def _update_pulsewave_dependency(self, reset_value=True):
         """Enable/disable Continuous Pulsewave based on Pulse Wave Analyser state"""
@@ -12701,6 +12708,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
     def _ship_update_preset_row_highlight(self):
         """Update the active ship preset's row highlight in the preset tree"""
+        self._ship_queue_diff_tint()
         if not hasattr(self, 'preset_list'):
             return
 
@@ -12726,6 +12734,65 @@ class App(tk.Tk, ColumnVisibilityMixin):
     def _ship_check_modified(self):
         """Check if ship preset was modified and update row highlight"""
         self._ship_update_preset_row_highlight()
+
+    def _preset_diff_fg(self):
+        """Text colour for values changed since the active preset was saved or loaded."""
+        if self.current_theme in ('modern', 'modern_slate', 'modern_orange'):
+            return modern_color("#FF9A32")
+        return "#ffffff" if self.current_theme == "elite_orange" else "#ffcc00"
+
+    def _ship_register_diff_widgets(self, root):
+        """Track the checkboxes and spinboxes under root whose values are saved in ship presets."""
+        paths = {str(v): ("Toggles", k) for k, v in self.toggle_vars.items() if k not in PRESET_EXCLUDED_TOGGLES}
+        paths.update({str(v): ("Timers", k) for k, v in self.timer_vars.items()})
+        for attr, key in (('laser_extra_repeat_var', "LaserExtraRepeatCount"), ('prospector_delay_var', "ProspectorDelay"),
+                          ('thrust_upduration_var', "ThrustUpDuration"), ('thrust_closed_var', "ThrustClosed"),
+                          ('thrust_open_var', "ThrustOpen")):
+            if hasattr(self, attr):
+                paths[str(getattr(self, attr))] = (key,)
+
+        def walk(widget):
+            for child in widget.winfo_children():
+                option = {"Checkbutton": "variable", "Spinbox": "textvariable"}.get(child.winfo_class())
+                path = paths.get(str(child.cget(option))) if option else None
+                if path:
+                    self._ship_diff_widgets.append((child, "fg", child.cget("fg"), (path,)))
+                walk(child)
+        walk(root)
+        self._ship_queue_diff_tint()
+
+    def _ship_queue_diff_tint(self):
+        if not self._ship_diff_tint_pending:
+            self._ship_diff_tint_pending = True
+            self.after_idle(self._ship_apply_diff_tint)
+
+    def _ship_apply_diff_tint(self):
+        """Colour controls whose value differs from the active ship preset (no active preset = no colour)."""
+        self._ship_diff_tint_pending = False
+        saved = self._active_ship_preset_snapshot if self._active_ship_preset_name else None
+        current = self._ship_get_current_snapshot() if saved else None
+        diff_fg = self._preset_diff_fg()
+        missing = object()
+
+        def lookup(data, path):
+            for key in path:
+                if not isinstance(data, dict) or key not in data:
+                    return missing
+                data = data[key]
+            return data
+
+        diff_combo_style = "FgDiff.TCombobox"
+        ttk.Style(self).map(diff_combo_style, foreground=[("disabled", "#666666"), ("!disabled", diff_fg)])
+        for widget, option, base, paths, *only_if in self._ship_diff_widgets:
+            changed = current is not None and any(
+                lookup(saved, path) is not missing and lookup(saved, path) != lookup(current, path) for path in paths)
+            if changed and only_if and not only_if[0]():
+                changed = False
+            value = (diff_combo_style if option == "style" else diff_fg) if changed else base
+            try:
+                widget.configure(**{option: value})
+            except tk.TclError:
+                pass
 
     def _populate_announcement_preset_submenu(self, preset_full_name: str) -> None:
         """Rebuild the Announcement Preset submenu for the right-clicked ship preset"""

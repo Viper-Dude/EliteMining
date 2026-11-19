@@ -11,6 +11,7 @@
 - Right-click on an announcement preset now opens a Load / Save / Rename menu, so you can't overwrite a preset by accident.
 - Tooltips now match the Modern themes.
 - Cleaner Distance Calculator layout with less repeated information.
+- VoiceAttack Controls now show in color which values you changed since loading or saving your ship preset.
 
 ## Bug Fixes
 
