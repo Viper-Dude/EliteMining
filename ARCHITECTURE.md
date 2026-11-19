@@ -14,7 +14,7 @@ Keep shared architecture, UI conventions, and working rules here. Keep assistant
 - **No emojis** unless explicitly asked.
 - **Follow existing patterns.** Match the style, naming conventions, and architecture already in the codebase. Check how similar things are done before inventing a new approach.
 - **Reuse existing functions.** Before writing new logic, search the likely modules for an existing function that does it (or almost does it), including across tabs (e.g. distance/coordinate lookups in `ring_finder.py`). Reuse or minimally extend it instead of duplicating the implementation. Keep the search bounded to the requested behavior; widen it only when evidence points elsewhere. Text-only edits do not require a helper search.
-- **Patch notes** (`docs/PATCHNOTES_v*.md`): one short, precise sentence per change, plain English from the player's view. No technical or dev language (no EDDN, API, cache, database, function names).
+- **Patch notes** (`docs/PATCHNOTES_v*.md`): one short, precise sentence per change, plain English from the player's view. No technical or dev language (no EDDN, API, cache, database, function names). Put new features and improvements under "New Features & Improvements" and fixes for broken behavior under "Bug Fixes" (both are in `docs/PATCHNOTES_TEMPLATE.md`).
 - **Git commits**: No `Co-Authored-By` trailers. Commit messages should be concise and focus on the "why".
 - **When uncertain**, ask one targeted question if the uncertainty materially affects scope, correctness, or risk. Resolve routine implementation choices using existing patterns and session context.
 - **Don't re-explain decisions** already made in the conversation. Move forward.
@@ -161,6 +161,7 @@ Use `centered_info_dialog` / `centered_yesno_dialog` from `ui/dialogs.py` for st
 - **Column headers**: use short wording consistent with matching columns in existing tabs. Set each column's minimum width to its translated header text measured with the scaled heading font, plus scaled padding, so headers cannot be squeezed or clipped. Default and restored widths must respect that minimum.
 
 - **Tables**: columns and headers are left-aligned by default (a Treeview can't pad cells, so right-aligned numbers touch the next column); center a column only where it looks clearly better. Centered today: the two Announcement material tables stay centered, and the Ring Finder Fav (star), Source and Visits columns.
+- **Feedback messages**: There is no global status bar. `EliteMiningApp._set_status()` only logs (`[Status]`). Show useful transient feedback (preset confirmations, scan progress, errors) in a label next to the relevant controls with `_show_notice(label, msg)`, using localized strings. Routine confirmations such as toggles stay log-only; real errors may use a popup. Journal scan progress uses `_set_journal_scan_status()` (footer row).
 - **Overlays**: "Enable Text Overlay" is the master switch for every overlay, including Auto Prices (off = Auto Prices uses the popup).
 
 ### New and Changed Tables

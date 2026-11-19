@@ -153,11 +153,8 @@ class ToolTip:
             tw.wm_attributes("-topmost", True)
             tw.lift()
 
-            label = tk.Label(tw, text=self.text, justify=tk.LEFT,
-                            background="#ffffe0", relief=tk.SOLID, borderwidth=1,
-                            font=scaled_font(8), wraplength=340,
-                            padx=4, pady=2)
-            label.pack()
+            from ui.tooltip import build_tooltip_label
+            build_tooltip_label(tw, self.text, scaled_font(8), 340)
             tw.update()
         except Exception as e:
             self.tooltip_window = None

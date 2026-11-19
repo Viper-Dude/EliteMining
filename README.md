@@ -730,8 +730,9 @@ Open **Settings** and choose **Announcements** for mineral alerts and presets, o
 Open **Settings → Announcements** to choose which minerals trigger alerts and their minimum percentages.
 
 - Enable the announcement types you want, then select minerals and set their thresholds.
-- **Set All** applies the shared percentage to all material thresholds. Core-only minerals do not use percentage thresholds.
-- Save different choices in announcement presets. Link a preset to a ship preset through the sidebar's right-click menu if you want them to load together.
+- Click a checkbox in the **Announce** column to turn a mineral on or off. Drag the column dividers to resize; sizes are remembered.
+- **Set All** applies the shared percentage to all material thresholds. Core-only minerals do not use percentage thresholds. In the Minimal % column, values changed since the active preset was last saved or loaded are shown in color, and the mouse wheel changes a value only after you click into its box.
+- Save different choices in announcement presets. Left-click a preset button to load it, right-click for Load / Save / Rename, and Ctrl+click or middle-click to rename. Link a preset to a ship preset through the sidebar's right-click menu if you want them to load together.
 - Use [Voice Feedback](#voice-feedback) to choose sounds or spoken feedback for mining events.
 
 <img src="Screenshot/mining_announcements.png" width="900"><br>

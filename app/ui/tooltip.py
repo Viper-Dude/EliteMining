@@ -8,6 +8,40 @@ import tkinter as tk
 
 from config import scaled_font
 
+_MODERN_THEMES = ("modern", "modern_slate", "modern_orange")
+
+
+def tooltip_colors():
+    """(background, foreground, border) for tooltips in the active theme.
+
+    Modern themes get a dark panel with a thin border; other themes keep the
+    classic yellow box (border None = solid black frame).
+    """
+    try:
+        from config import load_theme
+        theme = load_theme()
+        if theme in _MODERN_THEMES:
+            from ui.theme import get_theme_colors
+            c = get_theme_colors(theme)
+            return c["panel"], c["fg"], c["border"]
+    except Exception:
+        pass
+    return "#ffffe0", "#000000", None
+
+
+def build_tooltip_label(window, text, font, wraplength, padx=4, pady=2, colors=None):
+    """Create and pack a theme-styled tooltip label inside a tooltip Toplevel."""
+    bg, fg, border = colors or tooltip_colors()
+    if border:
+        window.configure(background=border)
+    label = tk.Label(window, text=text, justify=tk.LEFT,
+                     background=bg, foreground=fg,
+                     relief=tk.FLAT if border else tk.SOLID,
+                     borderwidth=0 if border else 1,
+                     font=font, wraplength=wraplength, padx=padx, pady=pady)
+    label.pack(padx=1 if border else 0, pady=1 if border else 0)
+    return label
+
 
 def add_header_tooltips(tree, text_for_column):
     from column_visibility_helper import displayed_column
@@ -122,16 +156,7 @@ class ToolTip:
             tw.wm_attributes("-topmost", True)
             tw.lift()
             
-            bg, fg, border = self.colors or ("#ffffe0", "#000000", None)
-            if border:
-                tw.configure(background=border)
-            label = tk.Label(tw, text=self.text, justify=tk.LEFT,
-                            background=bg, foreground=fg,
-                            relief=tk.FLAT if border else tk.SOLID,
-                            borderwidth=0 if border else 1,
-                            font=scaled_font(8), wraplength=340,
-                            padx=4, pady=2)
-            label.pack(padx=1 if border else 0, pady=1 if border else 0)
+            build_tooltip_label(tw, self.text, scaled_font(8), 340, colors=self.colors)
             if self.anchor_above:
                 tw.update_idletasks()
                 width, height = tw.winfo_reqwidth(), tw.winfo_reqheight()

@@ -1,5 +1,6 @@
 from ui.striped_treeview import StripedTreeview
 from ui.theme import modern_color
+from ui.tooltip import build_tooltip_label
 # ================================================================
 # Mining Analytics Panel - Final Baseline Version
 # Stable with the following fixes:
@@ -563,12 +564,12 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             try:
                 new_val = int(value_var.get())
                 if new_val < 0:
-                    self.status_cb("Value cannot be negative")
+                    messagebox.showwarning("Invalid value", "Value cannot be negative", parent=dialog)
                     return
                 result[0] = new_val
                 dialog.destroy()
             except ValueError:
-                self.status_cb("Please enter a valid number")
+                messagebox.showwarning("Invalid value", "Please enter a valid number", parent=dialog)
         
         def on_cancel():
             dialog.destroy()
@@ -640,9 +641,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         if result[0] is not None and result[0] != current_value:
             if self._apply_hits_adjustment(material_name, current_value, result[0]):
                 self._refresh_statistics_display()
-                self.status_cb(f"✓ Adjusted {material_name} hits from {current_value} to {result[0]}")
             else:
-                self.status_cb(f"Could not adjust hits for {material_name}")
+                messagebox.showerror("Error", f"Could not adjust hits for {material_name}")
     
     def _apply_hits_adjustment(self, material_name: str, old_count: int, new_count: int) -> bool:
         """Apply hits adjustment - can reduce or increase within reason"""
@@ -3867,8 +3867,18 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
     # --- UI helpers ---
     def _set_status(self, msg: str) -> None:
+        """Log the message and show it next to the Reports buttons; no global status bar exists."""
         try:
             self.status_cb(msg)
+        except Exception:
+            pass
+        try:
+            label = getattr(self, '_reports_notice_label', None)
+            if label is not None and label.winfo_exists():
+                label.config(text=msg)
+                self._reports_notice_token = token = object()
+                label.after(8000, lambda: label.winfo_exists() and getattr(self, '_reports_notice_token', None) is token
+                            and label.config(text=""))
         except Exception:
             pass
 
@@ -4862,12 +4872,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     tooltip_window = tk.Toplevel(tree)
                     tooltip_window.wm_overrideredirect(True)
                     tooltip_window.wm_geometry(f"+{x}+{y}")
-                    tooltip_window.configure(background="#ffffe0")
-                    
-                    label = tk.Label(tooltip_window, text=tooltip_text,
-                                   background="#ffffe0", relief=tk.SOLID, borderwidth=1,
-                                   font=scaled_font(9), justify=tk.LEFT, wraplength=300)
-                    label.pack(ipadx=5, ipady=3)
+                    label = build_tooltip_label(tooltip_window, tooltip_text, scaled_font(9), 300, padx=5, pady=3)
         
         def hide_tooltip(event):
             nonlocal tooltip_window
@@ -5402,6 +5407,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         for _b in (rebuild_btn, folder_btn, export_btn, discord_btn, card_btn):
             _b.configure(font=scaled_font(8), padx=scaled_px(6))
         self._reports_summary_label.configure(font=scaled_font(8))
+        self._reports_notice_label = ttk.Label(button_frame, text="", foreground="#888888", font=scaled_font(8))
+        self._reports_notice_label.pack(side="left", padx=(8, 0))
         self.reports_tree_tab.bind("<<TreeviewSelect>>", lambda e: self._update_card_button(), add='+')
         
         # Add double-click functionality for opening report files
@@ -6088,15 +6095,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     self._reports_tooltip_window = tk.Toplevel(tree)
                     self._reports_tooltip_window.wm_overrideredirect(True)
                     self._reports_tooltip_window.wm_geometry(f"+{x}+{y}")
-                    self._reports_tooltip_window.configure(background="#ffffe0")
-                    
                     # Make sure tooltip stays on top
                     self._reports_tooltip_window.wm_attributes("-topmost", True)
-                    
-                    label = tk.Label(self._reports_tooltip_window, text=tooltip_text,
-                                   background="#ffffe0", relief=tk.SOLID, borderwidth=1,
-                                   font=scaled_font(9), justify=tk.LEFT, wraplength=300)
-                    label.pack(ipadx=5, ipady=3)
+
+                    label = build_tooltip_label(self._reports_tooltip_window, tooltip_text, scaled_font(9), 300, padx=5, pady=3)
                     
                     # Track which column we're showing tooltip for
                     self._current_tooltip_column = column
@@ -6138,13 +6140,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     self._prospector_tooltip_window = tk.Toplevel(tree)
                     self._prospector_tooltip_window.wm_overrideredirect(True)
                     self._prospector_tooltip_window.wm_geometry(f"+{x}+{y}")
-                    self._prospector_tooltip_window.configure(background="#ffffe0")
                     self._prospector_tooltip_window.wm_attributes("-topmost", True)
-                    
-                    label = tk.Label(self._prospector_tooltip_window, text=tooltip_text,
-                                   background="#ffffe0", relief=tk.SOLID, borderwidth=1,
-                                   font=scaled_font(9), justify=tk.LEFT, wraplength=300)
-                    label.pack(ipadx=5, ipady=3)
+
+                    label = build_tooltip_label(self._prospector_tooltip_window, tooltip_text, scaled_font(9), 300, padx=5, pady=3)
                     
                     self._current_prospector_tooltip_column = column
         except Exception as e:
@@ -6194,13 +6192,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     self._mineral_tooltip_window = tk.Toplevel(tree)
                     self._mineral_tooltip_window.wm_overrideredirect(True)
                     self._mineral_tooltip_window.wm_geometry(f"+{x}+{y}")
-                    self._mineral_tooltip_window.configure(background="#ffffe0")
                     self._mineral_tooltip_window.wm_attributes("-topmost", True)
-                    
-                    label = tk.Label(self._mineral_tooltip_window, text=tooltip_text,
-                                   background="#ffffe0", relief=tk.SOLID, borderwidth=1,
-                                   font=scaled_font(9), justify=tk.LEFT, wraplength=350)
-                    label.pack(ipadx=5, ipady=3)
+
+                    label = build_tooltip_label(self._mineral_tooltip_window, tooltip_text, scaled_font(9), 350, padx=5, pady=3)
                     
                     self._current_mineral_tooltip_column = column
         except Exception as e:
@@ -9789,7 +9783,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             self._set_pending_ring_finder_switch()
             
         except Exception as e:
-            self._set_status(f"Report save/open failed: {e}")
+            log.error("Report save/open failed: %s", e)
+            messagebox.showerror("Error", f"Report save/open failed: {e}")
 
     def _toggle_pause_resume(self) -> None:
         """Toggle between pause and resume states"""
@@ -9849,7 +9844,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         try:
             _atomic_write_text(path, text)
         except Exception as e:
-            self._set_status(f"Write failed: {e}")
+            log.error("Write failed for %s: %s", path, e)
 
     # --- Mining Bookmarks System ---
     def _load_bookmarks(self) -> None:

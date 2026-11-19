@@ -5,6 +5,7 @@ import tkinter as tk
 
 from column_visibility_helper import displayed_column
 from config import scaled_font, scaled_px
+from ui.tooltip import build_tooltip_label
 
 
 def attach_cell_tooltip(tree, column_name, text_for_item):
@@ -41,9 +42,7 @@ def attach_cell_tooltip(tree, column_name, text_for_item):
             tip.withdraw()
             tip.wm_overrideredirect(True)
             tip.wm_attributes("-topmost", True)
-            tk.Label(tip, text=text, background="#ffffe0", foreground="#000000",
-                     relief="solid", borderwidth=1, font=scaled_font(10),
-                     padx=8, pady=6, wraplength=scaled_px(450), justify="left").pack()
+            build_tooltip_label(tip, text, scaled_font(10), scaled_px(450), padx=8, pady=6)
             state["tip"] = tip
         if state["tip"]:
             state["tip"].wm_geometry(f"+{event.x_root + 12}+{event.y_root + 16}")

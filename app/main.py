@@ -5395,7 +5395,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         # Actions row (global)
         actions = ttk.Frame(self)
-        actions.grid(row=1, column=0, columnspan=2, sticky="ew", padx=(10, 10), pady=(4, 0))
+        actions.grid(row=1, column=0, columnspan=2, sticky="ew", padx=(10, 10), pady=(4, 6))
         self._actions_frame = actions
 
         # Create the sidebar (Ship Presets + Cargo Monitor)
@@ -5464,6 +5464,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         _ind_frame = tk.Frame(actions, bg=_info_bg)
         _ind_frame.grid(row=0, column=1, sticky="e", padx=(0, 12))
         self._footer_service_statuses = dict.fromkeys(('eddn', 'spansh', 'market'), 'checking')
+        self._journal_scan_label = tk.Label(_ind_frame, text='', fg="#888888", bg=_info_bg, font=self._scaled_font(8))
+        self._journal_scan_label.pack(side="left", padx=(0, 10))
         self._footer_services_label = tk.Label(
             _ind_frame, text='', fg="#888888", bg=_info_bg,
             font=self._scaled_font(8), cursor="hand2")
@@ -5478,11 +5480,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Load CMDR name in background
         self.after(500, self._update_cmdr_system_display)
-
-        # Status bar - span both columns
-        self.status = tk.StringVar(value=f"{APP_TITLE} {APP_VERSION} | Installation: {self.va_root}")
-        sb = ttk.Label(self, textvariable=self.status, relief=tk.SUNKEN, anchor="w")
-        sb.grid(row=2, column=0, columnspan=2, sticky="ew", padx=6, pady=(2, 6))
 
         self._sidebar_visible = True
 
@@ -7061,7 +7058,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             except Exception as e:
                 print(f"[INTERFACE] Error reinitializing TTS: {e}")
         fix_tts_btn = tk.Button(box, text=t('settings.reset_tts'), command=_fix_tts_interface, **_btn_kw)
-        fix_tts_btn.grid(row=0, column=2, sticky="sw", padx=(8, 0), pady=(0, 5))
+        fix_tts_btn.grid(row=0, column=2, sticky="w", padx=(8, 0), pady=(0, 6))
         ToolTip(fix_tts_btn, t('tooltips.fix_tts'))
 
         if not hasattr(self, 'voice_volume'):
@@ -7078,11 +7075,24 @@ class App(tk.Tk, ColumnVisibilityMixin):
             except Exception as e:
                 print(f"Error changing TTS volume: {e}")
 
-        tk.Label(box, text=t('settings.tts_volume'), bg=_bg, fg="#ffffff", font=self._scaled_font(9)).grid(row=0, column=0, sticky="sw", pady=(0, 13))
-        tk.Scale(box, from_=0, to=100, orient="horizontal", variable=self.voice_volume, bg=_bg, fg=_slider_fg,
+        tk.Label(box, text=t('settings.tts_volume'), bg=_bg, fg="#ffffff", font=self._scaled_font(9)).grid(row=0, column=0, sticky="w", pady=(0, 6))
+        # Slider with its value to the right ("100%") instead of floating above it
+        vol_row = tk.Frame(box, bg=_bg)
+        vol_row.grid(row=0, column=1, sticky="ew", padx=(8, 0), pady=(0, 6))
+        tk.Scale(vol_row, from_=0, to=100, orient="horizontal", variable=self.voice_volume, bg=_bg, fg=_slider_fg,
                  activebackground=_slider_active, highlightthickness=0, troughcolor=_slider_trough,
-                 font=self._scaled_font(9), command=_on_volume_change, length=200,
-                 sliderrelief="flat", sliderlength=20).grid(row=0, column=1, sticky="ew", padx=(8, 0), pady=(0, 12))
+                 font=self._scaled_font(9), command=_on_volume_change, length=self._scaled_px(160),
+                 showvalue=0, sliderrelief="flat", sliderlength=20).pack(side="left", fill="x", expand=True)
+        vol_text = tk.StringVar()
+        def _sync_vol_text(*_a):
+            try:
+                vol_text.set(f"{int(self.voice_volume.get())}%")
+            except (tk.TclError, ValueError):
+                pass
+        self.voice_volume.trace_add("write", _sync_vol_text)
+        _sync_vol_text()
+        tk.Label(vol_row, textvariable=vol_text, bg=_bg, fg=_slider_fg, font=self._scaled_font(9),
+                 width=4, anchor="e").pack(side="left", padx=(6, 0))
 
         try:
             cfg = _load_cfg()
@@ -7206,6 +7216,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                  highlightbackground="#ffffff", highlightcolor="#ffffff",
                                  font=self._scaled_font(9))
                 sp.pack(side="left", padx=(6, 4))
+                ttk.Label(thr, text="%").pack(side="left")  # unit sits next to its value
                 sp.bind("<Return>", _ann_threshold_changed)
                 sp.bind("<FocusOut>", _ann_threshold_changed)
                 # Add mouse wheel support
@@ -7231,7 +7242,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                        relief="solid", bd=1, cursor="hand2", pady=2, padx=8)
                 set_all_btn.pack(side="left", padx=(10, 0))
                 ToolTip(set_all_btn, t('tooltips.set_all_threshold'))
-                ttk.Label(thr, text="%").pack(side="left")
                 self._build_tts_controls(frame)
 
                 # Materials section label - fixed position to always stay visible
@@ -7272,7 +7282,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                font=self._scaled_font(9, "bold"))
 
                 # Material tree
-                self.ann_mat_tree = StripedTreeview(materials_frame, columns=("announce", "material", "minpct"), show="headings", height=18, style="Announcements.Treeview")
+                self.ann_mat_tree = StripedTreeview(materials_frame, columns=("announce", "material", "minpct"), show="headings", height=18, style="Announcements.Treeview", selectmode="none")
                 self.ann_mat_tree.heading("announce", text=t('settings.announce'))
                 self.ann_mat_tree.heading("material", text=t('settings.mineral'))
                 self.ann_mat_tree.heading("minpct", text=t('settings.minimal_pct'))
@@ -7296,14 +7306,57 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.ann_mat_tree.column("announce", width=max(self._scaled_px(90), _ann_minwidths["announce"]),
                                           minwidth=_ann_minwidths["announce"], anchor="center", stretch=False)
                 self.ann_mat_tree.column("material", width=max(self._scaled_px(300), _ann_minwidths["material"]),
-                                          minwidth=_ann_minwidths["material"], anchor="center", stretch=True)
+                                          minwidth=_ann_minwidths["material"], anchor="center", stretch=False)
                 self.ann_mat_tree.column("minpct", width=max(self._scaled_px(100), _ann_minwidths["minpct"]),
                                           minwidth=_ann_minwidths["minpct"], anchor="center", stretch=False)
                 self.ann_mat_tree.grid(row=0, column=0, sticky="nsew")
-                
+
                 ann_scrollbar = ttk.Scrollbar(materials_frame, orient="vertical", command=self.ann_mat_tree.yview)
                 ann_scrollbar.grid(row=0, column=1, sticky="ns")
                 self.ann_mat_tree.configure(yscrollcommand=ann_scrollbar.set)
+                ann_hscrollbar = ttk.Scrollbar(materials_frame, orient="horizontal", command=lambda *a: (self.ann_mat_tree.xview(*a), self.ann_mat_tree.after_idle(_ann_position_minpct_spinboxes)))
+                ann_hscrollbar.grid(row=1, column=0, sticky="ew")
+                # Show the horizontal scrollbar only when the columns are wider than the table
+                def _ann_xscroll_set(lo, hi):
+                    if float(lo) <= 0.0 and float(hi) >= 1.0:
+                        ann_hscrollbar.grid_remove()
+                    else:
+                        ann_hscrollbar.grid()
+                    ann_hscrollbar.set(lo, hi)
+                self.ann_mat_tree.configure(xscrollcommand=_ann_xscroll_set)
+
+                # Columns are fixed-width (stretch=False) so drags stick; fill the
+                # table once with the Mineral column on first layout only.
+                _ann_filled = [False]
+                # Restore saved widths (never below the header-based minimum)
+                try:
+                    from config import load_announcement_column_widths
+                    _ann_saved = load_announcement_column_widths()
+                    for _c, _w in (_ann_saved or {}).items():
+                        if _c in _ann_minwidths:
+                            self.ann_mat_tree.column(_c, width=max(int(_w), _ann_minwidths[_c]))
+                            _ann_filled[0] = True
+                except Exception as e:
+                    print(f"[DEBUG] Could not load Announcement column widths: {e}")
+
+                def _ann_save_widths(event=None):
+                    try:
+                        from config import save_announcement_column_widths
+                        save_announcement_column_widths(
+                            {c: int(self.ann_mat_tree.column(c, "width")) for c in ("announce", "material", "minpct")})
+                    except Exception as e:
+                        print(f"[DEBUG] Could not save Announcement column widths: {e}")
+                self.ann_mat_tree.bind("<ButtonRelease-1>", _ann_save_widths, add='+')
+
+                def _ann_fill_once(event):
+                    if _ann_filled[0] or event.width < 200:
+                        return
+                    _ann_filled[0] = True
+                    others = sum(int(self.ann_mat_tree.column(c, "width")) for c in ("announce", "minpct"))
+                    free = event.width - others - self._scaled_px(4)
+                    if free > int(self.ann_mat_tree.column("material", "width")):
+                        self.ann_mat_tree.column("material", width=free)
+                self.ann_mat_tree.bind("<Configure>", _ann_fill_once, add='+')
 
                 # Configure alternating row colors
                 self.ann_mat_tree.tag_configure('oddrow', background='#1e1e1e')
@@ -7312,6 +7365,42 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 # Create spinboxes for per-material thresholds
                 self._ann_minpct_spin = {}
                 self._ann_minpct_vars = {}
+
+                # Spinbox look: darker field with a soft border (bright only when focused),
+                # following the active theme instead of fixed white/grey.
+                if self.current_theme in ('modern', 'modern_slate', 'modern_orange'):
+                    _ann_field_bg, _ann_field_btn = modern_color("#14171B"), modern_color("#262C34")
+                    _ann_field_border, _ann_field_focus = modern_color("#343B44"), modern_color("#FF9A32")
+                    _ann_diff_fg = modern_color("#FF9A32")
+                else:
+                    _ann_field_bg, _ann_field_btn, _ann_field_border = "#151515", "#2d2d2d", "#444444"
+                    _ann_field_focus = "#ff8c00" if self.current_theme == "elite_orange" else "#7fb2e5"
+                    _ann_diff_fg = "#ffffff" if self.current_theme == "elite_orange" else "#ffcc00"
+
+                # Values changed since the active preset was last saved or loaded get an
+                # accent colour (no active preset = no tint). Deferred so bulk changes
+                # (Set all, presets) cost one pass.
+                _ann_tint_pending = [False]
+                def _ann_apply_tint():
+                    _ann_tint_pending[0] = False
+                    _snap = getattr(self, '_active_preset_snapshot', None)
+                    _saved = (_snap or {}).get('min_pct_map') if getattr(self, '_active_preset_num', None) is not None else None
+                    for _m, _sp in self._ann_minpct_spin.items():
+                        try:
+                            _val = round(float(self._ann_minpct_vars[_m].get()), 1)
+                        except Exception:
+                            continue
+                        _changed = _saved is not None and _m in _saved and _val != _saved[_m]
+                        _fg = _ann_diff_fg if _changed else _ann_spinbox_fg
+                        try:
+                            _sp.configure(fg=_fg, insertbackground=_fg)
+                        except tk.TclError:
+                            pass
+                def _ann_queue_tint(*_a):
+                    if not _ann_tint_pending[0]:
+                        _ann_tint_pending[0] = True
+                        self.after_idle(_ann_apply_tint)
+                self._ann_queue_tint = _ann_queue_tint  # also fired when the preset snapshot changes
 
                 def _on_ann_minpct_change_factory(material):
                     def _on_change():
@@ -7330,13 +7419,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 # Populate with materials and create spinboxes
                 row_idx = 0
                 for mat in KNOWN_MATERIALS:
-                    flag = "✓" if self.prospector_panel.announce_map.get(mat, True) else "—"
+                    flag = self._ann_flag(self.prospector_panel.announce_map.get(mat, True))
                     row_tag = 'evenrow' if row_idx % 2 == 0 else 'oddrow'
                     # Get localized material name for display
                     from localization import get_material
                     display_mat = get_material(mat)
                     if mat in CORE_ONLY:
-                        self.ann_mat_tree.insert("", "end", iid=mat, values=(flag, display_mat, ""), tags=(row_tag,))
+                        self.ann_mat_tree.insert("", "end", iid=mat, values=(flag, display_mat, t('settings.core_only')), tags=(row_tag,))
                     else:
                         self.ann_mat_tree.insert("", "end", iid=mat, values=(flag, display_mat, ""), tags=(row_tag,))
                         
@@ -7352,14 +7441,19 @@ class App(tk.Tk, ColumnVisibilityMixin):
                             width=5,
                             textvariable=self._ann_minpct_vars[mat],
                             command=_on_ann_minpct_change_factory(mat),
-                            bg="#1e1e1e", fg=_ann_spinbox_fg, buttonbackground="#2d2d2d",
+                            bg=_ann_field_bg, fg=_ann_spinbox_fg, buttonbackground=_ann_field_btn,
                             insertbackground=_ann_spinbox_fg, selectbackground="#4a6a8a",
                             relief="solid", bd=0, highlightthickness=1,
-                            highlightbackground="#ffffff", highlightcolor="#ffffff",
+                            highlightbackground=_ann_field_border, highlightcolor=_ann_field_focus,
                             font=self._scaled_font(9)
                         )
-                        # Add mouse wheel support
-                        def on_ann_minpct_scroll(event, v=self._ann_minpct_vars[mat], m=mat):
+                        self._ann_minpct_vars[mat].trace_add("write", _ann_queue_tint)
+                        # Mouse wheel: only edits the value once the box has been clicked
+                        # into; otherwise it scrolls the list so values change by accident less.
+                        def on_ann_minpct_scroll(event, v=self._ann_minpct_vars[mat], m=mat, sp=self._ann_minpct_spin[mat]):
+                            if self.focus_get() is not sp:
+                                self.ann_mat_tree.yview_scroll(-1 if event.delta > 0 else 1, "units")
+                                return "break"
                             try:
                                 current = float(v.get())
                                 if event.delta > 0:
@@ -7393,6 +7487,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         self._ann_minpct_spin[mat].bind("<FocusOut>", on_ann_minpct_manual)
                     row_idx += 1
 
+                _ann_queue_tint()
+
                 # Click on treeview (not on spinbox) to clear spinbox focus
                 def _clear_spinbox_focus(event):
                     # Check if click is not on a spinbox
@@ -7403,6 +7499,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
                 # Add double-click handler to toggle announcement
                 def _ann_toggle_announce(event):
+                    if self.ann_mat_tree.identify_region(event.x, event.y) != "cell":
+                        return  # headers and column dividers are not toggles
                     item = self.ann_mat_tree.identify_row(event.y)
                     if item and item in KNOWN_MATERIALS:
                         col = self.ann_mat_tree.identify_column(event.x)
@@ -7415,7 +7513,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                 self.prospector_panel._save_announce_map()
                                 
                                 # Update display immediately
-                                flag = "✓" if new_state else "—"
+                                flag = self._ann_flag(new_state)
                                 current = self.ann_mat_tree.item(item, "values")
                                 self.ann_mat_tree.item(item, values=(flag, current[1], current[2]))
                                 print(f"Toggled {item}: {current_state} → {new_state}")
@@ -7423,7 +7521,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                             except Exception as e:
                                 print(f"Error toggling {item}: {e}")
 
-                self.ann_mat_tree.bind("<Double-1>", _ann_toggle_announce)
+                # Single click on the checkbox toggles (no double-click needed)
+                self.ann_mat_tree.bind("<Button-1>", _ann_toggle_announce, add='+')
 
                 # Position spinboxes
                 def _ann_position_minpct_spinboxes():
@@ -7436,11 +7535,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
                             bbox = self.ann_mat_tree.bbox(material, "#3")  # Third column
                             if bbox:
                                 x, y, width, height = bbox
-                                # Position the spinbox with fixed width instead of cell width
-                                spinbox_width = 60  # Fixed width for spinbox
-                                # Center the spinbox in the cell
+                                # Scale-aware width that grows a little with the column; inset
+                                # top/bottom so neighbouring boxes read as separate fields.
+                                spinbox_width = min(max(width - self._scaled_px(8), 1),
+                                                    max(self._scaled_px(72), int(width * 0.5)))
+                                pad_y = self._scaled_px(3)
                                 x_offset = (width - spinbox_width) // 2
-                                spinbox.place(in_=self.ann_mat_tree, x=x + x_offset, y=y, width=spinbox_width, height=height)
+                                spinbox.place(in_=self.ann_mat_tree, x=x + x_offset, y=y + pad_y,
+                                              width=spinbox_width, height=max(height - 2 * pad_y, 1))
                             else:
                                 spinbox.place_forget()
                     except Exception:
@@ -7455,9 +7557,19 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     _ann_position_minpct_spinboxes()
                 self.ann_mat_tree.configure(yscroll=_ann_yscroll_set)
 
+                # Keep spinboxes under the Minimal % column while a divider is dragged,
+                # after release, and when the table is resized.
+                def _ann_reposition_later(event=None):
+                    self.ann_mat_tree.after_idle(_ann_position_minpct_spinboxes)
+                self.ann_mat_tree.bind("<B1-Motion>", _ann_reposition_later, add='+')
+                self.ann_mat_tree.bind("<ButtonRelease-1>", _ann_reposition_later, add='+')
+                self.ann_mat_tree.bind("<Configure>", _ann_reposition_later, add='+')
+
                 # Buttons frame
                 btns = ttk.Frame(frame)
                 btns.grid(row=4, column=0, sticky="w", pady=(8, 0))
+                self._ann_preset_notice = ttk.Label(frame, text="", font=self._scaled_font(8))
+                self._ann_preset_notice.grid(row=5, column=0, sticky="w", pady=(2, 0))
                 
                 select_all_btn = announcement_button(btns, text=t('settings.select_all'), command=self._ann_select_all,
                                           bg="#2a5a2a", fg="#ffffff", 
@@ -7503,7 +7615,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     
                     # Bind left and right click events
                     preset_btn.bind("<Button-1>", lambda e, num=i: self._ann_load_preset(num))
-                    preset_btn.bind("<Button-3>", lambda e, num=i: self._ann_save_preset(num))
+                    # Right-click opens Load / Save / Rename so a stray click can't overwrite a preset
+                    preset_btn.bind("<Button-3>", lambda e, num=i: self._ann_show_preset_menu(num, e))
 
                     # Ctrl+Click (left or right) or Middle-click to rename preset
                     preset_btn.bind("<Button-2>", lambda e, num=i: self._rename_preset(num))
@@ -7632,6 +7745,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
     def _ann_update_preset_buttons(self):
         """Update all preset button visuals based on active state"""
+        try:
+            self._ann_queue_tint()  # refresh the per-mineral "changed since save" colouring
+        except Exception:
+            pass
         if not hasattr(self, 'preset_buttons'):
             return
         
@@ -7684,6 +7801,28 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 btn.config(text=base_name, bg=inactive_bg, 
                           activebackground=inactive_hover,
                           relief="raised")
+
+    def _ann_show_preset_menu(self, num, event):
+        """Right-click menu for an announcement preset button."""
+        from core.constants import get_menu_colors
+        mc = get_menu_colors(self.current_theme)
+        menu = tk.Menu(self, tearoff=0, bg=mc["bg"], fg=mc["fg"],
+                       activebackground=mc["activebackground"], activeforeground=mc["activeforeground"],
+                       font=self._scaled_font(9))
+        menu.add_command(label=t('settings.preset_menu_load'), command=lambda: self._ann_load_preset(num))
+        menu.add_command(label=t('settings.preset_menu_save'), command=lambda: self._ann_save_preset(num))
+        menu.add_separator()
+        menu.add_command(label=t('settings.preset_menu_rename'), command=lambda: self._rename_preset(num))
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+        return "break"
+
+    @staticmethod
+    def _ann_flag(enabled):
+        """Checkbox-style glyph for the Announce column."""
+        return "☑" if enabled else "☐"
 
     def _ann_check_modified(self):
         """Check if preset was modified and update button visuals"""
@@ -7738,7 +7877,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             try:
                 from prospector_panel import KNOWN_MATERIALS
                 for mat in KNOWN_MATERIALS:
-                    flag = "✓" if self.prospector_panel.announce_map.get(mat, True) else "—"
+                    flag = self._ann_flag(self.prospector_panel.announce_map.get(mat, True))
                     current = self.ann_mat_tree.item(mat, "values")
                     if current:
                         self.ann_mat_tree.item(mat, values=(flag, current[1], current[2]))
@@ -7766,7 +7905,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 cfg[f'announce_preset_{num}'] = preset_data
                 self.prospector_panel._save_cfg(cfg)
                 self._ann_set_active_preset(num)
-                self._set_status(t('settings.preset_saved').format(num=num))
+                self._show_notice(self._ann_preset_notice, t('settings.preset_saved').format(num=num))
                 
                 # Visual feedback - flash button green then restore active style
                 if hasattr(self, 'preset_buttons') and num in self.preset_buttons:
@@ -7821,7 +7960,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.prospector_panel._save_threshold_value()
                 self._ann_update_display()
                 self._ann_set_active_preset(num)
-                self._set_status(t('settings.preset_loaded').format(num=num))
+                self._show_notice(self._ann_preset_notice, t('settings.preset_loaded').format(num=num))
             except Exception as e:
                 print(f"Error loading preset {num}: {e}")
 
@@ -7886,7 +8025,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     # Update button text with proper active styling
                     self._ann_update_preset_buttons()
                     
-                    self._set_status(t('settings.preset_renamed').format(num=num, name=new_name))
+                    self._show_notice(self._ann_preset_notice, t('settings.preset_renamed').format(num=num, name=new_name))
                 dialog.destroy()
             
             # Buttons
@@ -8921,6 +9060,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                  cursor="hand2", font=self._scaled_font(10))
         presets_info.pack(side="left", padx=(6, 2))
         ToolTip(presets_info, t('sidebar.right_click_options'))
+        self._ship_preset_notice = ttk.Label(presets_header, text="", foreground=self.theme_colors['fg_muted'],
+                                             font=self._scaled_font(8))
+        self._ship_preset_notice.pack(side="left", padx=(4, 0))
 
         # Set minimum height for presets pane to prevent collapse
         presets_pane.configure(height=200)
@@ -10322,10 +10464,34 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
     # ---------- Status helper ----------
     def _set_status(self, msg: str, clear_after: int = 8000) -> None:
+        """Routine confirmations are logged only; useful feedback is shown next to its own controls."""
+        log.info("[Status] %s", msg)
+
+    def _set_journal_scan_status(self, msg: str, clear_after: int = 5000) -> None:
+        self._show_notice(getattr(self, '_journal_scan_label', None), msg, clear_after)
+
+    def _ship_preset_done(self, key: str) -> None:
+        self._show_notice(getattr(self, '_ship_preset_notice', None), t('sidebar.preset_' + key))
+
+    def _show_notice(self, label, msg: str, clear_after: int = 6000, fg=None) -> None:
+        """Show a short transient message in an inline label, then clear it."""
         try:
-            self.status.set(msg)
+            if not label.winfo_exists():
+                return
+            kw = {'text': msg}
+            if fg:
+                kw['fg'] = fg
+            label.config(**kw)
+            token = object()
+            label._notice_token = token
             if clear_after:
-                self.after(clear_after, lambda: self.status.set(""))
+                def _clear():
+                    try:
+                        if label.winfo_exists() and getattr(label, '_notice_token', None) is token:
+                            label.config(text="")
+                    except Exception:
+                        pass
+                self.after(clear_after, _clear)
         except Exception:
             pass
 
@@ -11681,7 +11847,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # IMPORTANT: Save all loaded values to Variables folder immediately
         self._save_all_to_txt()
-        self._set_status("Preset loaded and saved to Variables.")
+        self._ship_preset_done('loaded')
 
     def _ask_new_preset_name(self, preselect_ship: Optional[str] = None) -> Optional[str]:
         return self._ask_edit_preset_name(preselect_ship or "", "", "", creating=True)
@@ -11735,7 +11901,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Select the newly created preset
         self._select_preset_by_name(name)
         self._ship_set_active_preset(name)
-        self._set_status(f"Saved new preset '{name}'.")
+        self._ship_preset_done('saved')
 
     def _write_preset_file(self, name: str) -> None:
         """Write current settings to an existing preset file"""
@@ -11761,7 +11927,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             return
 
         self._write_preset_file(sel)
-        self._set_status(f"Overwrote preset '{sel}'.")
+        self._ship_preset_done('updated')
 
     def _edit_selected_preset(self) -> None:
         """Edit the selected preset - change ship type and build name"""
@@ -11796,7 +11962,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 save_active_ship_preset(new_name)
             self._refresh_preset_list()
             self._select_preset_by_name(new_name)
-            self._set_status(f"Updated preset to '{new_name}'.")
+            self._ship_preset_done('updated')
         except Exception as e:
             messagebox.showerror("Edit failed", str(e))
 
@@ -12308,7 +12474,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.distance_system_a.set(current_system)
                 self._ac_system_a.unsuppress()
                 self._ac_system_a.hide()
-                self._set_status(t('distance_calculator.using_current').format(system=current_system))
                 self.distance_status_label.config(text=t('distance_calculator.using_current').format(system=current_system), fg="#4da6ff")
                 # Update Home/FC distances
                 self._update_home_fc_distances()
@@ -12350,7 +12515,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         if home != load_home_system():
             save_home_system(home)
             key = 'distance_calculator.home_saved' if home else 'distance_calculator.home_cleared'
-            self._set_status(t(key).format(system=home))
+            self._show_notice(self.distance_status_label, t(key).format(system=home), fg="#4da6ff")
             self._update_home_fc_distances()
 
     def _distance_refresh_locations(self):
@@ -12358,14 +12523,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
             return
         parser = getattr(getattr(self, 'cargo_monitor', None), 'journal_parser', None)
         if not parser:
-            self._set_status(t('distance_calculator.no_journal'))
+            self._show_notice(self.distance_status_label, t('distance_calculator.no_journal'), fg="#ffaa00")
             return
         self._distance_refresh_running = True
         self.distance_refresh_btn.config(state='disabled', text=t('distance_calculator.refreshing'))
         self._distance_refresh_generation += 1
         generation = self._distance_refresh_generation
         initial_current = getattr(self, 'current_system', None)
-        self._set_status(t('distance_calculator.scanning'))
 
         def scan_thread():
             try:
@@ -12380,7 +12544,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             return
         self.after(350, self._finish_distance_location_refresh, generation)
         if error:
-            self._set_status(t('distance_calculator.scan_failed').format(error=error))
+            self._show_notice(self.distance_status_label, t('distance_calculator.scan_failed').format(error=error), fg="#ff6666")
             return
         if current and current != initial_current and getattr(self, 'current_system', None) == initial_current:
             self.update_current_system(current, count_visit=False)
@@ -12388,7 +12552,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.distance_fc_system.set(carrier.get('system') or '')
         self._update_home_fc_distances()
         key = 'distance_calculator.locations_refreshed' if current or carrier.get('system') else 'distance_calculator.locations_missing'
-        self._set_status(t(key))
+        self._show_notice(self.distance_status_label, t(key), fg="#4da6ff" if current or carrier.get('system') else "#ffaa00")
 
     def _finish_distance_location_refresh(self, generation):
         if generation == self._distance_refresh_generation:
@@ -12515,12 +12679,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
         else:
             key, color = 'distance_calculator.coordinates_missing', '#ffaa00'
         self.distance_status_label.config(text=t(key), fg=color)
-        self._set_status(t(key))
 
     def _show_distance_error(self, error_msg: str):
         logging.getLogger('EliteMining').error('Distance calculation failed: %s', error_msg)
         self.distance_status_label.config(text=t('distance_calculator.calculation_failed').format(error=error_msg), fg='#ff6666')
-        self._set_status(t('distance_calculator.lookup_error'))
 
     def _refresh_visit_count(self, system_name):
         """Refresh the visit count display for a system"""
@@ -12806,7 +12968,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if sel == self._active_ship_preset_name:
                     self._ship_clear_active_preset()
                 self._refresh_preset_list()
-                self._set_status(f"Deleted preset '{sel}'.")
+                self._ship_preset_done('deleted')
             except Exception as e:
                 messagebox.showerror("Delete failed", str(e))
 
@@ -12836,7 +12998,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 
             self._refresh_preset_list()
             self._select_preset_by_name(new_name)
-            self._set_status(f"Duplicated preset '{sel}' - edit to rename.")
+            self._ship_preset_done('duplicated')
             
             # Immediately open edit dialog so user can set proper ship type and build name
             self.after(100, self._edit_selected_preset)
@@ -12863,7 +13025,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             return
         try:
             shutil.copy2(src, dest)
-            self._set_status(f"Exported preset to '{dest}'.")
+            self._ship_preset_done('exported')
         except Exception as e:
             messagebox.showerror("Export failed", str(e))
 
@@ -12918,7 +13080,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 json.dump(data, f, indent=2)
             self._refresh_preset_list()
             self._select_preset_by_name(new_name)
-            self._set_status(f"Imported preset '{new_name}'. Double-click to load.")
+            self._ship_preset_done('imported')
         except Exception as e:
             messagebox.showerror("Import preset failed", str(e))
 
@@ -13780,7 +13942,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self._set_status("Screenshots folder updated.")
             
         except Exception as e:
-            self._set_status(f"Error updating screenshots folder: {e}")
+            messagebox.showerror("Error", f"Error updating screenshots folder: {e}")
 
     # ---------- Text overlay preference handling ----------
     def _load_text_overlay_preference(self) -> None:
@@ -18150,7 +18312,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self._confirm_sysfinder_reference()
                 self._set_status(t('system_finder.using_current').format(system=current), 3000)
             else:
-                self._set_status(t('ring_finder.could_not_detect_system'), 3000)
+                self._show_notice(self.sysfinder_status_label, t('ring_finder.could_not_detect_system'), 3000)
         except Exception as e:
             logging.error(f"[SYSTEM_FINDER] Error getting current system: {e}")
     
@@ -19237,11 +19399,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     return
             
             # Fallback: No ring finder available
-            self._set_status("Ring finder not available. Enter system manually.")
-            
+            self._show_notice(self.marketplace_total_label, t('ring_finder.could_not_detect_system'))
+
         except Exception as e:
             print(f"Error getting current system: {e}")
-            self._set_status("Error detecting current system. Enter system manually.")
+            self._show_notice(self.marketplace_total_label, t('ring_finder.could_not_detect_system'))
     
     # Removed _toggle_search_mode() - reference system now always visible for both modes
     
@@ -20395,30 +20557,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
         logging.info(f"[UPDATE_CHECK] Starting update check... Current version: {current_version}")
         print(f"Checking for updates... Current version: {current_version}")
         
-        # Show update check in main window status bar (bottom left)
-        try:
-            if hasattr(self, 'status'):
-                # Save current status
-                current_status = self.status.get()
-                
-                # Show checking message
-                self.status.set("🔍 Checking for updates...")
-                logging.info("[UPDATE_CHECK] Status bar updated: Checking for updates...")
-                
-                # Restore original status after 3 seconds
-                def restore_status():
-                    try:
-                        if hasattr(self, 'status'):
-                            self.status.set(current_status)
-                            logging.info("[UPDATE_CHECK] Status bar restored")
-                    except:
-                        pass
-                
-                self.after(3000, restore_status)
-        except Exception as e:
-            logging.error(f"[UPDATE_CHECK] Could not update status bar: {e}")
-            print(f"Could not update status bar for update check: {e}")
-        
         self.update_checker.check_for_updates_async(self)
 
     def _manual_update_check(self):
@@ -20869,19 +21007,18 @@ Your keybinds will need to be reconfigured manually."""
                 # Migration already fixed visit counts from ALL journals
                 if migration_ran:
                     print("[JOURNAL] Migration already ran - skipping redundant visit scan")
-                    self.after(0, lambda: self._set_status("Ready", 3000))
                     # Still trigger location refresh (journal scan for current system + FC)
                     if hasattr(self, '_distance_refresh_locations'):
                         self.after(500, self._distance_refresh_locations)
                     return
                     
-                self.after(0, lambda: self._set_status("Scanning journal history...", 0))
+                self.after(0, lambda: self._set_journal_scan_status(t('status_bar.journal_scanning'), 0))
                 
                 # Get journal directory
                 journal_dir = self.cargo_monitor.journal_dir
                 if not journal_dir or not os.path.isdir(journal_dir):
                     print("[JOURNAL] No journal directory found")
-                    self.after(0, lambda: self._set_status("No journal folder found", 5000))
+                    self.after(0, lambda: self._set_journal_scan_status(t('status_bar.journal_no_folder')))
                     return
                 
                 # Get ALL journals
@@ -20891,7 +21028,7 @@ Your keybinds will need to be reconfigured manually."""
                 if not all_journals:
                     print("[JOURNAL] No journal files found")
                     log.info("No journal files found")
-                    self.after(0, lambda: self._set_status("No journal files found", 5000))
+                    self.after(0, lambda: self._set_journal_scan_status(t('status_bar.journal_no_files')))
                     return
                 
                 # Determine if this is first install or migration needed
@@ -20927,7 +21064,7 @@ Your keybinds will need to be reconfigured manually."""
                     else:
                         print(f"[STARTUP] Regular scan: {len(journals_to_scan)} new journal file(s) since last scan")
                         log.info(f"Startup: Regular scan - {len(journals_to_scan)} new journal file(s) since last scan")
-                    self.after(0, lambda n=len(journals_to_scan): self._set_status(f"Scanning {n} journals..." if n else "Journals up to date", 0 if n else 3000))
+                    self.after(0, lambda n=len(journals_to_scan): self._set_journal_scan_status(t('status_bar.journal_scanning_count').format(n=n) if n else t('status_bar.journal_up_to_date'), 0 if n else 3000))
 
                 scanned_checkpoint = self._process_journals_for_catchup(journals_to_scan, is_full_sync=False, resume_offsets=resume_offsets)
                 if scanned_checkpoint:
@@ -20941,7 +21078,7 @@ Your keybinds will need to be reconfigured manually."""
 
             except Exception as e:
                 print(f"[JOURNAL] ERROR: {e}")
-                self.after(0, lambda: self._set_status("Journal scan failed", 5000))
+                self.after(0, lambda: self._set_journal_scan_status(t('status_bar.journal_scan_failed')))
                 import traceback
                 traceback.print_exc()
         
@@ -21269,7 +21406,6 @@ Your keybinds will need to be reconfigured manually."""
         except:
             pass
         self._startup_dialog_active = False
-        self._set_status("Journal scan complete", 5000)
     
     def _process_journals_for_catchup_with_progress(self, journals, is_full_sync=False, is_migration=False, progress_callback=None):
         """Process journals with progress callback for first install/migration dialog
@@ -21554,8 +21690,8 @@ Your keybinds will need to be reconfigured manually."""
         for idx, journal_path in enumerate(journals):
             # Update progress in status bar
             if idx % 25 == 0:  # Update every 25 files
-                progress = f"Scanning journals... {idx}/{len(journals)}"
-                self.after(0, lambda p=progress: self._set_status(p, 0))
+                progress = t('status_bar.journal_scanning_progress').format(done=idx, total=len(journals))
+                self.after(0, lambda p=progress: self._set_journal_scan_status(p, 0))
 
             try:
                 with open(journal_path, 'rb') as f:
@@ -21705,8 +21841,7 @@ Your keybinds will need to be reconfigured manually."""
         print(f"[JOURNAL] Scan complete: {len(journals)} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} mining missions")
         log.info(f"Journal scan complete: {len(journals)} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} mining missions")
         
-        # Show completion in status bar
-        self.after(0, lambda: self._set_status(f"Journal scan complete: {len(journals)} files processed"))
+        self.after(0, lambda: self._set_journal_scan_status(t('status_bar.journal_scan_done_count').format(n=len(journals))))
         
         # Refresh mining missions tab after scan (batch mode already notified callbacks)
         if hasattr(self, 'prospector_panel') and self.prospector_panel:
