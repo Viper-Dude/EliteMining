@@ -15,6 +15,7 @@ import sys
 import tempfile
 import time
 from collections import Counter
+from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'app'))
 
@@ -117,6 +118,34 @@ def selftest():
         sys.executable = saved[1]
     assert reader._reader_exe_path().parts[-5:] == ('va_profile_reader', 'bin', 'Release', 'net48',
                                                     'va_profile_reader.exe'), 'dev helper path'
+
+    # Failures must return None (the update flow then falls back to the export steps) and leave no temp folder
+    def temp_dirs():
+        return {d for d in os.listdir(tempfile.gettempdir()) if d.startswith('em_va_reader_')}
+    before = temp_dirs()
+    work = tempfile.mkdtemp(prefix='em_va_selftest_')
+    try:
+        assert reader.read_profile_bindings(backup_path=os.path.join(work, 'missing.dat')) is None, \
+            'missing data file'
+        assert reader.read_profile_bindings(backup_path=work) is None, 'data file path is a folder'
+        junk = os.path.join(work, 'junk.VoiceAttack.dat')
+        with open(junk, 'wb') as f:
+            f.write(os.urandom(4096))
+        if reader._reader_exe_path().exists():
+            assert reader.read_profile_bindings(backup_path=junk) is None, 'unreadable data file'
+        empty = os.path.join(work, 'empty.VoiceAttack.dat')
+        open(empty, 'wb').close()
+        if reader._reader_exe_path().exists():
+            assert reader.read_profile_bindings(backup_path=empty) is None, 'empty data file'
+        real_path = reader._reader_exe_path
+        reader._reader_exe_path = lambda: Path(work) / 'no_such_helper.exe'
+        try:
+            assert reader.read_profile_bindings(backup_path=junk) is None, 'helper missing'
+        finally:
+            reader._reader_exe_path = real_path
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    assert temp_dirs() == before, 'failed reads leave no temp folder behind'
     print('selftest: all checks passed')
 
 

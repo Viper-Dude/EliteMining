@@ -52,6 +52,34 @@ def real_profiles():
     check(VAKeybindExtractor().extract(target) == kb, "round trip: re-extracted bindings identical")
 
 
+def shipped_profile_order():
+    """The shipped profile omits unbound fields; merged commands must keep VoiceAttack's element order."""
+    from va_keybind_applier import COMMAND_ELEMENT_ORDER
+    parser = VAProfileParser()
+    export = parser.parse(os.path.join(ROOT, "Voiceattack Profile", "Test_profile", "EliteMining v1.0.0-Profile.vap"))
+    kb = VAKeybindExtractor().extract(export)
+    shipped = parser.parse(os.path.join(ROOT, "Voiceattack Profile", "EliteMining v5.6.6-Profile.vap"))
+    ap = VAKeybindApplier()
+    ap.apply(shipped, kb)
+    rank = {n: i for i, n in enumerate(COMMAND_ELEMENT_ORDER)}
+    bad = [c.findtext("CommandString") for c in shipped.findall(".//Command")
+           if [rank[e.tag] for e in c if e.tag in rank] != sorted(rank[e.tag] for e in c if e.tag in rank)]
+    check(len(ap.last_result.applied) == 68, "shipped profile: all 68 applied")
+    check(not bad, f"shipped profile: no command out of VoiceAttack order (got {len(bad)})")
+    check(not any(t not in rank for c in shipped.findall(".//Command") for t in [e.tag for e in c]),
+          "shipped profile: every command element is in the known order list")
+
+
+def no_shortcuts():
+    old = tree(cmd("Boost"), cmd("Other"), cmd("((Internal))"))
+    ex = VAKeybindExtractor()
+    check(ex.extract(old) == {} and not ex.skipped, "old profile without shortcuts: nothing extracted or skipped")
+    new = tree(cmd("Boost"))
+    ap = VAKeybindApplier()
+    ap.apply(new, {})
+    check(not ap.last_result.applied and not ap.last_result.not_applied, "empty bindings: nothing applied")
+
+
 def synthetic():
     old = tree(
         cmd("Boost", UseShortcut="true", keyValue="66", keyCtrl="1"),
@@ -98,6 +126,8 @@ def synthetic():
 
 if __name__ == "__main__":
     real_profiles()
+    shipped_profile_order()
+    no_shortcuts()
     synthetic()
     print("FAILED" if failures else "ALL PASSED")
     sys.exit(1 if failures else 0)

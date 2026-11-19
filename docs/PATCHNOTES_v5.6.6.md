@@ -10,6 +10,8 @@
 - Announcement presets now have a right-click Load / Save / Rename menu to prevent accidental overwrites.
 - Added a Ships tab to Mining Statistics with sessions, tons and T/hr for each ship.
 - Added a Patch Notes button to the About window.
+- VoiceAttack profile updates now keep your key and joystick shortcuts automatically, with no export needed.
+- Setup now asks you to close VoiceAttack when it updates the profile.
 
 ## Bug Fixes
 
