@@ -149,3 +149,5 @@ app/Images/bot_avatar.jpg
 /sol_system.json
 /sparse_search.json
 tools/obj/
+tools/va_profile_reader/bin/
+tools/va_profile_reader/obj/

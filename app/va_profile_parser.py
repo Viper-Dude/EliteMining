@@ -119,16 +119,19 @@ class VAProfileParser:
         if version_elem is not None and version_elem.text:
             return version_elem.text
         
-        # Parse from profile name: "EliteMining v4.76" or "EliteMining Dev 4.7.5-Profile"
-        name = self.get_profile_name(tree)
-        match = re.search(r'v?(\d+\.\d+(?:\.\d+)?)', name)
-        if match:
-            version = match.group(1)
+        version = self.version_from_name(self.get_profile_name(tree))
+        if version:
             logger.info(f"Extracted version from name: {version}")
             return version
-        
+
         logger.warning("Could not determine profile version")
         return "unknown"
+
+    @staticmethod
+    def version_from_name(name: str) -> Optional[str]:
+        """Parse version from profile name: "EliteMining v4.76" or "EliteMining Dev 4.7.5-Profile" """
+        match = re.search(r'v?(\d+\.\d+(?:\.\d+)?)', name or "")
+        return match.group(1) if match else None
     
     def get_all_commands(self, tree: ET.ElementTree) -> List[ET.Element]:
         """

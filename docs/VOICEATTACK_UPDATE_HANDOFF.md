@@ -112,6 +112,20 @@ Drafted on 19 November 2026. The goal is to remove the manual export step. The a
 - Input: the path to `VoiceAttack.dat` and a profile name. Output: the profile's commands and bindings as XML in the same shape as an exported `.vap`, so the existing extractor reads it unchanged.
 - Always work on a temporary copy and never write to VoiceAttack's file. Check both the VoiceAttack 2 and VoiceAttack 1 folders.
 
+### Phase 1 result (19 November 2026)
+
+**Done on branch `va-binding-reader`.** The reader works on the maintainer's data, and every field mapped by position only in Phase 0 is now confirmed.
+
+- **Helper.** `tools/va_profile_reader/` (C#, .NET Framework 4.8, LiteDB 5.0.21). `list <copy> <out.xml>` lists every profile with its player-command and bound counts. `export <copy> <profile id> <out.xml>` writes the profile's player commands with `BaseId`, `CommandString` and the 41 binding fields, using the VoiceAttack 2 export element names; internal `((…))` commands are skipped. It refuses any path inside `%APPDATA%\VoiceAttack2\` or `%APPDATA%\VoiceAttack\` (exit 4). It exits 3 on any unexpected layout: a record `Version` other than 1, a field whose width differs from its fixed table, fewer than 82 command fields, or out-of-range offsets. Field widths were identical across all 6,978 stored commands in 18 profiles.
+- **Python wrapper.** `app/va_profile_reader.py` finds the newest backup by modification time in both VoiceAttack folders, copies it to a temp folder, chooses the profile and exports it. It is not yet called from `main.py`. `VAProfileParser.version_from_name()` is shared with the update check.
+- **Profile choice.** Candidates are profiles whose name starts with "EliteMining". A single candidate wins. Otherwise the order is: the one matching `installed_version` in `va_profile_state.json`, then the highest version among those with bindings, then the one with more bindings. A tie, or no candidate, gives no pick. The dev state file holds a stale `4.8.9`. Phase 3 must keep it current, or a stale value could select an old profile.
+- **Checks.** `tools/check_va_profile_reader.py selftest` covers the choice rules and the 12-hour-clock backup names. `real --export` against the v5.6.6 export found 242 player commands, 68 with a shortcut, and 0 mismatches over 41 fields.
+- **Position-only fields confirmed.** A generated 20-command test profile set Alt/Win, Mouse3–Mouse9, mouse and joystick release, the keyboard and mouse tap levels, `joystickExclusive` and the three variable-shortcut switches. Read back from the backup written at import, it gave 0 mismatches. Mouse1 and Mouse2 were not set; they sit directly before Mouse3 in the field order.
+- **Backups do not lag.** The backup written at import already contained the imported profile and had the same modification time as the live file.
+- **Variable shortcut names are not mapped.** The export omits the field holding the variable name when it is empty. The test profile switched variable shortcuts on without a name, and VoiceAttack crashed (`NullReferenceException` in `GetTextVariables`) on import and whenever the profile was selected. The maintainer restored the pre-import backup. Phase 2 must never carry a variable shortcut over without its name; skip those fields until the name is mapped. None of the 242 player commands uses one.
+- **Packaging (Phase 3).** The exe needs `LiteDB.dll` and `System.Buffers.dll` beside it. The build output is git-ignored, and `_reader_exe_path()` only knows the dev path. The unused `tools/VAProfileHelper.csproj` would also compile the new `Program.cs` if anyone built it.
+- VoiceAttack 1 remains untested.
+
 ### Phase 2: improve the merge (useful either way)
 
 - Reuse `VAKeybindExtractor` and `VAKeybindApplier`, which already cover the binding fields. [Extractor](../app/va_keybind_extractor.py) · [Applier](../app/va_keybind_applier.py)
