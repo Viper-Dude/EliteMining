@@ -2,5 +2,13 @@
 
 New Features & Improvements
 - Hover the Updated column wherever prices are shown to see where each price came from.
+- Sell My Hold now shows the landing pad size of each station.
+- New modern look for sliders, number boxes, checkboxes and the text color and size options.
+- The session summary line and the journal history import window now follow your language and theme colors.
 
 Bug Fixes
+- Typed timer values in VoiceAttack Controls are now saved right away.
+- Changing the journal folder now takes effect right away for jumps-left and shared market data, without a restart.
+- Jumps-left no longer misses a route update or clear when several game events arrive at the same time.
+- Fixed mining events being skipped right after the app starts.
+- The journal history import window no longer stays open if the import fails, and now shows an error instead.
