@@ -172,7 +172,8 @@ class ReportChecks(unittest.TestCase):
         cargo = dict(materials_mined={'Platinum': 100}, total_tons_mined=100,
                      session_duration=3600, prospectors_used=0, engineering_materials={})
         monitor = SimpleNamespace(get_live_session_materials=lambda: {'Platinum': 100},
-                                  end_session_tracking=lambda: cargo)
+                                  end_session_tracking=lambda: cargo,
+                                  user_db=SimpleNamespace(get_ring_type=lambda system, body: None))
         obj = bind_methods(SimpleNamespace(
             reports_dir=self.folder.name, session_active=True, session_paused=False,
             session_start=datetime.now(), main_app=SimpleNamespace(cargo_monitor=monitor),
@@ -180,6 +181,7 @@ class ReportChecks(unittest.TestCase):
             _set_status=Mock(), start_btn=Mock(), stop_btn=Mock(), cancel_btn=Mock(),
             pause_resume_btn=Mock(), session_system=SimpleNamespace(get=lambda: 'Sol'),
             session_body=SimpleNamespace(get=lambda: 'A Ring'), session_mining_body='',
+            session_mining_system='',
             session_elapsed=SimpleNamespace(get=lambda: '01:00:00'),
             multi_session_var=SimpleNamespace(get=lambda: False),
             session_ship_name='Cutter', _write_var_text=Mock(), charts_panel=None,

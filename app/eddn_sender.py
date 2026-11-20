@@ -67,6 +67,7 @@ class EDDNSender:
         Args:
             load_game_event: LoadGame event from journal
         """
+        previous = (self.game_version, self.horizons, self.odyssey)
         # Elite's LoadGame event uses lowercase 'gameversion'/'build' (not 'GameVersion'/'Build')
         self.game_version = load_game_event.get('gameversion') or load_game_event.get('GameVersion', '')
         self.game_build = load_game_event.get('build') or load_game_event.get('Build', '')
@@ -77,7 +78,8 @@ class EDDNSender:
         if 'Commander' in load_game_event:
             self.commander_name = load_game_event['Commander']
         
-        log.info(f"Updated game info: {self.game_version}, Horizons={self.horizons}, Odyssey={self.odyssey}")
+        if (self.game_version, self.horizons, self.odyssey) != previous:
+            log.info(f"Updated game info: {self.game_version}, Horizons={self.horizons}, Odyssey={self.odyssey}")
 
     def prime_from_journal(self, journal_dir: str) -> bool:
         """

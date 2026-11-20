@@ -3,7 +3,8 @@
 
 ## New Features & Improvements
 
-- Hover the Updated column in any Commodity Market results table to see where that price came from.
+- Hover the Updated column wherever prices are shown to see where each price came from.
+- Sell My Hold now shows the landing pad size of each station.
 
 
 ## Bug Fixes

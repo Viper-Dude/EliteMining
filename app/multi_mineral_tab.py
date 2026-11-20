@@ -142,7 +142,7 @@ class MultiMineralTab:
                 self.tree.heading(c, text="", anchor="w")
                 self.tree.column(c, width=app._scaled_px(20), stretch=True)
                 continue
-            anchor = "w"
+            anchor = "center" if c in ("pad", "updated") else "w"
             self.tree.heading(c, text=headings[c], anchor=anchor, command=lambda col=c: self._sort(col))
             self.tree.column(c, width=max(app._scaled_px(widths[c]), min_for(c)), minwidth=min_for(c),
                              stretch=False, anchor=anchor)

@@ -51,9 +51,9 @@ class VAProfileParser:
             else:
                 # Try parsing as plain XML first
                 try:
-                    logger.info(f"Attempting to parse as uncompressed XML: {vap_path}")
+                    logger.debug(f"Attempting to parse as uncompressed XML: {vap_path}")
                     tree = ET.parse(vap_path)
-                    logger.info(f"Parsed uncompressed VAP file: {vap_path}")
+                    logger.debug(f"Parsed uncompressed VAP file: {vap_path}")
                     return tree
                 except ET.ParseError:
                     # Not plain XML, try DEFLATE decompression

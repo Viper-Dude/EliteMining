@@ -12,7 +12,8 @@ def attach_cell_tooltip(tree, column_name, text_for_item):
     """Show text_for_item(item_id) in a tooltip while hovering a cell of `column_name`.
 
     Nothing is shown when text_for_item returns an empty string. Uses add='+' bindings
-    so it coexists with the tree's existing handlers.
+    so it coexists with the tree's existing handlers. Returns a function telling whether
+    the tooltip is showing, for dialogs whose keep-on-top loop would bury it.
     """
     state = {"tip": None, "key": None}
 
@@ -51,3 +52,4 @@ def attach_cell_tooltip(tree, column_name, text_for_item):
     tree.bind("<Motion>", on_motion, add="+")
     tree.bind("<Leave>", hide, add="+")
     tree.bind("<ButtonPress-1>", hide, add="+")
+    return lambda: state["tip"] is not None

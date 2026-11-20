@@ -1481,7 +1481,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         except Exception as e:
             print(f"[ERROR] Force rebuild failed: {e}")
             from tkinter import messagebox
-            from main import center_window
+            from ui.dialogs import center_window
             import tkinter as tk
             main_parent = self.winfo_toplevel()
             dialog = tk.Toplevel(main_parent)
@@ -1533,7 +1533,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         except Exception as e:
             print(f"[ERROR] Clear cache failed: {e}")
             from tkinter import messagebox
-            from main import center_window
+            from ui.dialogs import center_window
             import tkinter as tk
             main_parent = self.winfo_toplevel()
             dialog = tk.Toplevel(main_parent)
@@ -1624,7 +1624,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 for inc in inconsistencies:
                     print(f"[WARNING] {inc['system']} {inc['body']}: UI='{inc['ui_comment']}' vs CSV='{inc['csv_comment']}'")
                 
-                from main import centered_yesno_dialog
+                from ui.dialogs import centered_yesno_dialog
                 result = centered_yesno_dialog(
                     self.winfo_toplevel(),
                     "Data Inconsistency Detected",
@@ -2835,7 +2835,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 print(f"Exporting CSV from {csv_path} to {dest_path}")
                 shutil.copy2(csv_path, dest_path)
                 self._set_status(f"Session data exported to {dest_path}")
-                from main import center_window
+                from ui.dialogs import center_window
                 import tkinter as tk
                 main_parent = self.winfo_toplevel()
                 dialog = tk.Toplevel(main_parent)
@@ -2876,7 +2876,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             error_msg = f"Export failed: {e}"
             self._set_status(error_msg)
             from tkinter import messagebox
-            from main import center_window
+            from ui.dialogs import center_window
             import tkinter as tk
             main_parent = self.winfo_toplevel()
             dialog = tk.Toplevel(main_parent)
@@ -3047,7 +3047,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             dialog.title("Discord Username")
             dialog.configure(bg="#1e1e1e")
             dialog.resizable(False, False)
-            from main import center_window
+            from ui.dialogs import center_window
             center_window(dialog, main_parent)
             
             # Set app icon
@@ -4392,7 +4392,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         cfg = _load_cfg()
         overlay_mode = cfg.get("overlay_mode", "standard")
         show_all = cfg.get("prospector_show_all", False)
-        log.info(f"[OVERLAY] prospector overlay request: mode={overlay_mode}, show_all={show_all}, "
+        log.debug(f"[OVERLAY] prospector overlay request: mode={overlay_mode}, show_all={show_all}, "
                  f"overlay_enabled={getattr(self.text_overlay, 'overlay_enabled', None)}")
 
         try:
@@ -5791,7 +5791,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     title = t('context_menu.delete_sessions_title')
                 
                 # Confirm deletion
-                from main import centered_yesno_dialog
+                from ui.dialogs import centered_yesno_dialog
                 if centered_yesno_dialog(
                     self.winfo_toplevel(),
                     title,
@@ -9569,7 +9569,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         add_refinery = False
         if (not silent and self.main_app and hasattr(self.main_app, 'cargo_monitor')
                 and not bool(self.multi_session_var.get())):
-            from main import centered_yesno_dialog
+            from ui.dialogs import centered_yesno_dialog
             add_refinery = centered_yesno_dialog(
                 self.main_app,
                 t('dialogs.refinery_materials_title'),
@@ -9628,7 +9628,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             if add_refinery:
                 try:
                     # Import here to avoid circular import
-                    from main import RefineryDialog
+                    from ui.refinery_dialog import RefineryDialog
                     dialog = RefineryDialog(
                         parent=parent_window,
                         cargo_monitor=self.main_app.cargo_monitor,
@@ -12029,7 +12029,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     system = values[2] if len(values) > 2 else "Unknown"
                     body = values[3] if len(values) > 3 else "Unknown"
                     
-                    from main import centered_info_dialog
+                    from ui.dialogs import centered_info_dialog
                     centered_info_dialog(
                         self.winfo_toplevel(),
                         t('context_menu.no_detailed_report_title'),
@@ -12039,7 +12039,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     )
                 else:
                     # Multiple selections with no detailed reports
-                    from main import centered_info_dialog
+                    from ui.dialogs import centered_info_dialog
                     centered_info_dialog(
                         self.winfo_toplevel(),
                         t('context_menu.no_detailed_reports_title'),
@@ -12075,7 +12075,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 title = "Delete Multiple Detailed Reports"
             
             # Show confirmation dialog
-            from main import centered_yesno_dialog
+            from ui.dialogs import centered_yesno_dialog
             if not centered_yesno_dialog(
                 self.winfo_toplevel(),
                 title,
@@ -12268,7 +12268,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                             pass
             
             # Open Refinery Dialog
-            from main import RefineryDialog
+            from ui.refinery_dialog import RefineryDialog
             # Get the top-level window as parent
             parent_window = self.winfo_toplevel()
             dialog = RefineryDialog(
@@ -13018,7 +13018,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     pass
             
             # Ask user if they want to add screenshots before generating the report
-            from main import centered_yesno_dialog
+            from ui.dialogs import centered_yesno_dialog
             add_screenshots = centered_yesno_dialog(
                 tree.winfo_toplevel(),
                 t('context_menu.detailed_report_title'),
@@ -13067,7 +13067,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         print(f"Could not update tree item indicator: {e}")
                     
                     # Ask user if they want to preview the report
-                    from main import centered_yesno_dialog
+                    from ui.dialogs import centered_yesno_dialog
                     preview_report = centered_yesno_dialog(
                         tree.winfo_toplevel(),
                         t('context_menu.report_generated_title'),
@@ -13166,7 +13166,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     self._update_enhanced_report_mapping(enhanced_session_data, os.path.basename(html_report_path))
                     
                     # Ask user if they want to preview the report
-                    from main import centered_yesno_dialog
+                    from ui.dialogs import centered_yesno_dialog
                     preview_report = centered_yesno_dialog(
                         self.winfo_toplevel(),
                         t('context_menu.report_generated_title'),

@@ -310,9 +310,8 @@ class EDDNListener:
                         self.messages_received += 1
                         self.last_message_time = datetime.now()
                         
-                        # Log first few messages to show it's working
-                        if self.messages_received <= 5:
-                            log.info(f"📡 EDDN: Message #{self.messages_received} received")
+                        if self.messages_received == 1:
+                            log.info("📡 EDDN: First message received")
                         
                     except zmq.Again:
                         # Timeout - check if we should continue

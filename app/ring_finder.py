@@ -7729,11 +7729,16 @@ class RingFinder(ColumnVisibilityMixin):
 
         mineral_by_row = {}
         system_by_row = {}
+        source_by_row = {}
+        from app_utils import format_market_source
+        from ui.cell_tooltip import attach_cell_tooltip
+        cell_tip_open = attach_cell_tooltip(tree, "Updated", lambda item: source_by_row.get(item, ''))
 
         def populate_rows():
             tree.delete(*tree.get_children())
             mineral_by_row.clear()
             system_by_row.clear()
+            source_by_row.clear()
             for mat, best, priced_rows in results:
                 row_best = rows_for_mode(mat, best, priced_rows)
                 if row_best and row_best.get('sellPrice', 0) > 0:
@@ -7777,6 +7782,8 @@ class RingFinder(ColumnVisibilityMixin):
                 row_id = tree.insert("", "end", values=(mat_display, ring_type_display, price, station, station_type, pad, dist, ls, demand, powerplay, updated))
                 mineral_by_row[row_id] = mat
                 system_by_row[row_id] = station_system
+                if row_best and row_best.get('sellPrice', 0) > 0:
+                    source_by_row[row_id] = format_market_source(row_best)
 
         def on_pp_check_toggle():
             save_pp_mode(pp_mode_var.get())
@@ -7971,7 +7978,7 @@ class RingFinder(ColumnVisibilityMixin):
         def keep_on_top():
             try:
                 if dialog.winfo_exists():
-                    if not getattr(dialog, '_row_menu_open', False):
+                    if not getattr(dialog, '_row_menu_open', False) and not cell_tip_open():
                         dialog.lift()
                     dialog.after(100, keep_on_top)
             except Exception:
@@ -8538,6 +8545,10 @@ class RingFinder(ColumnVisibilityMixin):
         tree.bind("<ButtonRelease-1>", save_reverse_search_widths, add='+')
 
         system_by_row = {}
+        source_by_row = {}
+        from app_utils import format_market_source
+        from ui.cell_tooltip import attach_cell_tooltip
+        attach_cell_tooltip(tree, "Updated", lambda item: source_by_row.get(item, ''))
         for r in results:
             best = r['best']
             if best and r['mineral']:
@@ -8581,6 +8592,8 @@ class RingFinder(ColumnVisibilityMixin):
                 r['system'], f"{r['distance']:.1f}", mineral_display, price, station,
                 station_type, ls, powerplay, updated))
             system_by_row[row_id] = r['system']
+            if best and r['mineral']:
+                source_by_row[row_id] = format_market_source(best)
 
         v_scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
         h_scrollbar = ttk.Scrollbar(tree_frame, orient="horizontal", command=tree.xview)
@@ -9070,6 +9083,10 @@ class RingFinder(ColumnVisibilityMixin):
 
         system_by_row = {}
         station_by_row = {}
+        source_by_row = {}
+        from app_utils import format_market_source
+        from ui.cell_tooltip import attach_cell_tooltip
+        attach_cell_tooltip(tree, "Updated", lambda item: source_by_row.get(item, ''))
         for sys_name, sys_entry in results:
             power = sys_entry.get('controlling_power', '') or t('ring_finder.pp_unoccupied')
             if power == '~none~':
@@ -9087,6 +9104,7 @@ class RingFinder(ColumnVisibilityMixin):
                 f"{price:,} CR", self._format_data_age(buyer_row.get('updatedAt', ''))))
             system_by_row[row_id] = sys_name
             station_by_row[row_id] = station
+            source_by_row[row_id] = format_market_source(buyer_row)
 
         v_scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
         tree.configure(yscrollcommand=v_scrollbar.set)
