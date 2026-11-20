@@ -1841,8 +1841,7 @@
     "results": "Beste Optionen unter den gemeldeten Käufern im Suchradius. Restladung und Anflugentfernungen vor der Reise prüfen.",
     "one_stop": "Ein Stopp",
     "two_stops": "Zwei Stopps",
-    "quick_sale": "Schnellverkauf",
-    "hours": "vor {hours:.1f} Std."
+    "quick_sale": "Schnellverkauf"
   },
   "statistics_expanded": {
     "low_temp_diamonds": "Tieftemperaturdiamanten",

@@ -6,7 +6,6 @@ import threading
 import tkinter as tk
 import tkinter.font as tkfont
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
 from itertools import combinations
 from tkinter import ttk
 
@@ -17,7 +16,7 @@ from config import _load_cfg, update_config_value, load_theme
 from ui.tooltip import ToolTip, add_header_tooltips
 from column_visibility_helper import ColumnVisibilityMixin
 from core.constants import get_menu_colors
-from app_utils import create_action_button, format_market_source, format_market_station_type, open_system_website
+from app_utils import create_action_button, format_market_source, format_market_station_type, format_relative_age, open_system_website
 
 
 def sale_cargo(cargo, missions):
@@ -378,12 +377,7 @@ class CargoSellPlanner(ColumnVisibilityMixin):
             row = sale['row']
             stop = plan['stops'][sale['stop']]['info']
             leg = plan['legs'][sale['stop']]
-            try:
-                stamp = datetime.fromisoformat(row['updatedAt'].replace('Z', '+00:00'))
-                age = (datetime.now(timezone.utc) - stamp.replace(tzinfo=stamp.tzinfo or timezone.utc)).total_seconds() / 3600
-                updated = t('sell_hold.hours').format(hours=max(0, age))
-            except (ValueError, KeyError, TypeError):
-                updated = '?'
+            updated = format_relative_age(row.get('updatedAt')) or '?'
             arrival = row.get('distanceToArrival')
             arrival_display = self._format_arrival(arrival)
             item = self.details.insert('', 'end', values=(

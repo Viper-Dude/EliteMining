@@ -1833,8 +1833,7 @@
     "results": "Best options among reported buyers within the search radius. Check unsold cargo and arrival distances before travelling.",
     "one_stop": "One stop",
     "two_stops": "Two stops",
-    "quick_sale": "Quick sale",
-    "hours": "{hours:.1f} h ago"
+    "quick_sale": "Quick sale"
   },
   "statistics_expanded": {
     "low_temp_diamonds": "Low Temp Diamonds",
