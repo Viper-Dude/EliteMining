@@ -66,7 +66,7 @@ Origin: an honest review of the GUI, features, performance, the file watcher (wa
 
 ## Open items
 
-1. **Retest in the next test build (user):**
+1. **Retest passed on the installer build from `9783abf` (20 Nov 2026).** Splash, startup log, supercruise tab switch, carrier ring type and empty-session reports all worked. The log showed one leftover `self.app` in the CarrierLocation handler (distance update), now `self.main_app`; uncommitted, needs a rebuild and carrier retest. Original list:
    - The app gets past the splash screen, and the startup log has no "Applying detected cargo capacity at startup failed" line.
    - Error lines from the converted prints now appear in the installed log.
    - About 3 s after entering supercruise, the tab switches to Hotspots Finder (if the app was idle for 30 s).

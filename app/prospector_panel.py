@@ -7494,8 +7494,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         self.main_app.update_current_system(self.last_system, coords, count_visit=False)
                     
                     # Update distances in Distance Calculator (non-blocking)
-                    if hasattr(self.app, '_update_home_fc_distances'):
-                        self.app.after(100, self.app._update_home_fc_distances)
+                    if self.main_app and hasattr(self.main_app, '_update_home_fc_distances'):
+                        self.main_app.after(100, self.main_app._update_home_fc_distances)
                 
                 # Handle station/carrier context - use real-time Status.json for docked state
                 journal_docked_status = evt.get("Docked", False)
@@ -9672,7 +9672,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             # Ask if user wants to add a comment
             # Use main_app as parent to ensure dialog appears on correct monitor
             main_parent = self.main_app if self.main_app else self.winfo_toplevel()
-            if silent:
+            if silent or (cargo_session_data and cargo_session_data.get('total_tons_mined', 0) <= 0):
                 pass
             elif centered_yesno_dialog(
                 main_parent,
