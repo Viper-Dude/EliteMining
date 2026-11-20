@@ -659,6 +659,16 @@ def format_market_pad(size):
     return size.upper() if isinstance(size, str) and size.upper() in ('S', 'M', 'L') else '?'
 
 
+def format_market_source(row):
+    """Where a market row's price came from, for the Updated column tooltip."""
+    if row.get('_source'):
+        return row['_source']
+    if row.get('_saved'):
+        from localization import t
+        return t('marketplace.source_local')
+    return ''
+
+
 def format_market_powerplay(entry, include_age=False, no_data=None):
     from localization import t
     power, state = entry.get('controlling_power', ''), entry.get('power_state', '')

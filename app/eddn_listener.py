@@ -117,6 +117,7 @@ class EDDNListener:
                         UNIQUE(system_name, station_name, commodity_name)
                     )
                 ''')
+                EDDNListener.ensure_source_column(cursor)
                 cursor.execute('''
                     CREATE INDEX IF NOT EXISTS idx_commodity_name
                     ON commodity_prices_data(commodity_name)
@@ -169,6 +170,13 @@ class EDDNListener:
         except Exception as e:
             log.error(f"EDDN database init error: {e}")
         
+    @staticmethod
+    def ensure_source_column(cursor):
+        """Add the price source column to caches created before it existed."""
+        columns = {row[1] for row in cursor.execute('PRAGMA table_info(commodity_prices_data)').fetchall()}
+        if columns and 'source' not in columns:
+            cursor.execute('ALTER TABLE commodity_prices_data ADD COLUMN source TEXT')
+
     def start(self):
         """Start the EDDN listener in background thread"""
         if self.running:
@@ -525,11 +533,11 @@ class EDDNListener:
                         INSERT OR REPLACE INTO commodity_prices_data
                         (system_name, system_x, system_y, system_z, station_name, station_type,
                          commodity_name, sell_price, buy_price, demand, stock, distance_to_arrival,
-                         market_id, updated_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         market_id, updated_at, source)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ''', (system_name, system_x, system_y, system_z, station_name, station_type,
                           commodity_name, sell_price, buy_price, demand, stock, None,
-                          market_id, timestamp))
+                          market_id, timestamp, 'EDDN'))
                 
                 conn.commit()
                 

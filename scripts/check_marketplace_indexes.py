@@ -162,6 +162,28 @@ class CacheIndexChecks(unittest.TestCase):
             self.assertEqual(conn.execute('SELECT count(*) FROM commodity_prices_data WHERE market_id=1').fetchone()[0], 1)
             self.assertEqual(conn.execute('PRAGMA integrity_check').fetchall(), [('ok',)])
 
+    def test_saved_prices_keep_their_original_source(self):
+        self.listener._update_commodity_prices('Sol', 'Station 1', 'Coriolis', 1, [
+            dict(name='platinum', sellPrice=250000, buyPrice=200000, demand=500, stock=25),
+        ], self.now)
+        MarketplaceAPI._backfill_eddn_cache([dict(
+            marketId=2, systemName='Sol', stationName='Station 2', stationType='Outpost',
+            commodityName='platinum', sellPrice=300, updatedAt=self.now, _source='Ardent')])
+        rows = {row['marketId']: row for row in MarketplaceAPI._fetch_eddn_cache('platinum', 'Sol', 'buy', max_days_ago=7)}
+        self.assertEqual((rows[1]['_source'], rows[2]['_source'], rows[4]['_source']), ('EDDN', 'Ardent', None))
+        self.assertTrue(all(row['_saved'] for row in rows.values()))
+
+    def test_cache_without_source_column_is_upgraded_and_keeps_records(self):
+        with closing(sqlite3.connect(self.path)) as conn:
+            conn.execute('ALTER TABLE commodity_prices_data DROP COLUMN source')
+            conn.commit()
+            before = conn.execute('SELECT * FROM commodity_prices_data ORDER BY id').fetchall()
+        EDDNListener(self.path)
+        with closing(sqlite3.connect(self.path)) as conn:
+            after = conn.execute('SELECT * FROM commodity_prices_data ORDER BY id').fetchall()
+        self.assertEqual([row[:-1] for row in after], before)
+        self.assertTrue(all(row[-1] is None for row in after))
+
     def test_cleanup_removes_old_prices_but_preserves_powerplay(self):
         self.assertEqual(self.listener._cleanup_old_data(), 1)
         with closing(sqlite3.connect(self.path)) as conn:

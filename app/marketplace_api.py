@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Optional
 
 _system_coords_cache: Dict[str, object] = {}  # module-level coord cache
+_source_column_ready: set = set()  # cache paths already checked for the source column
 
 import threading as _threading
 import time as _time_mod
@@ -478,6 +479,7 @@ class MarketplaceAPI:
 
             cutoff = (datetime.now(timezone.utc) - timedelta(days=max_days_ago)).isoformat()
 
+            MarketplaceAPI._ensure_source_column()
             with sqlite3.connect(MarketplaceAPI.EDDN_CACHE_PATH) as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
@@ -488,7 +490,7 @@ class MarketplaceAPI:
                     SELECT c.system_name, c.system_x, c.system_y, c.system_z,
                            c.station_name, c.commodity_name,
                            c.sell_price, c.buy_price, c.demand, c.stock,
-                           c.market_id, c.updated_at,
+                           c.market_id, c.updated_at, c.source,
                            COALESCE(NULLIF(c.station_type, 'Unknown'), m.station_type, 'Unknown') AS station_type,
                            COALESCE(c.distance_to_arrival, m.distance_to_arrival)             AS distance_to_arrival,
                            COALESCE(m.max_landing_pad_size, 0)                                AS meta_pad_size
@@ -628,7 +630,8 @@ class MarketplaceAPI:
                     "systemX":           sx,
                     "systemY":           sy,
                     "systemZ":           sz,
-                    "_source":           "EDDN",
+                    "_source":           row["source"],
+                    "_saved":            True,
                 })
 
             print(f"[EDDN CACHE] {filter_type}: {len(normalized)} results for {spansh_name}")
@@ -637,6 +640,20 @@ class MarketplaceAPI:
         except Exception as e:
             print(f"[EDDN CACHE] Error: {e}")
             return []
+
+    @staticmethod
+    def _ensure_source_column() -> None:
+        path = MarketplaceAPI.EDDN_CACHE_PATH
+        if not path or path in _source_column_ready:
+            return
+        import sqlite3
+        from eddn_listener import EDDNListener
+        try:
+            with sqlite3.connect(path) as conn:
+                EDDNListener.ensure_source_column(conn.cursor())
+            _source_column_ready.add(path)
+        except Exception as e:
+            print(f"[EDDN CACHE] Source column check failed: {e}")
 
     @staticmethod
     def _get_system_coords(system_name: str):
@@ -871,6 +888,9 @@ class MarketplaceAPI:
             else:
                 rows = []
             print(f"[ARDENT] {len(rows)} results")
+            for row in rows:
+                if isinstance(row, dict):
+                    row["_source"] = "Ardent"
             return rows
         except Exception as e:
             print(f"[ARDENT] {MarketplaceAPI.ARDENT_URL} failed: {e}")
@@ -930,7 +950,8 @@ class MarketplaceAPI:
                 best[mid] = row
             else:
                 existing = best[mid]
-                if _ts(row) > _ts(existing):
+                # On equal timestamps the saved copy is usually this same live record backfilled earlier.
+                if _ts(row) > _ts(existing) or (_ts(row) == _ts(existing) and existing.get("_saved") and not row.get("_saved")):
                     # Newer record wins for pricing data
                     merged = dict(row)
                     # Preserve metadata from older record if newer lacks it
@@ -954,7 +975,12 @@ class MarketplaceAPI:
                     best[mid] = _preserve_coords(best[mid], row)
 
         merged = list(best.values()) + no_id
+        source_counts: Dict[str, int] = {}
+        for row in merged:
+            label = row.get("_source") or ("Saved" if row.get("_saved") else "Unknown")
+            source_counts[label] = source_counts.get(label, 0) + 1
         print(f"[DUAL-API] After merge: {len(merged)} unique results")
+        print(f"[DUAL-API] Price sources: {', '.join(f'{k} {v}' for k, v in sorted(source_counts.items()))}")
         return merged
 
     @staticmethod
@@ -979,6 +1005,7 @@ class MarketplaceAPI:
             if not to_write:
                 return
 
+            MarketplaceAPI._ensure_source_column()
             with sqlite3.connect(MarketplaceAPI.EDDN_CACHE_PATH) as conn:
                 cursor = conn.cursor()
                 for r in to_write:
@@ -986,12 +1013,12 @@ class MarketplaceAPI:
                         INSERT OR REPLACE INTO commodity_prices_data
                         (system_name, system_x, system_y, system_z, station_name, station_type,
                          commodity_name, sell_price, buy_price, demand, stock, distance_to_arrival,
-                         market_id, updated_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         market_id, updated_at, source)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ''', (r.get("systemName"), r.get("systemX"), r.get("systemY"), r.get("systemZ"),
                           r.get("stationName"), r.get("stationType"), r.get("commodityName", "").lower(),
                           r.get("sellPrice", 0), r.get("buyPrice", 0), r.get("demand", 0), r.get("stock", 0),
-                          r.get("distanceToArrival"), r.get("marketId"), r.get("updatedAt")))
+                          r.get("distanceToArrival"), r.get("marketId"), r.get("updatedAt"), r.get("_source")))
                 conn.commit()
         except Exception as e:
             print(f"[EDDN CACHE] Backfill error: {e}")

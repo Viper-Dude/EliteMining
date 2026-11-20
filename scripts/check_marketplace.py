@@ -17,7 +17,8 @@ from unittest.mock import Mock, patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'app'))
 
-from app_utils import format_market_pad, format_market_powerplay, format_market_station_type
+from localization import t
+from app_utils import format_market_pad, format_market_powerplay, format_market_source, format_market_station_type
 from cargo_sell_planner import build_plans
 from column_visibility_helper import ColumnVisibilityMixin, displayed_column
 from marketplace_api import MarketplaceAPI, _short_cache, _short_cache_key_locks, _system_coords_cache
@@ -184,6 +185,36 @@ class MarketTests(unittest.TestCase):
             result = MarketplaceAPI.add_distances_to_results(rows, 'Wregoe MD-K d8-19')
         self.assertEqual(result[0]['distance'], 0)
         self.assertEqual(result[0]['systemX'], 158.84375)
+
+    def test_merge_keeps_source_of_the_newer_price_and_fills_station_type(self):
+        older = market(1, _source='Ardent', stationType='Coriolis', updatedAt='2026-11-14T00:00:00Z')
+        newer = market(1, _source='EDDN', _saved=True, stationType='', updatedAt='2026-11-15T00:00:00Z')
+        for rows in ([older, newer], [newer, older]):
+            result = MarketplaceAPI._merge_by_freshness(rows)[0]
+            self.assertEqual(result['_source'], 'EDDN')
+            self.assertEqual(result['stationType'], 'Coriolis')
+
+    def test_equal_timestamps_prefer_the_live_lookup_over_the_saved_copy(self):
+        stamp = '2026-11-15T00:00:00Z'
+        saved = market(1, _source='Ardent', _saved=True, updatedAt=stamp)
+        live = market(1, _source='Ardent', updatedAt=stamp)
+        for rows in ([saved, live], [live, saved]):
+            self.assertFalse(MarketplaceAPI._merge_by_freshness(rows)[0].get('_saved'))
+        newer_saved = market(1, _source='EDDN', _saved=True, updatedAt='2026-11-16T00:00:00Z')
+        self.assertTrue(MarketplaceAPI._merge_by_freshness([live, newer_saved])[0].get('_saved'))
+
+    def test_source_label_for_live_saved_and_untagged_rows(self):
+        self.assertEqual(format_market_source(market(1, _source='Spansh')), 'Spansh')
+        self.assertEqual(format_market_source(market(1, _source='Ardent', _saved=True)), 'Ardent')
+        self.assertEqual(format_market_source(market(1, _source=None, _saved=True)), t('marketplace.source_local'))
+        self.assertEqual(format_market_source(market(1)), '')
+
+    def test_ardent_rows_are_tagged_with_their_source(self):
+        response = Mock()
+        response.json.return_value = [market(1), market(2)]
+        with patch('marketplace_api.tracked_request', return_value=response):
+            rows = MarketplaceAPI._fetch_ardent('/x', {})
+        self.assertEqual([r['_source'] for r in rows], ['Ardent', 'Ardent'])
 
 
 class SearchTests(unittest.TestCase):

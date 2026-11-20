@@ -570,6 +570,7 @@
     "limpets_used": "Limpets"
   },
   "marketplace": {
+    "source_local": "Not recorded",
     "multi_title": "Sell Several Minerals",
     "multi_hint": "Pick minerals, then click Search",
     "multi_select_minerals": "Minerals to sell (up to {max}):",

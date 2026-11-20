@@ -929,7 +929,7 @@ class CargoTextOverlay:
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.6.6"
+APP_VERSION = "v5.6.7"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -18969,6 +18969,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.marketplace_tree.bind("<Button-1>", lambda e: self._deselect_on_empty_click(e, self.marketplace_tree))
         # Double-click the Powerplay cell to open Inara and fetch/refresh its data
         self.marketplace_tree.bind("<Double-1>", lambda e: self._on_commodity_tree_double_click(e, self.marketplace_tree))
+        self._marketplace_row_source = {}
+        from ui.cell_tooltip import attach_cell_tooltip
+        attach_cell_tooltip(self.marketplace_tree, "updated", lambda item: self._marketplace_row_source.get(item, ''))
         
         # Vertical scrollbar
         v_scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.marketplace_tree.yview)
@@ -19968,6 +19971,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self.trade_tree.bind("<ButtonRelease-1>", save_trade_widths)
         # Double-click the Powerplay cell to open Inara and fetch/refresh its data
         self.trade_tree.bind("<Double-1>", lambda e: self._on_commodity_tree_double_click(e, self.trade_tree))
+        self._trade_row_source = {}
+        from ui.cell_tooltip import attach_cell_tooltip
+        attach_cell_tooltip(self.trade_tree, "updated", lambda item: self._trade_row_source.get(item, ''))
 
         # Vertical scrollbar
         v_scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.trade_tree.yview)
@@ -20050,6 +20056,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Clear existing results
         for item in self.trade_tree.get_children():
             self.trade_tree.delete(item)
+        self._trade_row_source = {}
         if hasattr(self, 'trade_avg_label'):
             self.trade_avg_label.config(text="")
         if hasattr(self, 'trade_best_label'):
@@ -20081,7 +20088,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # LOCATION (System + Station)
             location = f"{result.get('systemName', 'Unknown')} / {result.get('stationName', 'Unknown')[:25]}"
             
-            from app_utils import format_market_station_type, format_market_pad, format_relative_age, format_market_powerplay
+            from app_utils import format_market_station_type, format_market_pad, format_relative_age, format_market_powerplay, format_market_source
             station_type = format_market_station_type(result.get('stationType'))
             pad = format_market_pad(result.get('maxLandingPadSize'))
 
@@ -20116,7 +20123,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
             # Insert row with alternating row tag
             row_tag = 'oddrow' if row_index % 2 == 0 else 'evenrow'
-            self.trade_tree.insert('', 'end', values=(
+            row_id = self.trade_tree.insert('', 'end', values=(
                 f" {location} ",
                 f" {station_type} ",
                 f" {pad} ",
@@ -20128,6 +20135,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 f" {updated} ",
                 ""
             ), tags=(row_tag,))
+            self._trade_row_source[row_id] = format_market_source(result)
 
         # Backfill/refresh PowerPlay from Spansh's own Exploited/Fortified/Stronghold/Unoccupied
         # data - queried for every result system, not just ones missing from the EDDN cache,
@@ -20142,6 +20150,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         if hasattr(self, 'trade_tree'):
             for item in self.trade_tree.get_children():
                 self.trade_tree.delete(item)
+            self._trade_row_source = {}
         if hasattr(self, 'trade_avg_label'):
             self.trade_avg_label.config(text="")
         if hasattr(self, 'trade_best_label'):
@@ -20380,6 +20389,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         """Clear marketplace results tree"""
         for item in self.marketplace_tree.get_children():
             self.marketplace_tree.delete(item)
+        self._marketplace_row_source = {}
         if hasattr(self, 'marketplace_avg_label'):
             self.marketplace_avg_label.config(text="")
         if hasattr(self, 'marketplace_best_label'):
@@ -20415,6 +20425,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         try:
             # Determine mode for correct field handling
             is_buy_mode = self.marketplace_buy_mode.get()
+            self._marketplace_row_source = {}
 
             # Bulk-fetch PowerPlay data from the local EDDN cache for all result systems in one
             # query - local-only, no Spansh/Inara calls (unlike Ring Finder's PowerPlay column).
@@ -20427,7 +20438,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 # LOCATION (System + Station) - API uses camelCase
                 location = f"{result['systemName']} / {result['stationName'][:25]}"
                 
-                from app_utils import format_market_station_type, format_market_pad, format_relative_age, format_market_powerplay
+                from app_utils import format_market_station_type, format_market_pad, format_relative_age, format_market_powerplay, format_market_source
                 station_type = format_market_station_type(result.get('stationType'))
                 pad = format_market_pad(result.get('maxLandingPadSize'))
 
@@ -20470,7 +20481,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 tag = 'evenrow' if row_index % 2 == 0 else 'oddrow'
 
                 # Add subtle visual separator using spacing
-                self.marketplace_tree.insert("", "end", values=(
+                row_id = self.marketplace_tree.insert("", "end", values=(
                     f" {location} ",
                     f" {station_type} ",
                     f" {pad} ",
@@ -20482,6 +20493,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     f" {updated} ",
                     ""
                 ), tags=(tag,))
+                self._marketplace_row_source[row_id] = format_market_source(result)
 
             # Backfill/refresh PowerPlay from Spansh's own Exploited/Fortified/Stronghold/
             # Unoccupied data - queried for every result system, not just ones missing from

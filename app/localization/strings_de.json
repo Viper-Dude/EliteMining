@@ -566,6 +566,7 @@
     "limpets_used": "Drohnen"
   },
   "marketplace": {
+    "source_local": "Nicht gespeichert",
     "multi_title": "Mehrere Mineralien verkaufen",
     "multi_hint": "Mineralien wählen, dann Suchen klicken",
     "multi_select_minerals": "Zu verkaufende Mineralien (bis zu {max}):",

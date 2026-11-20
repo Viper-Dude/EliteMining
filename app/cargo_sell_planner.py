@@ -17,7 +17,7 @@ from config import _load_cfg, update_config_value, load_theme
 from ui.tooltip import ToolTip, add_header_tooltips
 from column_visibility_helper import ColumnVisibilityMixin
 from core.constants import get_menu_colors
-from app_utils import create_action_button, format_market_station_type, open_system_website
+from app_utils import create_action_button, format_market_source, format_market_station_type, open_system_website
 
 
 def sale_cargo(cargo, missions):
@@ -134,6 +134,7 @@ class CargoSellPlanner(ColumnVisibilityMixin):
         self.frame = frame
         self.plans = {}
         self.destinations = {}
+        self.sources = {}
         self.snapshot = None
         self.preferences = _load_cfg().get('sell_hold', {})
         controls = ttk.Frame(frame, padding=10)
@@ -191,6 +192,8 @@ class CargoSellPlanner(ColumnVisibilityMixin):
         self.tree.bind('<<TreeviewSelect>>', self.select)
         self.details = self._table(details_pane, ('stop', 'type', 'leg_distance', 'commodity', 'quantity', 'price', 'demand', 'arrival', 'updated'),
                                    (330, 150, 100, 180, 80, 110, 100, 100, 180), 10)
+        from ui.cell_tooltip import attach_cell_tooltip
+        attach_cell_tooltip(self.details, 'updated', lambda item: self.sources.get(item, ''))
         for variable in (self.system_var, self.large, self.carriers, self.radius, self.age):
             variable.trace_add('write', self._save_preferences)
         self.tables_paned.bind('<ButtonRelease-1>', self._save_layout)
@@ -366,6 +369,7 @@ class CargoSellPlanner(ColumnVisibilityMixin):
     def select(self, event=None):
         self.details.delete(*self.details.get_children())
         self.destinations.clear()
+        self.sources.clear()
         selection = self.tree.selection()
         if not selection or selection[0] not in self.plans:
             return
@@ -389,6 +393,7 @@ class CargoSellPlanner(ColumnVisibilityMixin):
                 self.app._commodity_map.get(sale['name'], sale['name']), sale['quantity'],
                 f"{row['sellPrice']:,.0f}", row['demand'], arrival_display, updated))
             self.destinations[item] = stop['systemName']
+            self.sources[item] = format_market_source(row)
 
     def _row_systems(self, tree, item):
         if tree is self.tree:

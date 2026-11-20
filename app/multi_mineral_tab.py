@@ -11,7 +11,7 @@ from localization import t
 from ui.search_control import SearchControl
 from marketplace_api import MarketplaceAPI
 from core.constants import MINING_COMMODITY_ORDER
-from app_utils import create_action_button, format_market_pad, format_market_powerplay, format_relative_age
+from app_utils import create_action_button, format_market_pad, format_market_powerplay, format_market_source, format_relative_age
 
 MAX_MINERALS = 5
 
@@ -168,6 +168,9 @@ class MultiMineralTab:
             save_multiple_prices_column_widths(widths)
         self.tree.bind("<ButtonRelease-1>", save_widths)
         self.tree.bind("<Double-1>", lambda e: app._on_commodity_tree_double_click(e, self.tree, refresh_powerplay=False))
+        self._row_source = {}
+        from ui.cell_tooltip import attach_cell_tooltip
+        attach_cell_tooltip(self.tree, "updated", lambda item: self._row_source.get(item, ''))
         vsb = ttk.Scrollbar(table, orient="vertical", command=self.tree.yview)
         hsb = ttk.Scrollbar(table, orient="horizontal", command=self.tree.xview)
         self.tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
@@ -341,6 +344,7 @@ class MultiMineralTab:
         app = self.app
         self.search_btn.config(state="normal")
         self.tree.delete(*self.tree.get_children())
+        self._row_source = {}
         self._sort_col, self._sort_rev = None, False
         self._show_sort_arrow()
         if not stations:
@@ -361,8 +365,9 @@ class MultiMineralTab:
                 f"{int(float(ls)):,}" if ls is not None else "?", "", "",
                 format_market_powerplay(pp_data.get(info.get('systemName', ''), {})), ""))
             for mineral, r in sorted(s['minerals'].items(), key=lambda kv: -kv[1].get('sellPrice', 0)):
-                self.tree.insert(parent, "end", text=app._commodity_map.get(mineral, mineral), values=(
+                child = self.tree.insert(parent, "end", text=app._commodity_map.get(mineral, mineral), values=(
                     "", "", "", "", f"{r.get('demand', 0):,}", f"{r.get('sellPrice', 0):,} CR", "", format_relative_age(r.get('updatedAt')) or '?'))
+                self._row_source[child] = format_market_source(r)
         self.status_label.config(text=t('marketplace.multi_found').format(count=len(stations)))
 
     def _on_station_type_change(self, *args):
