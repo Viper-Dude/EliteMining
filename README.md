@@ -194,6 +194,8 @@ Your custom commands stay separate and survive EliteMining profile updates and k
 
 Use the app to track mining, search for locations and prices, and configure announcements and optional VoiceAttack automation.
 
+*Screenshots in this guide may differ slightly from the current version, as the app is updated regularly. Layouts, labels and colours can change between releases.*
+
 ### Start EliteMining  
 - EliteMining Desktop icon or direct: `\EliteMining\Configurator\EliteMining.exe`
 

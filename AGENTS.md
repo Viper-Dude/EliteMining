@@ -66,7 +66,7 @@
 ## Git
 
 - Commit messages are concise and focus on the why. Attribution trailers follow the tool's guidance.
-- For commit and push, use `git add -A -- . ":(exclude)Voiceattack Profile/*.vap" ":(exclude)docs/INSTALLER_RELEASE_NOTES.txt"`. The user commits those excluded files; don't offer to clean or commit them. Before a release, at most mention once if the shipped profile still has shortcuts.
+- For commit and push, use `git add -A -- . ":(exclude)docs/INSTALLER_RELEASE_NOTES.txt"`. The `.vap` profile is included; the user commits the excluded installer notes, so don't offer to clean or commit them. Before a release, at most mention once if the shipped profile still has shortcuts.
 - The remote is `https://github.com/Viper-Dude/EliteMining.git`. Confirm it still matches, and never change it automatically.
 
 ## More docs
