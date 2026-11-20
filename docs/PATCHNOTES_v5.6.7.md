@@ -16,7 +16,7 @@
 
 
 ### Voiceattack Profile -update to V5.6.7
-- Fixed a sound effect playing even when the prospector sequence was not launched due to unmet conditions.
+- Fixed sound effect playing even when the prospector sequence was not launched due to unmet conditions.
 
 ### Important Notes 
 
