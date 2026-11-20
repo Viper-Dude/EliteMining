@@ -18,7 +18,9 @@
 ### Voiceattack Profile -update to V5.6.7
 - Fixed a sound effect playing even when the prospector sequence was not launched due to unmet conditions.
 
+### Important Notes 
 
+- Remember to always check all your key and joystick bindings after every profile update.
 
 
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)
