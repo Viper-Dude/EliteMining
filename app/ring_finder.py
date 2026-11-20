@@ -975,7 +975,7 @@ class RingFinder(ColumnVisibilityMixin):
         try:
             self._on_material_changed()  # Use the unified callback
         except Exception as e:
-            print(f"Warning: Failed to initialize material change handler: {e}")
+            log.warning(f"Warning: Failed to initialize material change handler: {e}")
         
         # Add tooltip for distance limitation
         ToolTip(self.distance_combo, t('tooltips.max_distance'))
@@ -1511,7 +1511,7 @@ class RingFinder(ColumnVisibilityMixin):
             return tuple(materials)
             
         except Exception as e:
-            print(f"Warning: Could not load materials from database: {e}")
+            log.warning(f"Warning: Could not load materials from database: {e}")
             # Fallback to hardcoded sorted list
             from localization import t
             return (t('ring_finder.all_minerals'), "Alexandrite", "Benitoite", "Bromellite", "Grandidierite", 
@@ -1835,7 +1835,7 @@ class RingFinder(ColumnVisibilityMixin):
                 print("[SPANSH] Connection pre-warmed successfully")
             except Exception as e:
                 # Silently fail - this is just optimization
-                print(f"[SPANSH] Warmup failed (non-critical): {e}")
+                log.error(f"[SPANSH] Warmup failed (non-critical): {e}")
         
         # Run in background thread so it doesn't block UI
         threading.Thread(target=warmup, daemon=True).start()
@@ -1858,7 +1858,7 @@ class RingFinder(ColumnVisibilityMixin):
                 else:
                     _schedule("offline")
             except Exception as e:
-                print(f"[SPANSH STATUS] Check failed: {e}")
+                log.error(f"[SPANSH STATUS] Check failed: {e}")
                 _schedule("offline")
         
         threading.Thread(target=_background_check, daemon=True).start()
@@ -2046,7 +2046,7 @@ class RingFinder(ColumnVisibilityMixin):
                     continue
                     
         except Exception as e:
-            print(f"Error reading journal: {e}")
+            log.error(f"Error reading journal: {e}")
         
         return None
     
@@ -2072,11 +2072,11 @@ class RingFinder(ColumnVisibilityMixin):
                 if attempt < max_retries - 1:
                     time.sleep(0.5)  # Wait before retry
                 else:
-                    print(f"[ERROR] Database verification failed after {max_retries} attempts")
+                    log.error(f"[ERROR] Database verification failed after {max_retries} attempts")
                     self.db_ready = False
                     return False
             except Exception as e:
-                print(f"[ERROR] Unexpected database error: {e}")
+                log.error(f"[ERROR] Unexpected database error: {e}")
                 self.db_ready = False
                 return False
     
@@ -2105,7 +2105,7 @@ class RingFinder(ColumnVisibilityMixin):
                 self.max_results_var.trace_add('write', lambda *args: self._save_filter_settings())
                 self.min_hotspots_var.trace_add('write', lambda *args: self._save_filter_settings())
             except Exception as e:
-                print(f"Warning: Could not setup filter settings: {e}")
+                log.warning(f"Warning: Could not setup filter settings: {e}")
             finally:
                 self._filters_loaded = True
 
@@ -2131,7 +2131,7 @@ class RingFinder(ColumnVisibilityMixin):
                 if self.confirmed_checkbox:
                     self.confirmed_checkbox.configure(state="normal", fg="#cccccc")
         except Exception as e:
-            print(f"Warning: Material change handler error: {e}")
+            log.warning(f"Warning: Material change handler error: {e}")
     
     def _hotspot_contains_material(self, result, specific_material):
         """Check if a hotspot result contains the requested specific material"""
@@ -2490,12 +2490,12 @@ class RingFinder(ColumnVisibilityMixin):
                 try:
                     self._fill_missing_metadata_edsm(overlaps, max_systems=30)
                 except Exception as e:
-                    print(f" DEBUG: EDSM metadata fill failed: {e}")
+                    log.error(f" DEBUG: EDSM metadata fill failed: {e}")
             
             return overlaps
             
         except Exception as e:
-            print(f"Error getting overlaps for search: {e}")
+            log.error(f"Error getting overlaps for search: {e}")
             return []
     
     def _get_ring_hotspots_display(self, system_name: str, body_name: str, material_filter: str = None) -> str:
@@ -2547,7 +2547,7 @@ class RingFinder(ColumnVisibilityMixin):
             return ", ".join(parts) if parts else "-"
             
         except Exception as e:
-            print(f"Error getting ring hotspots display: {e}")
+            log.error(f"Error getting ring hotspots display: {e}")
             return "-"
     
     def _get_all_res_for_search(self, reference_system: str, reference_coords: Dict, specific_material: str) -> List[Dict]:
@@ -2672,12 +2672,12 @@ class RingFinder(ColumnVisibilityMixin):
                 try:
                     self._fill_missing_metadata_edsm(res_sites, max_systems=30)
                 except Exception as e:
-                    print(f" DEBUG: EDSM metadata fill failed: {e}")
+                    log.error(f" DEBUG: EDSM metadata fill failed: {e}")
             
             return res_sites
             
         except Exception as e:
-            print(f"Error getting RES sites for search: {e}")
+            log.error(f"Error getting RES sites for search: {e}")
             return []
     
     def _abbreviate_res_tag(self, res_tag: str) -> str:
@@ -2871,7 +2871,7 @@ class RingFinder(ColumnVisibilityMixin):
         try:
             confirmed_only = self.confirmed_only_var.get()
         except AttributeError:
-            print("Warning: confirmed_only_var not found, defaulting to False")
+            log.warning("Warning: confirmed_only_var not found, defaulting to False")
             confirmed_only = False
             
         max_distance = float(self.distance_var.get() or "100")
@@ -3213,8 +3213,8 @@ class RingFinder(ColumnVisibilityMixin):
                 
         except Exception as e:
             # EDSM fallback failure is non-critical - just log and continue
-            print(f"[EDSM] ⚠ Fallback failed (non-critical): {e}")
-            print(f"[EDSM DEBUG] Exception details: {type(e).__name__}: {str(e)}")
+            log.error(f"[EDSM] ⚠ Fallback failed (non-critical): {e}")
+            log.error(f"[EDSM DEBUG] Exception details: {type(e).__name__}: {str(e)}")
     
     def _refresh_hotspot_metadata_from_db(self, hotspots: List[Dict]):
         """
@@ -3281,8 +3281,8 @@ class RingFinder(ColumnVisibilityMixin):
             print(f"[EDSM DEBUG] Metadata refresh completed: {updated_count} hotspots updated")
             
         except Exception as e:
-            print(f"[EDSM] ⚠ Error refreshing metadata: {e}")
-            print(f"[EDSM DEBUG] Refresh exception: {type(e).__name__}: {str(e)}")
+            log.error(f"[EDSM] ⚠ Error refreshing metadata: {e}")
+            log.error(f"[EDSM DEBUG] Refresh exception: {type(e).__name__}: {str(e)}")
     
     def _limit_results_by_unique_rings(self, results: List[Dict], max_rings: int) -> List[Dict]:
         """Limit results by counting unique rings (system+body pairs) instead of individual rows.
@@ -3360,7 +3360,7 @@ class RingFinder(ColumnVisibilityMixin):
             return values[0].strip() if values else None
             
         except Exception as e:
-            print(f"[SPANSH] System name resolution failed: {e}")
+            log.error(f"[SPANSH] System name resolution failed: {e}")
             return None
     
     def _search_spansh_with_filters(self, reference_system: str, material_filter: str, specific_material: str, max_distance: float, max_results: int, reference_coords, ring_type_only: bool = False, is_cancelled=None) -> List[Dict]:
@@ -3570,7 +3570,7 @@ class RingFinder(ColumnVisibilityMixin):
                                 found_in_local_db = True
                                 print(f"[RING SEARCH] Found {len(materials_found)} hotspots in local DB for {system_name} {db_ring_name}")
                         except Exception as e:
-                            print(f"[RING SEARCH] DB lookup error for {system_name} {ring_name}: {e}")
+                            log.error(f"[RING SEARCH] DB lookup error for {system_name} {ring_name}: {e}")
                         
                         # Fallback to Spansh signals if no local data
                         if not materials_found and signals:
@@ -3662,14 +3662,14 @@ class RingFinder(ColumnVisibilityMixin):
             self.parent.after(0, lambda: self._update_spansh_status("offline"))
             return []
         except requests.exceptions.RequestException as e:
-            print(f"[SPANSH] API error: {e}")
+            log.error(f"[SPANSH] API error: {e}")
             self.parent.after(0, lambda: self.status_var.set("Spansh API error")
                               if not (is_cancelled and is_cancelled()) else None)
             # Update status: Spansh has errors
             self.parent.after(0, lambda: self._update_spansh_status("offline"))
             return []
         except Exception as e:
-            print(f"[SPANSH] Unexpected error: {e}")
+            log.error(f"[SPANSH] Unexpected error: {e}")
             import traceback
             traceback.print_exc()
             return []
@@ -3861,14 +3861,14 @@ class RingFinder(ColumnVisibilityMixin):
             self.parent.after(0, lambda: self._update_spansh_status("offline"))
             return []
         except requests.exceptions.RequestException as e:
-            print(f"[SPANSH] API error: {e}")
+            log.error(f"[SPANSH] API error: {e}")
             self.parent.after(0, lambda: self.status_var.set(t('ring_finder.spansh_error'))
                               if not (is_cancelled and is_cancelled()) else None)
             # Update status: Spansh has errors
             self.parent.after(0, lambda: self._update_spansh_status("offline"))
             return []
         except Exception as e:
-            print(f"[SPANSH] Unexpected error: {e}")
+            log.error(f"[SPANSH] Unexpected error: {e}")
             return []
 
     def _convert_spansh_to_hotspots(self, spansh_rings: List[Dict], reference_coords) -> List[Dict]:
@@ -3935,7 +3935,7 @@ class RingFinder(ColumnVisibilityMixin):
                             hotspot_display += f" +{len(formatted_parts)-4}"
                         print(f"[SPANSH DB LOOKUP] Formatted: {hotspot_display}")
             except Exception as e:
-                print(f"[SPANSH] Error looking up hotspots for {system_name} {ring_name}: {e}")
+                log.error(f"[SPANSH] Error looking up hotspots for {system_name} {ring_name}: {e}")
             
             # Create result in standard format (same as _search_user_database_first)
             result = {
@@ -4076,7 +4076,7 @@ class RingFinder(ColumnVisibilityMixin):
                     # Cache the Spansh results for potential reuse
                     self._cached_spansh_results = spansh_results
                 except Exception as e:
-                    print(f"[SEARCH] Spansh query failed: {e}")
+                    log.error(f"[SEARCH] Spansh query failed: {e}")
                     import traceback
                     traceback.print_exc()
         
@@ -4188,7 +4188,7 @@ class RingFinder(ColumnVisibilityMixin):
             return compatible_results
             
         except Exception as e:
-            print(f"[SEARCH] Database search error: {e}")
+            log.error(f"[SEARCH] Database search error: {e}")
             import traceback
             traceback.print_exc()
             return []
@@ -4275,7 +4275,7 @@ class RingFinder(ColumnVisibilityMixin):
     
     def _determine_ring_type_from_material(self, material_name: str) -> str:
         """DEPRECATED: Always return 'No data' to identify wrong code paths"""
-        print(f"⚠️ WARNING: Fallback ring type function called for '{material_name}' - this should not happen!")
+        log.warning(f"⚠️ WARNING: Fallback ring type function called for '{material_name}' - this should not happen!")
         return "Unknown"  # Force obvious identification
             
         material_lower = material_name.lower()
@@ -4522,13 +4522,13 @@ class RingFinder(ColumnVisibilityMixin):
                             else:
                                 print(" DEBUG: No additional systems found in user database")
                     except Exception as e:
-                        print(f" DEBUG: Error searching user database: {e}")
+                        log.error(f" DEBUG: Error searching user database: {e}")
                     
                     return nearby_systems
                 else:
                     print(f" DEBUG: Local database returned no results")
             except Exception as e:
-                print(f" DEBUG: Local database search failed: {e}")
+                log.error(f" DEBUG: Local database search failed: {e}")
                 # Fall back to API search
                 
         # Fallback to existing API-based search methods (Note: Local database is much more efficient)
@@ -4628,7 +4628,7 @@ class RingFinder(ColumnVisibilityMixin):
                 
             elif isinstance(systems_data, dict):
                 if 'error' in systems_data:
-                    print(f" DEBUG: EDSM cube-systems API error: {systems_data['error']}")
+                    log.error(f" DEBUG: EDSM cube-systems API error: {systems_data['error']}")
                 elif len(systems_data) == 0:
                     print(f" DEBUG: EDSM cube-systems API returned empty dict (API may have changed or require different parameters)")
                 else:
@@ -4637,7 +4637,7 @@ class RingFinder(ColumnVisibilityMixin):
                 print(f" DEBUG: EDSM cube-systems returned unexpected format")
                 
         except Exception as e:
-            print(f" DEBUG: EDSM cube-systems API failed: {e}")
+            log.error(f" DEBUG: EDSM cube-systems API failed: {e}")
             
         # Try sector-based search as secondary fallback
         try:
@@ -4693,7 +4693,7 @@ class RingFinder(ColumnVisibilityMixin):
                                     break
                                     
                     except Exception as pattern_error:
-                        print(f" DEBUG: Pattern '{pattern}' search failed: {pattern_error}")
+                        log.error(f" DEBUG: Pattern '{pattern}' search failed: {pattern_error}")
                         continue
                 
                 if sector_systems:
@@ -4704,7 +4704,7 @@ class RingFinder(ColumnVisibilityMixin):
                     return sector_systems
                     
         except Exception as e:
-            print(f" DEBUG: Sector-based search failed: {e}")
+            log.error(f" DEBUG: Sector-based search failed: {e}")
             
         # Final fallback: Use a curated list of known systems for popular mining areas
         print(f" DEBUG: Using fallback system list for nearby systems search")
@@ -4843,7 +4843,7 @@ class RingFinder(ColumnVisibilityMixin):
                         body_num = body_match.group(1)
                 return f"{body_num} A Ring"
         except Exception as e:
-            print(f"Error cleaning ring name: {e}")
+            log.error(f"Error cleaning ring name: {e}")
             return full_ring_name
 
     def _get_fallback_hotspots(self, search_term: str, material_filter: str) -> List[Dict]:
@@ -4947,7 +4947,7 @@ class RingFinder(ColumnVisibilityMixin):
                         user_hotspots.append(hotspot_entry)
                         
                     except Exception as e:
-                        print(f" DEBUG: Error processing {system_name}: {e}")
+                        log.error(f" DEBUG: Error processing {system_name}: {e}")
                         continue
                 
                 # Sort by hotspot count first (best hotspots), then by distance
@@ -5244,7 +5244,7 @@ class RingFinder(ColumnVisibilityMixin):
                         if reference_coords and coords_available:
                             # Safety check: ensure distance is not None before comparison
                             if distance is None:
-                                print(f" DEBUG: WARNING - distance is None for {system_name}, setting to 999.9")
+                                log.warning(f" DEBUG: WARNING - distance is None for {system_name}, setting to 999.9")
                                 distance = 999.9
                             # Apply distance filter for systems with coordinates
                             if distance > max_distance:
@@ -5384,11 +5384,11 @@ class RingFinder(ColumnVisibilityMixin):
                         print(f" DEBUG: Galaxy DB locked, retrying... (attempt {attempt + 1})")
                         time.sleep(0.3)
                     else:
-                        print(f" DEBUG: Galaxy DB access failed after retries: {e}")
+                        log.error(f" DEBUG: Galaxy DB access failed after retries: {e}")
                         return None
                     
         except Exception as e:
-            print(f" DEBUG: Error accessing galaxy database: {e}")
+            log.error(f" DEBUG: Error accessing galaxy database: {e}")
             
         return None
     
@@ -5550,7 +5550,7 @@ class RingFinder(ColumnVisibilityMixin):
                     print(f" DEBUG: System '{system_name}' not found in EDSM - may be incomplete name or not discovered yet")
                     
         except Exception as e:
-            print(f" DEBUG: Failed to get coordinates from EDSM: {e}")
+            log.error(f" DEBUG: Failed to get coordinates from EDSM: {e}")
             
         return None
         
@@ -6082,7 +6082,7 @@ class RingFinder(ColumnVisibilityMixin):
     def _show_error(self, error_msg: str):
         """Show error message and reset UI"""
         self.status_var.set(t('ring_finder.search_failed'))
-        print(f"Hotspot search error: {error_msg}")
+        log.error(f"Hotspot search error: {error_msg}")
         # Clear results on error
         self.results_tree.delete(*self.results_tree.get_children())
     
@@ -6468,7 +6468,7 @@ class RingFinder(ColumnVisibilityMixin):
             else:
                 subprocess.Popen(['xdg-open', path])
         except Exception as e:
-            print(f"[EXPORT] Failed to open {path!r}: {e}")
+            log.error(f"[EXPORT] Failed to open {path!r}: {e}")
 
     def _show_export_result_dialog(self, title: str, message: str, opened_path: Optional[str]):
         """Themed result dialog for the CSV export, with an Open File button when it succeeded."""
@@ -6583,7 +6583,7 @@ class RingFinder(ColumnVisibilityMixin):
             if hasattr(main_app, '_search_systems'):
                 main_app.after(100, main_app._search_systems)
         except Exception as e:
-            print(f"[RING FINDER] Error jumping to Star Systems: {e}")
+            log.error(f"[RING FINDER] Error jumping to Star Systems: {e}")
 
     def _set_as_reference_system(self):
         """Set the selected system as the reference system and re-run the search"""
@@ -6911,7 +6911,7 @@ class RingFinder(ColumnVisibilityMixin):
                 self.status_var.set(f"Searching sell stations for {mineral} near {system_name}...")
                 
             except Exception as e:
-                print(f"[RING FINDER] Error opening commodity market: {e}")
+                log.error(f"[RING FINDER] Error opening commodity market: {e}")
                 import traceback
                 traceback.print_exc()
                 self.status_var.set(f"Error: {e}")
@@ -9420,7 +9420,7 @@ class RingFinder(ColumnVisibilityMixin):
                         if edsm_coords and 'x' in edsm_coords:
                             coordinates = (edsm_coords['x'], edsm_coords['y'], edsm_coords['z'])
                 except Exception as e:
-                    print(f"[SAVE] Error getting coordinates for {system_name}: {e}")
+                    log.error(f"[SAVE] Error getting coordinates for {system_name}: {e}")
                 
                 if not coordinates:
                     skipped_count += 1
@@ -9749,7 +9749,7 @@ class RingFinder(ColumnVisibilityMixin):
                         updated_count += count
                         systems_processed += 1
                 except Exception as e:
-                    print(f"[RESERVE UPDATE] Error updating {system_name}: {e}")
+                    log.error(f"[RESERVE UPDATE] Error updating {system_name}: {e}")
 
         # Update UI on main thread
         self.parent.after(0, lambda: self._update_reserve_complete(updated_count, systems_processed, len(systems_to_update)))
@@ -9822,7 +9822,7 @@ class RingFinder(ColumnVisibilityMixin):
                 return {}
                 
         except Exception as e:
-            print(f"[RESERVE UPDATE] Error fetching from Spansh: {e}")
+            log.error(f"[RESERVE UPDATE] Error fetching from Spansh: {e}")
             import traceback
             traceback.print_exc()
             return {}
@@ -9966,7 +9966,7 @@ class RingFinder(ColumnVisibilityMixin):
                 self.status_var.set("Bookmark functionality not available")
 
         except Exception as e:
-            print(f"Error bookmarking ring location: {e}")
+            log.error(f"Error bookmarking ring location: {e}")
             self.status_var.set(f"Error bookmarking location: {e}")
 
     def _open_mining_report_selected(self):
@@ -9996,7 +9996,7 @@ class RingFinder(ColumnVisibilityMixin):
             self.prospector_panel.open_report_file_by_timestamp(system_name, ring_name, timestamp_raw)
 
         except Exception as e:
-            print(f"Error opening mining report: {e}")
+            log.error(f"Error opening mining report: {e}")
             self.status_var.set(f"Error opening mining report: {e}")
 
     def _toggle_favourite_selected(self, mark: Optional[bool] = None):
@@ -10042,7 +10042,7 @@ class RingFinder(ColumnVisibilityMixin):
                 self.status_var.set(t('context_menu.no_selection_favourite'))
 
         except Exception as e:
-            print(f"Error toggling favourite: {e}")
+            log.error(f"Error toggling favourite: {e}")
             self.status_var.set(f"Error toggling favourite: {e}")
 
     def _expand_abbreviated_materials(self, hotspots_text: str) -> str:
@@ -10151,7 +10151,7 @@ class RingFinder(ColumnVisibilityMixin):
                     print(f"[AUTO-SEARCH] ✗ SAME SYSTEM: already in {current_system}")
 
         except Exception as e:
-            print(f"[AUTO-SEARCH ERROR] {e}")  # Log errors instead of silent fail
+            log.error(f"[AUTO-SEARCH ERROR] {e}")  # Log errors instead of silent fail
 
     def _auto_search_new_system(self, system_name: str):
         """Auto-populate reference system and trigger search silently"""
@@ -10530,7 +10530,7 @@ class RingFinder(ColumnVisibilityMixin):
                     main_app.auto_switch_tabs.set(1 if enabled else 0)
                     # The trace will handle saving to config
         except Exception as e:
-            print(f"[AUTO-TAB] Error syncing auto-switch tabs: {e}")
+            log.error(f"[AUTO-TAB] Error syncing auto-switch tabs: {e}")
 
     def _startup_auto_search(self, force: bool = False, _retries_left: int = 5):
         """Perform auto-search on startup if enabled
@@ -10631,7 +10631,7 @@ class RingFinder(ColumnVisibilityMixin):
             
             return ", ".join(display_parts)
         except Exception as e:
-            print(f"Error getting overlap display: {e}")
+            log.error(f"Error getting overlap display: {e}")
             return ""
 
     def _get_res_display(self, system_name: str, body_name: str, material_filter: str = None, prefetched: list = None) -> str:
@@ -10689,7 +10689,7 @@ class RingFinder(ColumnVisibilityMixin):
             
             return ", ".join(display_parts)
         except Exception as e:
-            print(f"Error getting RES display: {e}")
+            log.error(f"Error getting RES display: {e}")
             return ""
 
     def _show_edit_ring_data_dialog(self):
@@ -10938,7 +10938,7 @@ class RingFinder(ColumnVisibilityMixin):
                 pass
 
         except Exception as e:
-            print(f"Error showing edit ring data dialog: {e}")
+            log.error(f"Error showing edit ring data dialog: {e}")
             import traceback
             traceback.print_exc()
             self.status_var.set(f"Error: {e}")
@@ -11106,7 +11106,7 @@ class RingFinder(ColumnVisibilityMixin):
                 pass
 
         except Exception as e:
-            print(f"Error showing edit hotspots dialog: {e}")
+            log.error(f"Error showing edit hotspots dialog: {e}")
             import traceback
             traceback.print_exc()
 
@@ -11119,7 +11119,7 @@ class RingFinder(ColumnVisibilityMixin):
                 values[8] = hotspots_display  # Hotspots column
                 self.results_tree.item(item, values=values)
         except Exception as e:
-            print(f"Error refreshing row hotspots: {e}")
+            log.error(f"Error refreshing row hotspots: {e}")
 
     def _show_edit_visits_dialog(self):
         """Show dialog to edit visit count for selected system"""
@@ -11253,7 +11253,7 @@ class RingFinder(ColumnVisibilityMixin):
             dialog.bind('<Escape>', lambda e: cancel())
             
         except Exception as e:
-            print(f"Error showing edit visits dialog: {e}")
+            log.error(f"Error showing edit visits dialog: {e}")
     
     def _refresh_row_visits(self, item, system_name):
         """Refresh the visit status display for a row after editing"""
@@ -11286,7 +11286,7 @@ class RingFinder(ColumnVisibilityMixin):
                     main_app.after(100, lambda: main_app._refresh_visit_count(current_sys))
                 
         except Exception as e:
-            print(f"Error refreshing row visits: {e}")
+            log.error(f"Error refreshing row visits: {e}")
 
     def _show_comment_dialog(self):
         """Show dialog to add/edit a comment for the selected ring (applies to the whole ring, not per material)"""
@@ -11382,7 +11382,7 @@ class RingFinder(ColumnVisibilityMixin):
                 pass
 
         except Exception as e:
-            print(f"Error showing comment dialog: {e}")
+            log.error(f"Error showing comment dialog: {e}")
             import traceback
             traceback.print_exc()
             self.status_var.set(f"Error: {e}")
@@ -11540,7 +11540,7 @@ class RingFinder(ColumnVisibilityMixin):
             dialog.focus_set()
 
         except Exception as e:
-            print(f"Error showing overlap dialog: {e}")
+            log.error(f"Error showing overlap dialog: {e}")
             import traceback
             traceback.print_exc()
             self.status_var.set(f"Error: {e}")
@@ -11584,7 +11584,7 @@ class RingFinder(ColumnVisibilityMixin):
                 values[9] = overlap_display
                 self.results_tree.item(item_id, values=values)
         except Exception as e:
-            print(f"Error refreshing row overlap: {e}")
+            log.error(f"Error refreshing row overlap: {e}")
 
     def _show_res_dialog(self):
         """Show dialog to add RES site(s) for selected hotspot - supports multiple RES per material"""
@@ -11777,7 +11777,7 @@ class RingFinder(ColumnVisibilityMixin):
             dialog.focus_set()
             
         except Exception as e:
-            print(f"Error showing RES dialog: {e}")
+            log.error(f"Error showing RES dialog: {e}")
             import traceback
             traceback.print_exc()
             self.status_var.set(f"Error: {e}")
@@ -11792,7 +11792,7 @@ class RingFinder(ColumnVisibilityMixin):
                 values[10] = res_display
                 self.results_tree.item(item_id, values=values)
         except Exception as e:
-            print(f"Error refreshing row RES: {e}")
+            log.error(f"Error refreshing row RES: {e}")
     
     def _refresh_row_reserve(self, item_id: str, system_name: str, ring_name: str):
         """Refresh Reserve display for a specific row after setting reserve level"""
@@ -11809,7 +11809,7 @@ class RingFinder(ColumnVisibilityMixin):
                 values[7] = reserve_display
                 self.results_tree.item(item_id, values=values)
         except Exception as e:
-            print(f"Error refreshing reserve display: {e}")
+            log.error(f"Error refreshing reserve display: {e}")
 
     def _show_edit_ring_type_dialog(self):
         """Show dialog to set/correct ring type for selected ring"""
@@ -11941,7 +11941,7 @@ class RingFinder(ColumnVisibilityMixin):
             dialog.focus_set()
 
         except Exception as e:
-            print(f"Error showing ring type dialog: {e}")
+            log.error(f"Error showing ring type dialog: {e}")
             import traceback
             traceback.print_exc()
             self.status_var.set(f"Error: {e}")
@@ -11959,5 +11959,5 @@ class RingFinder(ColumnVisibilityMixin):
                 values[6] = ring_type_display
                 self.results_tree.item(item_id, values=values)
         except Exception as e:
-            print(f"Error refreshing ring type display: {e}")
+            log.error(f"Error refreshing ring type display: {e}")
 

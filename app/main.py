@@ -88,7 +88,7 @@ try:
             result = _t(key, **kwargs)
             return result
         except Exception as ex:
-            print(f"[MAIN] t() error for {key}: {ex}")
+            log.error(f"[MAIN] t() error for {key}: {ex}")
             return key.split('.')[-1]  # Return last part of key as fallback
 except Exception as e:
     print(f"[WARNING] Could not initialize localization: {e}")
@@ -574,7 +574,7 @@ class TextOverlay:
                 final_color = self._get_current_color()
                 self.canvas.itemconfig(self.text_item, fill=final_color)
             except Exception as e:
-                print(f"Error updating text color: {e}")
+                log.error(f"Error updating text color: {e}")
     
     def set_position(self, position: str):
         """Set overlay position - always upper left"""
@@ -591,7 +591,7 @@ class TextOverlay:
                 self.canvas.delete("all")
                 self._outline_items = []
             except Exception as e:
-                print(f"Error setting font size: {e}")
+                log.error(f"Error setting font size: {e}")
     
     def set_display_duration(self, seconds: int):
         """Set how long text stays on screen (5-30 seconds)"""
@@ -1309,7 +1309,7 @@ class CargoMonitor:
                         and getattr(self.ring_finder, 'auto_search_var', None) and self.ring_finder.auto_search_var.get()):
                     self.ring_finder.system_var.set(most_recent_system)
         except Exception as e:
-            print(f"[GAME START] Error handling LoadGame: {e}")
+            log.error(f"[GAME START] Error handling LoadGame: {e}")
     
     def _on_reserve_updated(self, system_name: str):
         """Callback triggered when reserve levels are updated in database
@@ -1334,10 +1334,10 @@ class CargoMonitor:
                         print(f"[RESERVE] Refreshing Ring Finder UI for {system_name}")
                         self.ring_finder._update_results(self.ring_finder._search_cache)
         except Exception as e:
-            print(f"[RESERVE] Error refreshing UI: {e}")
+            log.error(f"[RESERVE] Error refreshing UI: {e}")
                 
         except Exception as e:
-            print(f"[GAME START] Error refreshing location: {e}")
+            log.error(f"[GAME START] Error refreshing location: {e}")
             import traceback
             traceback.print_exc()
     
@@ -1396,13 +1396,13 @@ class CargoMonitor:
                             else:
                                 print(f"ℹ EDSM immediate fallback: No updates needed for {self.current_system}")
                     except Exception as e:
-                        print(f"⚠ EDSM immediate fallback failed: {e}")
+                        log.error(f"⚠ EDSM immediate fallback failed: {e}")
                 else:
                     print(f"⚡ EDSM fallback skipped for {self.current_system} (already processed)")
                     
         except Exception as e:
             # Log error but don't break other functionality
-            print(f"Warning: Failed to refresh Ring Finder after hotspot add: {e}")
+            log.warning(f"Warning: Failed to refresh Ring Finder after hotspot add: {e}")
     
     def _check_auto_refresh_ring_finder(self, scanned_system: str, scanned_body: str = None, hotspots_were_new: bool = False):
         """Check if Ring Finder should auto-refresh after ring scan
@@ -1641,7 +1641,7 @@ class CargoMonitor:
                             cargo_dict[name] = data
                     tracker.update_progress_from_cargo(cargo_dict)
         except Exception as e:
-            print(f"[MISSIONS] Error updating progress: {e}")
+            log.error(f"[MISSIONS] Error updating progress: {e}")
     
     def force_cargo_update(self):
         """Force read the latest cargo data from Cargo.json and journal"""
@@ -1888,7 +1888,7 @@ class CargoMonitor:
                     
                 return False
         except Exception as e:
-            print(f"Error reading Status.json: {e}")
+            log.error(f"Error reading Status.json: {e}")
             return False
     
     def stop_journal_monitoring(self):
@@ -1972,7 +1972,7 @@ class CargoMonitor:
                 self._journal_initializing = False
             self.scan_journal_for_cargo_capacity(latest_file)
         except Exception as e:
-            print(f"Error finding journal files: {e}")
+            log.error(f"Error finding journal files: {e}")
 
     def scan_journal_for_cargo_capacity(self, journal_file):
         """Scan existing journal file for the most recent CargoCapacity, current system location, and ring metadata"""
@@ -2169,7 +2169,7 @@ class CargoMonitor:
                                          f"These materials will be included in mining reports and statistics.")
                     
                 except Exception as e:
-                    print(f"Error showing refinery dialog: {e}")
+                    log.error(f"Error showing refinery dialog: {e}")
     
     def record_mining_activity(self):
         """Record that mining activity occurred (call when cargo changes)"""
@@ -2265,10 +2265,10 @@ class CargoMonitor:
                             self.prospector_panel._update_statistics_display()
                         
                 except Exception as e:
-                    print(f"Error showing refinery dialog in multi-session: {e}")
+                    log.error(f"Error showing refinery dialog in multi-session: {e}")
                     
         except Exception as e:
-            print(f"Error prompting for refinery contents: {e}")
+            log.error(f"Error prompting for refinery contents: {e}")
     
     def read_new_journal_entries(self):
         with self._lock:
@@ -2319,7 +2319,7 @@ class CargoMonitor:
                 print(f"Journal file not found (rotated to new file): {self.last_journal_file}")
                 return False
             except Exception as e:
-                print(f"Error reading journal entries: {e}")
+                log.error(f"Error reading journal entries: {e}")
                 return False
         return False
     
@@ -2835,7 +2835,7 @@ class CargoMonitor:
                 try:
                     self._process_scan_event(event)
                 except Exception as scan_err:
-                    print(f"Warning: Failed to process Scan event: {scan_err}")
+                    log.warning(f"Warning: Failed to process Scan event: {scan_err}")
                         
             elif event_type == "SAASignalsFound":
                 # Process ring scans through JournalParser for complete hotspot data with ring info
@@ -2879,7 +2879,7 @@ class CargoMonitor:
                     print(f"[OK] SAASignalsFound processed successfully")
                     
                 except Exception as saa_err:
-                    print(f"Warning: Failed to process SAASignalsFound event: {saa_err}")
+                    log.warning(f"Warning: Failed to process SAASignalsFound event: {saa_err}")
             
             elif event_type == "MaterialCollected":
                 # Track engineering materials collected (Raw materials only)
@@ -2968,7 +2968,7 @@ class CargoMonitor:
                         
             return 0
         except Exception as e:
-            print(f"Error extracting cargo capacity: {e}")
+            log.error(f"Error extracting cargo capacity: {e}")
             return 0
     
     def refresh_ship_capacity(self):
@@ -3475,10 +3475,10 @@ class CargoMonitor:
                     if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, '_update_integrated_cargo_display'):
                         self.main_app_ref._update_integrated_cargo_display()
                 else:
-                    print(f"[LIMPET] Failed to update Cargo.json")
+                    log.error(f"[LIMPET] Failed to update Cargo.json")
                     
         except Exception as e:
-            print(f"[LIMPET] Error adjusting limpet count: {e}")
+            log.error(f"[LIMPET] Error adjusting limpet count: {e}")
             import traceback
             traceback.print_exc()
 
@@ -3559,7 +3559,7 @@ class CargoMonitor:
             return True
             
         except Exception as e:
-            print(f"[LIMPET] Error updating Cargo.json: {e}")
+            log.error(f"[LIMPET] Error updating Cargo.json: {e}")
             import traceback
             traceback.print_exc()
             return False
@@ -3600,7 +3600,7 @@ class CargoMonitor:
                 print("Refinery dialog cancelled")
                 
         except Exception as e:
-            print(f"Error showing refinery dialog: {e}")
+            log.error(f"Error showing refinery dialog: {e}")
             import traceback
             traceback.print_exc()
 
@@ -3726,14 +3726,14 @@ class CargoMonitor:
                     try:
                         prospector_panel._refresh_reports_tab()
                     except Exception as e:
-                        print(f"Error refreshing reports displays: {e}")
+                        log.error(f"Error refreshing reports displays: {e}")
                 else:
-                    print("Failed to update CSV row")
+                    log.error("Failed to update CSV row")
             else:
                 print("Could not extract timestamp from session filename")
                 
         except Exception as e:
-            print(f"Error updating CSV after refinery addition: {e}")
+            log.error(f"Error updating CSV after refinery addition: {e}")
             import traceback
             traceback.print_exc()
 
@@ -3926,7 +3926,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         try:
             style.theme_use("clam")
         except Exception as e:
-            print("Theme switch failed:", e)
+            log.error("Theme switch failed: %s", e)
 
         # Configure horizontal scrollbar too
         style.configure("Horizontal.TScrollbar",
@@ -4076,7 +4076,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.attributes('-toolwindow', False)  # Show in taskbar
             # Don't use focus_force() - it steals focus from game when app starts
         except Exception as e:
-            print(f"Window attributes setup failed: {e}")
+            log.error(f"Window attributes setup failed: {e}")
 
         # Don't restore geometry here - will be done after widgets load
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -4143,7 +4143,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             elif icon_path and icon_path.endswith('.png'):
                 self.iconphoto(False, tk.PhotoImage(file=icon_path))
         except Exception as e:
-            print("Icon load failed:", e)
+            log.error("Icon load failed: %s", e)
 
 
         # Model vars
@@ -4267,7 +4267,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
         self._in_supercruise = False  # Track current supercruise state
 
         self._load_cargo_preferences()
-        
+        pending_capacity = getattr(self, '_pending_detected_capacity', None)
+        if pending_capacity is not None:
+            self._pending_detected_capacity = None
+            try:
+                self._on_cargo_capacity_detected(pending_capacity)
+            except Exception:
+                log.exception("Applying detected cargo capacity at startup failed")
+
         self._load_text_overlay_preference()
         self.text_overlay_enabled.trace('w', self._on_text_overlay_toggle)
         self.text_overlay_transparency.trace('w', self._on_transparency_change)
@@ -4332,7 +4339,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     if count:
                         print(f"[OK] Journal PP backfill: {count} systems loaded from local journals")
                 except Exception as e:
-                    print(f"[WARN] Journal PP backfill failed: {e}")
+                    log.warning(f"[WARN] Journal PP backfill failed: {e}")
 
             threading.Thread(target=_backfill_pp, daemon=True).start()
 
@@ -5628,7 +5635,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if hasattr(self.prospector_panel, '_update_ship_info_display'):
                     self.prospector_panel._update_ship_info_display()
         except Exception as e:
-            print(f"[DEBUG] Error in _on_cargo_changed: {e}")
+            log.error(f"[DEBUG] Error in _on_cargo_changed: {e}")
             import traceback
             traceback.print_exc()
 
@@ -5657,7 +5664,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     # This will be called with the is_new_discovery flag
                     pass
         except Exception as e:
-            print(f"Warning: Ring Finder refresh failed: {e}")
+            log.warning(f"Warning: Ring Finder refresh failed: {e}")
 
     # ---------- Comprehensive Dashboard with Sub-tabs ----------
     def _build_mining_session_tab(self, frame: ttk.Frame) -> None:
@@ -5991,7 +5998,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 webbrowser.open("https://www.paypal.com/donate/?hosted_button_id=NZQTA4TGPDSC6")
             paypal_btn.bind("<Button-1>", open_paypal)
         except Exception as e:
-            print(f"About tab PayPal widget failed: {e}")
+            log.error(f"About tab PayPal widget failed: {e}")
 
     def _build_voiceattack_controls_tab(self, frame: ttk.Frame) -> None:
         """Build the VoiceAttack Controls tab with Mining Controls and Firegroups"""
@@ -6268,7 +6275,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         try:
             voice_values = announcer.list_voices()
         except Exception as e:
-            print(f"Error getting voice list: {e}")
+            log.error(f"Error getting voice list: {e}")
             voice_values = []
         if not hasattr(self, 'voice_choice'):
             self.voice_choice = tk.StringVar(value="")
@@ -6284,7 +6291,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             try:
                 announcer.say(t('settings.tts_test_message'))
             except Exception as e:
-                print(f"Error testing voice: {e}")
+                log.error(f"Error testing voice: {e}")
         tk.Button(box, text=t('settings.test_voice'), command=_test_voice_interface, **_btn_kw).grid(row=1, column=2, sticky="w", padx=(8, 0))
 
         def _fix_tts_interface():
@@ -6296,9 +6303,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     print("[INTERFACE] TTS engine reinitialized successfully")
                     self._refresh_voice_list()
                 else:
-                    print("[INTERFACE] Failed to reinitialize TTS engine")
+                    log.error("[INTERFACE] Failed to reinitialize TTS engine")
             except Exception as e:
-                print(f"[INTERFACE] Error reinitializing TTS: {e}")
+                log.error(f"[INTERFACE] Error reinitializing TTS: {e}")
         fix_tts_btn = tk.Button(box, text=t('settings.reset_tts'), command=_fix_tts_interface, **_btn_kw)
         fix_tts_btn.grid(row=0, column=2, sticky="w", padx=(8, 0), pady=(0, 6))
         ToolTip(fix_tts_btn, t('tooltips.fix_tts'))
@@ -6315,7 +6322,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 from config import update_config_value
                 update_config_value("tts_volume", int(float(v)))
             except Exception as e:
-                print(f"Error changing TTS volume: {e}")
+                log.error(f"Error changing TTS volume: {e}")
 
         tk.Label(box, text=t('settings.tts_volume'), bg=_bg, fg="#ffffff", font=self._scaled_font(9)).grid(row=0, column=0, sticky="w", pady=(0, 6))
         # Slider with its value to the right ("100%") instead of floating above it
@@ -6343,7 +6350,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 try:
                     announcer.set_voice(saved_voice)
                 except Exception as e:
-                    print(f"Error setting saved voice: {e}")
+                    log.error(f"Error setting saved voice: {e}")
             elif voice_values:
                 self.voice_choice.set(voice_values[0])
             self.voice_volume.set(cfg.get("tts_volume", 80))
@@ -6358,7 +6365,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 from config import update_config_value
                 update_config_value("tts_voice", sel)
             except Exception as e:
-                print(f"Error changing TTS voice: {e}")
+                log.error(f"Error changing TTS voice: {e}")
         self.voice_combo.bind("<<ComboboxSelected>>", _on_voice_change_interface)
 
         # Refresh voice list after a short delay to ensure announcer is fully initialized
@@ -6738,7 +6745,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                 print(f"Toggled {item}: {current_state} → {new_state}")
                                 self._ann_check_modified()
                             except Exception as e:
-                                print(f"Error toggling {item}: {e}")
+                                log.error(f"Error toggling {item}: {e}")
 
                 # Single click on the checkbox toggles (no double-click needed)
                 self.ann_mat_tree.bind("<Button-1>", _ann_toggle_announce, add='+')
@@ -7059,7 +7066,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self._ann_update_display()
                 self._ann_check_modified()
             except Exception as e:
-                print(f"Error in _ann_select_all: {e}")
+                log.error(f"Error in _ann_select_all: {e}")
     
     def _ann_unselect_all(self):
         """Disable announcements for all materials"""
@@ -7072,7 +7079,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self._ann_update_display()
                 self._ann_check_modified()
             except Exception as e:
-                print(f"Error in _ann_unselect_all: {e}")
+                log.error(f"Error in _ann_unselect_all: {e}")
     
     def _ann_set_all_threshold(self):
         """Set all materials to the current threshold percentage"""
@@ -7089,7 +7096,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.prospector_panel._save_min_pct_map()
                 self._ann_check_modified()
             except Exception as e:
-                print(f"Error in _ann_set_all_threshold: {e}")
+                log.error(f"Error in _ann_set_all_threshold: {e}")
             
     def _ann_update_display(self):
         """Update the announcements display"""
@@ -7102,7 +7109,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     if current:
                         self.ann_mat_tree.item(mat, values=(flag, current[1], current[2]))
             except Exception as e:
-                print(f"Error in _ann_update_display: {e}")
+                log.error(f"Error in _ann_update_display: {e}")
 
     def _ann_save_preset(self, num):
         """Save current announcement settings as preset num"""
@@ -7133,7 +7140,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     btn.config(bg="#2a5a2a")
                     self.after(300, self._ann_update_preset_buttons)
             except Exception as e:
-                print(f"Error saving preset {num}: {e}")
+                log.error(f"Error saving preset {num}: {e}")
 
     def _ann_load_preset(self, num):
         """Load announcement settings from preset num"""
@@ -7182,7 +7189,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self._ann_set_active_preset(num)
                 self._show_notice(self._ann_preset_notice, t('settings.preset_loaded').format(num=num))
             except Exception as e:
-                print(f"Error loading preset {num}: {e}")
+                log.error(f"Error loading preset {num}: {e}")
 
     def _rename_preset(self, num):
         """Rename a preset with a custom name"""
@@ -7286,7 +7293,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             keep_on_top()
 
         except Exception as e:
-            print(f"Error renaming preset {num}: {e}")
+            log.error(f"Error renaming preset {num}: {e}")
 
     def _build_interface_options_tab(self, frame: ttk.Frame) -> None:
         # Theme-aware background color
@@ -7518,7 +7525,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 cfg['language'] = selected_code
                 save_config_func(cfg)
             except Exception as e:
-                print(f"Error saving language setting: {e}")
+                log.error(f"Error saving language setting: {e}")
             
             # Show restart prompt with option to restart now
             from app_utils import centered_askyesno
@@ -9357,7 +9364,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if reset_value:
                     self.toggle_vars["Continuous Pulsewave"].set(0)
         except Exception as e:
-            print(f"Error updating pulsewave dependency: {e}")
+            log.error(f"Error updating pulsewave dependency: {e}")
 
     def _update_fsdjump_dependencies(self):
         """Enable/disable Open System Map and its timers based on FSD Jump Sequence / Open System Map state"""
@@ -9376,7 +9383,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 pause_enabled = master_enabled and not osm_enabled
                 spinboxes["FSD Jump Pause Timer"].configure(state="normal" if pause_enabled else "disabled")
         except Exception as e:
-            print(f"Error updating FSD jump dependency: {e}")
+            log.error(f"Error updating FSD jump dependency: {e}")
 
     _DECIMAL_TIMERS = {"Continuous Prospector Sequence Timer"}
 
@@ -9408,7 +9415,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.prospector_cooldown_spinbox.configure(state="normal" if master_enabled else "disabled")
                 self.prospector_cooldown_label.configure(fg=self._cpst_fg if master_enabled else "#666666")
         except Exception as e:
-            print(f"Error updating prospector dependencies: {e}")
+            log.error(f"Error updating prospector dependencies: {e}")
 
     # ---------- Status helper ----------
     def _set_status(self, msg: str, clear_after: int = 8000) -> None:
@@ -9482,7 +9489,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 jumps_file = os.path.join(self.vars_dir, "jumpsleft.txt")
                 _atomic_write_text(jumps_file, str(jumps))
         except Exception as e:
-            print(f"[ROUTE] Error writing jumpsleft: {e}")
+            log.error(f"[ROUTE] Error writing jumpsleft: {e}")
     
     def _save_laser_extra_repeat(self) -> None:
         """Save laser mining extra repeat count to txt file"""
@@ -9502,7 +9509,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             print(f"[LASER EXTRA] Saved repeat count: {count}")
             self._ship_check_modified()
         except Exception as e:
-            print(f"[LASER EXTRA] Error saving repeat count: {e}")
+            log.error(f"[LASER EXTRA] Error saving repeat count: {e}")
     
     def _save_prospector_delay(self) -> None:
         """Save prospector delay to delayprospector.txt"""
@@ -9519,7 +9526,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             print(f"[PROSPECTOR DELAY] Saved delay: {delay_str} seconds")
             self._ship_check_modified()
         except Exception as e:
-            print(f"[PROSPECTOR DELAY] Error saving delay: {e}")
+            log.error(f"[PROSPECTOR DELAY] Error saving delay: {e}")
     
     def _list_sound_events(self) -> dict:
         """{event: ["British Female", ...]} from Sound_Packs/<pack>/<pack>_<voice>/*.wav; fills self._sound_label_map"""
@@ -9754,7 +9761,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             print(f"[TOGGLE] Auto-saved {toggle_name}: {self.toggle_vars[toggle_name].get()}")
             self._ship_check_modified()
         except Exception as e:
-            print(f"[TOGGLE] Error auto-saving {toggle_name}: {e}")
+            log.error(f"[TOGGLE] Error auto-saving {toggle_name}: {e}")
     
     def _save_firegroup(self, tool: str) -> None:
         """Save a firegroup assignment to file immediately on change"""
@@ -9773,7 +9780,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 print(f"[FIREGROUP] Auto-saved {tool}: {letter}")
                 self._ship_check_modified()
         except Exception as e:
-            print(f"[FIREGROUP] Error auto-saving {tool}: {e}")
+            log.error(f"[FIREGROUP] Error auto-saving {tool}: {e}")
     
     def _save_fire_button(self, tool: str) -> None:
         """Save a fire button assignment to file immediately on change"""
@@ -9792,7 +9799,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 print(f"[FIRE BUTTON] Auto-saved {tool}: {'primary' if v == 1 else 'secondary'}")
                 self._ship_check_modified()
         except Exception as e:
-            print(f"[FIRE BUTTON] Error auto-saving {tool}: {e}")
+            log.error(f"[FIRE BUTTON] Error auto-saving {tool}: {e}")
     
     def _make_stepper(self, parent, lo, hi, variable, bg, fg, increment=1, command=None):
         """Themed number stepper used for the VoiceAttack Controls timers"""
@@ -9819,7 +9826,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             print(f"[TIMER] Auto-saved {timer_name}: {delay} seconds")
             self._ship_check_modified()
         except Exception as e:
-            print(f"[TIMER] Error auto-saving {timer_name}: {e}")
+            log.error(f"[TIMER] Error auto-saving {timer_name}: {e}")
     
     def _save_thrust_upduration(self) -> None:
         """Save thrust key hold duration to thrustUpduration.txt"""
@@ -9833,7 +9840,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             print(f"[THRUST UPDURATION] Saved: {delay_str} seconds")
             self._ship_check_modified()
         except Exception as e:
-            print(f"[THRUST UPDURATION] Error saving: {e}")
+            log.error(f"[THRUST UPDURATION] Error saving: {e}")
 
     def _save_thrust_closed(self) -> None:
         """Save thrust closed timing to thrustScoopClosed.txt"""
@@ -9849,7 +9856,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             print(f"[THRUST CLOSED] Saved timing: {delay_str} seconds")
             self._ship_check_modified()
         except Exception as e:
-            print(f"[THRUST CLOSED] Error saving timing: {e}")
+            log.error(f"[THRUST CLOSED] Error saving timing: {e}")
     
     def _save_thrust_open(self) -> None:
         """Save thrust open timing to thrustScoopOpen.txt"""
@@ -9865,7 +9872,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             print(f"[THRUST OPEN] Saved timing: {delay_str} seconds")
             self._ship_check_modified()
         except Exception as e:
-            print(f"[THRUST OPEN] Error saving timing: {e}")
+            log.error(f"[THRUST OPEN] Error saving timing: {e}")
     
     def _initialize_va_variables(self) -> None:
         """Initialize VoiceAttack variables manager"""
@@ -9917,7 +9924,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         self._navroute_mtime = mtime
                         navroute_file_changed = True
                 except Exception as e:
-                    print(f"[ROUTE] Error checking NavRoute: {e}")
+                    log.error(f"[ROUTE] Error checking NavRoute: {e}")
             
             # Always scan journal for FSDTarget (authoritative source)
             if True:
@@ -10057,7 +10064,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.route_label_value.config(text=str(jumps_remaining))
             
         except Exception as e:
-            print(f"Error updating CMDR/system display: {e}")
+            log.error(f"Error updating CMDR/system display: {e}")
 
     def _show_edit_visits_dialog_for_current_system(self):
         """Show dialog to edit visit count for the current system"""
@@ -10186,7 +10193,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             dialog.bind("<Escape>", lambda e: cancel())
             
         except Exception as e:
-            print(f"Error showing edit visits dialog: {e}")
+            log.error(f"Error showing edit visits dialog: {e}")
 
     def _import_all_from_txt(self) -> None:
         """Import all VoiceAttack settings from Variables folder on startup"""
@@ -10309,7 +10316,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         print(f"[IMPORT] Loaded laser extra repeat count: {count}")
                     except Exception as e:
                         missing.append(f"{repeat_count_file}.txt")
-                        print(f"[IMPORT] Error loading laser extra repeat count: {e}")
+                        log.error(f"[IMPORT] Error loading laser extra repeat count: {e}")
                 else:
                     missing.append(f"{repeat_count_file}.txt")
 
@@ -10327,7 +10334,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         print(f"[IMPORT] Loaded prospector delay: {delay:.1f}s")
                     except Exception as e:
                         missing.append(f"{prospector_delay_file}.txt")
-                        print(f"[IMPORT] Error loading prospector delay: {e}")
+                        log.error(f"[IMPORT] Error loading prospector delay: {e}")
                 else:
                     missing.append(f"{prospector_delay_file}.txt")
 
@@ -10344,7 +10351,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         print(f"[IMPORT] Loaded thrust upduration: {delay:.1f}s")
                     except Exception as e:
                         missing.append(f"{thrust_upduration_file}.txt")
-                        print(f"[IMPORT] Error loading thrust upduration: {e}")
+                        log.error(f"[IMPORT] Error loading thrust upduration: {e}")
                 else:
                     missing.append(f"{thrust_upduration_file}.txt")
 
@@ -10362,7 +10369,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         print(f"[IMPORT] Loaded thrust closed: {delay:.1f}s")
                     except Exception as e:
                         missing.append(f"{thrust_closed_file}.txt")
-                        print(f"[IMPORT] Error loading thrust closed: {e}")
+                        log.error(f"[IMPORT] Error loading thrust closed: {e}")
                 else:
                     missing.append(f"{thrust_closed_file}.txt")
 
@@ -10380,7 +10387,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         print(f"[IMPORT] Loaded thrust open: {delay:.1f}s")
                     except Exception as e:
                         missing.append(f"{thrust_open_file}.txt")
-                        print(f"[IMPORT] Error loading thrust open: {e}")
+                        log.error(f"[IMPORT] Error loading thrust open: {e}")
                 else:
                     missing.append(f"{thrust_open_file}.txt")
 
@@ -10396,7 +10403,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if missing:
                 print(f"[STARTUP] Missing files: {missing}")
         except Exception as e:
-            print(f"[STARTUP] Import failed with error: {e}")
+            log.error(f"[STARTUP] Import failed with error: {e}")
             import traceback
             traceback.print_exc()
             messagebox.showerror("Import failed", str(e))
@@ -10458,7 +10465,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     self._write_var_text("laserminingextra_count", str(count))
                     print(f"[SAVE] Saved laser extra repeat count: {count}")
                 except Exception as e:
-                    print(f"[SAVE] Error saving laser extra repeat count: {e}")
+                    log.error(f"[SAVE] Error saving laser extra repeat count: {e}")
 
             self._set_status("Settings saved to VoiceAttack Variables.")
         except Exception as e:
@@ -10747,7 +10754,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     self.laser_extra_status_label.config(text=f"({t('voiceattack.will_run')} {count} {times_text})")
                 print(f"[PRESET] Loaded laser extra repeat count: {count}")
             except Exception as e:
-                print(f"[PRESET] Error loading laser extra repeat count: {e}")
+                log.error(f"[PRESET] Error loading laser extra repeat count: {e}")
         
         # Load linked announcement preset slot
         self._active_ship_announcement_slot = data.get("AnnouncementPresetSlot") or None
@@ -10762,7 +10769,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self._save_prospector_delay()
                 print(f"[PRESET] Loaded prospector delay: {delay:.1f}s")
             except Exception as e:
-                print(f"[PRESET] Error loading prospector delay: {e}")
+                log.error(f"[PRESET] Error loading prospector delay: {e}")
         
         # Load thrust key hold duration if available
         if "ThrustUpDuration" in data and hasattr(self, 'thrust_upduration_var'):
@@ -10773,7 +10780,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self._save_thrust_upduration()
                 print(f"[PRESET] Loaded thrust up duration: {delay:.1f}s")
             except Exception as e:
-                print(f"[PRESET] Error loading thrust up duration: {e}")
+                log.error(f"[PRESET] Error loading thrust up duration: {e}")
 
         # Load thrust closed timing if available
         if "ThrustClosed" in data and hasattr(self, 'thrust_closed_var'):
@@ -10785,7 +10792,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self._save_thrust_closed()
                 print(f"[PRESET] Loaded thrust closed timing: {delay:.1f}s")
             except Exception as e:
-                print(f"[PRESET] Error loading thrust closed timing: {e}")
+                log.error(f"[PRESET] Error loading thrust closed timing: {e}")
         
         # Load thrust open timing if available
         if "ThrustOpen" in data and hasattr(self, 'thrust_open_var'):
@@ -10797,7 +10804,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self._save_thrust_open()
                 print(f"[PRESET] Loaded thrust open timing: {delay:.1f}s")
             except Exception as e:
-                print(f"[PRESET] Error loading thrust open timing: {e}")
+                log.error(f"[PRESET] Error loading thrust open timing: {e}")
         
         # IMPORTANT: Save all loaded values to Variables folder immediately
         self._save_all_to_txt()
@@ -11582,7 +11589,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         _schedule("online")
                         return
                 except Exception as e:
-                    print(f"[MARKET API] Ardent exception: {e}")
+                    log.error(f"[MARKET API] Ardent exception: {e}")
                 _schedule("offline")
             except Exception:
                 _schedule("offline")
@@ -12040,7 +12047,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if enabled:
                 print("[STAY ON TOP] Applied at startup: enabled")
         except Exception as e:
-            print(f"[STAY ON TOP] Failed to apply at startup: {e}")
+            log.error(f"[STAY ON TOP] Failed to apply at startup: {e}")
 
     def _save_stay_on_top_preference(self) -> None:
         """Save stay on top state to config"""
@@ -12069,7 +12076,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if hasattr(self, 'prospector_panel') and self.prospector_panel:
                 self.prospector_panel._save_last_material_settings()
         except Exception as e:
-            print(f"Error saving announcement preferences: {e}")
+            log.error(f"Error saving announcement preferences: {e}")
 
     def _on_announcement_change(self, *args) -> None:
         """Called when any announcement setting changes - auto-save to config"""
@@ -12088,7 +12095,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self._save_stay_on_top_preference()
             self._set_status(f"Stay on top {'enabled' if enabled else 'disabled'}")
         except Exception as e:
-            print(f"Error setting stay on top: {e}")
+            log.error(f"Error setting stay on top: {e}")
             self._set_status("Error changing stay on top setting")
     
     def _load_auto_scan_preference(self) -> None:
@@ -12218,7 +12225,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.notebook.select(tab_indices[tab_name])
                 print(f"[AUTO-TAB] Switched to tab: {tab_name}")
         except Exception as e:
-            print(f"[AUTO-TAB] Error switching to tab {tab_name}: {e}")
+            log.error(f"[AUTO-TAB] Error switching to tab {tab_name}: {e}")
     
     def _load_auto_start_preference(self) -> None:
         """Load auto-start session preference from config"""
@@ -12945,7 +12952,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         try:
             self.color_menu.refresh()
         except Exception as e:
-            print(f"Error updating color menu display: {e}")
+            log.error(f"Error updating color menu display: {e}")
 
     # ---------- Cargo Monitor Methods ----------
     def _load_cargo_preferences(self) -> None:
@@ -12980,8 +12987,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
     def _on_cargo_capacity_detected(self, detected_capacity: int) -> None:
         """Called when CargoMonitor detects cargo capacity from Elite Dangerous"""
         if not hasattr(self, 'cargo_max_capacity'):
-            # The startup scan runs before the capacity setting exists; apply it once startup finishes
-            self.after(0, self._on_cargo_capacity_detected, detected_capacity)
+            # The startup scan runs before the capacity setting exists; it is applied after the
+            # preferences load. Not after(0): splash update() would re-run it forever.
+            self._pending_detected_capacity = detected_capacity
             return
         current_capacity = int(self.cargo_max_capacity.get())
         if detected_capacity != current_capacity and detected_capacity > 0:
@@ -12989,7 +12997,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.cargo_max_capacity.set(detected_capacity)
             # Save the detected capacity to config
             self._save_cargo_preferences()
-            print(f"🔄 Auto-updated cargo capacity: {current_capacity}t → {detected_capacity}t")
+            log.info(f"Auto-updated cargo capacity: {current_capacity}t -> {detected_capacity}t")
     
     def _on_ship_info_changed(self) -> None:
         """Called when CargoMonitor detects ship info change (LoadGame/Loadout events)"""
@@ -13907,7 +13915,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         img = img.subsample(scale, scale)
                     self._flag_images[lang_code] = img
                 except Exception as e:
-                    print(f"Error loading flag image {filename}: {e}")
+                    log.error(f"Error loading flag image {filename}: {e}")
         
         # Determine current flag
         current_image = self._flag_images.get(current_lang, self._flag_images.get('en'))
@@ -14276,7 +14284,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             cfg['language'] = lang_code
             _save_cfg(cfg)
         except Exception as e:
-            print(f"Error saving language setting: {e}")
+            log.error(f"Error saving language setting: {e}")
             return
 
         # Update the flag display with new image
@@ -14330,7 +14338,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             if hasattr(self, 'prospector_panel') and self.prospector_panel.session_active:
                 self.prospector_panel._session_stop()
         except Exception as e:
-            print(f"Error saving session before restart: {e}")
+            log.error(f"Error saving session before restart: {e}")
 
         # Close the single-instance mutex handle so the relaunched process can acquire it.
         # Created with bInitialOwner=False, so it's never "owned" by a thread -
@@ -14342,7 +14350,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 win32api.CloseHandle(mutex)
                 mutex = None
         except Exception as e:
-            print(f"Warning: Could not close single-instance mutex before restart: {e}")
+            log.warning(f"Warning: Could not close single-instance mutex before restart: {e}")
 
         flush_config()
 
@@ -15815,7 +15823,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 
         except Exception as e:
             import traceback
-            print(f"Ring finder setup failed: {e}")
+            log.error(f"Ring finder setup failed: {e}")
             traceback.print_exc()
 
     def _build_marketplace_tab(self, frame: ttk.Frame) -> None:
@@ -17924,7 +17932,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         webbrowser.open(url)
                         print(f"[MARKETPLACE] Opening Inara for station: {station_name}")
             except Exception as e:
-                print(f"[MARKETPLACE] Error opening Inara: {e}")
+                log.error(f"[MARKETPLACE] Error opening Inara: {e}")
     
     def _open_edsm_from_menu(self):
         """Open EDSM station search from context menu"""
@@ -17945,7 +17953,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         webbrowser.open(url)
                         print(f"[MARKETPLACE] Opening EDSM for station: {station_name}")
             except Exception as e:
-                print(f"[MARKETPLACE] Error opening EDSM: {e}")
+                log.error(f"[MARKETPLACE] Error opening EDSM: {e}")
     
     def _open_spansh_from_menu(self):
         """Open Spansh system search from context menu"""
@@ -17964,7 +17972,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         webbrowser.open(url)
                         print(f"[MARKETPLACE] Opening Spansh for system: {system_name}")
             except Exception as e:
-                print(f"[MARKETPLACE] Error opening Spansh: {e}")
+                log.error(f"[MARKETPLACE] Error opening Spansh: {e}")
 
     def _copy_marketplace_system(self):
         """Copy system name from location column (format: 'System / Station')"""
@@ -18042,7 +18050,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 print(f"[MARKETPLACE] Searching hotspots for {commodity_english} near {system_name or 'current system'}")
                 
         except Exception as e:
-            print(f"[MARKETPLACE] Error opening hotspots finder: {e}")
+            log.error(f"[MARKETPLACE] Error opening hotspots finder: {e}")
             import traceback
             traceback.print_exc()
     
@@ -18064,7 +18072,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         webbrowser.open(url)
                         print(f"[TRADE] Opening Inara for station: {station_name}")
             except Exception as e:
-                print(f"[TRADE] Error opening Inara: {e}")
+                log.error(f"[TRADE] Error opening Inara: {e}")
     
     def _open_edsm_from_trade_menu(self):
         """Open EDSM station search from Trade context menu"""
@@ -18084,7 +18092,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         webbrowser.open(url)
                         print(f"[TRADE] Opening EDSM for station: {station_name}")
             except Exception as e:
-                print(f"[TRADE] Error opening EDSM: {e}")
+                log.error(f"[TRADE] Error opening EDSM: {e}")
     
     def _open_spansh_from_trade_menu(self):
         """Open Spansh system search from Trade context menu"""
@@ -18103,7 +18111,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         webbrowser.open(url)
                         print(f"[TRADE] Opening Spansh for system: {system_name}")
             except Exception as e:
-                print(f"[TRADE] Error opening Spansh: {e}")
+                log.error(f"[TRADE] Error opening Spansh: {e}")
     
     def _show_trade_context_menu(self, event):
         """Show context menu on right-click in Trade Commodities table"""
@@ -18301,7 +18309,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self._show_notice(self.marketplace_total_label, t('ring_finder.could_not_detect_system'))
 
         except Exception as e:
-            print(f"Error getting current system: {e}")
+            log.error(f"Error getting current system: {e}")
             self._show_notice(self.marketplace_total_label, t('ring_finder.could_not_detect_system'))
     
     # Removed _toggle_search_mode() - reference system now always visible for both modes
@@ -19344,7 +19352,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
         except Exception as e:
             self.marketplace_total_label.config(text=f"❌ Error displaying results: {str(e)}")
-            print(f"Error populating results: {e}")
+            log.error(f"Error populating results: {e}")
 
     def _show_marketplace_context_menu(self, event):
         """Show the context menu when right-clicking on marketplace results"""
@@ -19449,7 +19457,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             apply_sort_arrow(self.marketplace_tree, col_id, self.marketplace_sort_reverse)
 
         except Exception as e:
-            print(f"Error sorting marketplace column: {e}")
+            log.error(f"Error sorting marketplace column: {e}")
             self.marketplace_total_label.config(text=f"❌ Sort error: {str(e)}")
     
     
@@ -20123,7 +20131,7 @@ Your keybinds will need to be reconfigured manually."""
                     self.cargo_monitor.journal_parser.is_live_monitoring = True
 
             except Exception as e:
-                print(f"[JOURNAL] ERROR: {e}")
+                log.error(f"[JOURNAL] ERROR: {e}")
                 self.after(0, lambda: self._set_journal_scan_status(t('status_bar.journal_scan_failed')))
                 import traceback
                 traceback.print_exc()
@@ -20182,13 +20190,13 @@ Your keybinds will need to be reconfigured manually."""
                             return 'migration'
                             
                     except Exception as e:
-                        print(f"[STARTUP] Scan status check error: {e}")
+                        log.error(f"[STARTUP] Scan status check error: {e}")
                         # If we can't check, assume needs migration
                         return 'migration'
                     
                     return 'none'  # Has visits and scan already done
         except Exception as e:
-            print(f"[STARTUP] _is_first_install exception: {e}")
+            log.error(f"[STARTUP] _is_first_install exception: {e}")
         return 'first_install'  # Assume first install if we can't determine
 
     def _get_journal_scan_state_path(self) -> str:
@@ -20205,7 +20213,7 @@ Your keybinds will need to be reconfigured manually."""
                 with open(path, 'r') as f:
                     return json.load(f)
         except Exception as e:
-            print(f"[JOURNAL] Failed to read scan checkpoint: {e}")
+            log.error(f"[JOURNAL] Failed to read scan checkpoint: {e}")
         return {}
 
     def _save_journal_scan_checkpoint(self, last_file: str, last_offset: int) -> None:
@@ -20216,7 +20224,7 @@ Your keybinds will need to be reconfigured manually."""
             with open(path, 'w') as f:
                 json.dump({"last_file": last_file, "last_offset": last_offset}, f)
         except Exception as e:
-            print(f"[JOURNAL] Failed to save scan checkpoint: {e}")
+            log.error(f"[JOURNAL] Failed to save scan checkpoint: {e}")
 
     def _fc_carrier_data_has_history(self) -> bool:
         """Whether the persisted Fleet Carrier cache already has a location or jump history.
@@ -20431,7 +20439,7 @@ Your keybinds will need to be reconfigured manually."""
                     progress_callback=lambda c, m: self.after(0, lambda: update_progress(c, total, m))
                 )
             except Exception as e:
-                print(f"[FULL SCAN] Error: {e}")
+                log.error(f"[FULL SCAN] Error: {e}")
             finally:
                 # Historical catch-up is done — safe to enable live-only PP inference now
                 # (see journal_parser._upsert_pp_from_event).
@@ -20488,7 +20496,7 @@ Your keybinds will need to be reconfigured manually."""
                         conn.commit()
                     print("[MIGRATION] Reset all visit counts and dates before rescan")
             except Exception as e:
-                print(f"[MIGRATION] Failed to reset visit data: {e}")
+                log.error(f"[MIGRATION] Failed to reset visit data: {e}")
         
         # Start batch mode for mission tracker
         mission_tracker = None
@@ -20640,7 +20648,7 @@ Your keybinds will need to be reconfigured manually."""
             
             print(f"[FIRST INSTALL] Full scan status saved: {scan_status_file}")
         except Exception as e:
-            print(f"[FIRST INSTALL] Failed to save scan status: {e}")
+            log.error(f"[FIRST INSTALL] Failed to save scan status: {e}")
         
         # Update UI components
         if hasattr(self, 'ring_finder') and self.ring_finder:
@@ -20859,7 +20867,7 @@ Your keybinds will need to be reconfigured manually."""
                         scanned_checkpoint = (os.path.basename(journal_path), position)
             except Exception as e:
                 checkpoint_valid = False
-                print(f"[JOURNAL] Error reading {os.path.basename(journal_path)}: {e}")
+                log.error(f"[JOURNAL] Error reading {os.path.basename(journal_path)}: {e}")
                 continue
         
         # End batch mode for mission tracker

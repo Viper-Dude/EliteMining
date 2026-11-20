@@ -826,7 +826,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             else:
                 print(f"[DEBUG] Auto-start file does not exist, defaulting to False")
         except Exception as e:
-            print(f"[DEBUG] Error loading auto-start file: {e}")
+            log.error(f"[DEBUG] Error loading auto-start file: {e}")
             pass
         
         self.auto_end_session = False
@@ -854,7 +854,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             else:
                 print(f"[DEBUG] Prompt-when-full file does not exist, defaulting to False")
         except Exception as e:
-            print(f"[DEBUG] Error loading prompt-when-full file: {e}")
+            log.error(f"[DEBUG] Error loading prompt-when-full file: {e}")
             pass
         
         # Multi-session mode - load from toggle file
@@ -870,7 +870,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             else:
                 print(f"[DEBUG] Multi-session file does not exist, defaulting to False")
         except Exception as e:
-            print(f"[DEBUG] Error loading multi-session file: {e}")
+            log.error(f"[DEBUG] Error loading multi-session file: {e}")
             pass
         
         # Note: Multi-session and prompt-when-full are incompatible features
@@ -955,7 +955,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     status_data = json.load(f)
                     return status_data.get("Docked", False)
         except Exception as e:
-            print(f"Error reading Status.json: {e}")
+            log.error(f"Error reading Status.json: {e}")
         return False
     
     def _get_current_status_data(self) -> dict:
@@ -966,7 +966,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     status_data = json.load(f)
                     return status_data
         except Exception as e:
-            print(f"Error reading Status.json: {e}")
+            log.error(f"Error reading Status.json: {e}")
         return {}
     
     def _check_status_location_fields(self) -> None:
@@ -1056,7 +1056,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         self._update_location_display()
                         
         except Exception as e:
-            print(f"Error checking status location fields: {e}")
+            log.error(f"Error checking status location fields: {e}")
     
     def _update_location_display(self) -> None:
         """Update the location display with current context"""
@@ -1105,7 +1105,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             else:
                 self.ship_info_label.config(text="")
         except Exception as e:
-            print(f"Error updating ship info: {e}")
+            log.error(f"Error updating ship info: {e}")
             self.ship_info_label.config(text="")
     
     def _startup_sync_with_status(self) -> None:
@@ -1234,7 +1234,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     print(f"[STARTUP] No body found in journal (at star or system)")
                     
         except Exception as e:
-            print(f"Error reading initial location from journal: {e}")
+            log.error(f"Error reading initial location from journal: {e}")
 
     def _load_min_pct_map(self) -> Dict[str, float]:
         cfg = self._load_cfg()
@@ -1512,7 +1512,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             self._refresh_session_statistics()
             
         except Exception as e:
-            print(f"[ERROR] Force rebuild failed: {e}")
+            log.error(f"[ERROR] Force rebuild failed: {e}")
             from tkinter import messagebox
             from ui.dialogs import center_window
             import tkinter as tk
@@ -1564,7 +1564,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             self._set_status("Cache cleared and reports refreshed")
             
         except Exception as e:
-            print(f"[ERROR] Clear cache failed: {e}")
+            log.error(f"[ERROR] Clear cache failed: {e}")
             from tkinter import messagebox
             from ui.dialogs import center_window
             import tkinter as tk
@@ -1653,9 +1653,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             
             # If inconsistencies found, offer to fix them  
             if inconsistencies:
-                print(f"[WARNING] Found {len(inconsistencies)} comment inconsistencies between UI and CSV")
+                log.warning(f"[WARNING] Found {len(inconsistencies)} comment inconsistencies between UI and CSV")
                 for inc in inconsistencies:
-                    print(f"[WARNING] {inc['system']} {inc['body']}: UI='{inc['ui_comment']}' vs CSV='{inc['csv_comment']}'")
+                    log.warning(f"[WARNING] {inc['system']} {inc['body']}: UI='{inc['ui_comment']}' vs CSV='{inc['csv_comment']}'")
                 
                 from ui.dialogs import centered_yesno_dialog
                 result = centered_yesno_dialog(
@@ -1696,7 +1696,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 print("[INFO] UI and CSV comment data is consistent")
                 
         except Exception as e:
-            print(f"[ERROR] Failed to validate UI/CSV consistency: {e}")
+            log.error(f"[ERROR] Failed to validate UI/CSV consistency: {e}")
 
     # --- UI ---
     def _build_ui(self) -> None:
@@ -2543,7 +2543,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                     'comment': row.get('comment', '')  # Preserve comments
                                 }
                 except Exception as e:
-                    print(f"Warning: Could not read existing analysis data: {e}")
+                    log.warning(f"Warning: Could not read existing analysis data: {e}")
             else:
                 print(f"[REBUILD] CSV does not exist at: {csv_path}")
             
@@ -2768,7 +2768,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     })
                     
                 except Exception as e:
-                    print(f"Error parsing {fn}: {e}")
+                    log.error(f"Error parsing {fn}: {e}")
                     continue
             
             if not sessions:
@@ -2840,7 +2840,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 self._set_status("EliteMining ready")
         except Exception as e:
             # Log error but don't show to user on startup
-            print(f"[STARTUP ERROR] Auto rebuild failed: {e}")
+            log.error(f"[STARTUP ERROR] Auto rebuild failed: {e}")
 
     def _export_csv(self, csv_path: str) -> None:
         """Copy the CSV file to a user-selected location"""
@@ -3066,7 +3066,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 return None, None
                 
         except Exception as e:
-            print(f"[DEBUG] Error getting Discord username: {e}")
+            log.error(f"[DEBUG] Error getting Discord username: {e}")
             return None, None
 
     def _show_username_dialog(self, current_username=""):
@@ -3142,7 +3142,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     dialog.geometry(f"+{x}+{y}")
                     print(f"[DEBUG] Dialog fallback positioned at: x={x}, y={y}")
             except Exception as e:
-                print(f"[DEBUG] Error positioning dialog: {e}")
+                log.error(f"[DEBUG] Error positioning dialog: {e}")
                 # Final fallback - position near prospector panel
                 try:
                     x = self.winfo_rootx() + 50
@@ -3319,7 +3319,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             return result["username"], result["comment"]
                 
         except Exception as e:
-            print(f"[DEBUG] Error showing username dialog: {e}")
+            log.error(f"[DEBUG] Error showing username dialog: {e}")
             return None, None
 
     def _share_selected_to_discord(self):
@@ -3355,7 +3355,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             return cmdr_result
                 
         except Exception as e:
-            print(f"[DEBUG] Error getting CMDR info: {e}")
+            log.error(f"[DEBUG] Error getting CMDR info: {e}")
             return None
 
     def _show_cmdr_dialog(self, current_cmdr=""):
@@ -3498,7 +3498,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             return result
             
         except Exception as e:
-            print(f"[DEBUG] Error showing CMDR dialog: {e}")
+            log.error(f"[DEBUG] Error showing CMDR dialog: {e}")
             import traceback
             traceback.print_exc()
             return None
@@ -3793,7 +3793,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                             }
                                             total_tons += tons
                                     except Exception as e:
-                                        print(f"[CARD] Error parsing material line: {line}, {e}")
+                                        log.error(f"[CARD] Error parsing material line: {line}, {e}")
                     
                     # Parse session duration for overall TPH from first line
                     lines = content.split('\n')
@@ -3832,7 +3832,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                         tph = total_tons / session_duration_hours
                                         print(f"[CARD] Calculated TPH: {tph:.1f} from {total_tons:.0f}t / {session_duration_hours:.2f}h")
                             except Exception as e:
-                                print(f"[CARD] Error parsing session stats: {e}")
+                                log.error(f"[CARD] Error parsing session stats: {e}")
                                 import traceback
                                 traceback.print_exc()
             
@@ -3880,7 +3880,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 messagebox.showerror("Error", "Failed to generate mining card.")
                 
         except Exception as e:
-            print(f"[CARD] Error generating mining card: {e}")
+            log.error(f"[CARD] Error generating mining card: {e}")
             import traceback
             traceback.print_exc()
             from tkinter import messagebox
@@ -4339,7 +4339,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 writer.writerows(sessions)
                 
         except Exception as e:
-            print(f"Failed to update CSV: {e}")
+            log.error(f"Failed to update CSV: {e}")
 
     def _clear_prospector_reports(self):
         """Clear the prospector reports table for new session"""
@@ -4354,7 +4354,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             if not self.multi_session_mode:
                 self.history = []
         except Exception as e:
-            print(f"Failed to clear prospector reports: {e}")
+            log.error(f"Failed to clear prospector reports: {e}")
     
     def _on_cargo_event(self, event_type: str, count: int):
         """Handle cargo events for multi-session tracking
@@ -4379,7 +4379,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             # Update display to show new totals
             self._refresh_statistics_display()
         except Exception as e:
-            print(f"Error tracking cargo event: {e}")
+            log.error(f"Error tracking cargo event: {e}")
 
     def _track_session_yield_data(self, materials_txt: str):
         """Extract and store yield data from prospector report during session"""
@@ -4699,7 +4699,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 return False
                 
         except Exception as e:
-            print(f"Failed to update existing CSV row: {e}")
+            log.error(f"Failed to update existing CSV row: {e}")
             return False
 
     def _enhance_materials_with_yields(self, materials_breakdown_raw: str, avg_quality_percent: str) -> str:
@@ -4763,7 +4763,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             
         except Exception as e:
             # If parsing fails, return original
-            print(f"Warning: Could not enhance materials with yields: {e}")
+            log.warning(f"Warning: Could not enhance materials with yields: {e}")
             return materials_breakdown_raw
 
     def _enhance_materials_with_yields_and_tph(self, materials_breakdown_raw: str, avg_quality_percent: str, material_tph_breakdown: str) -> str:
@@ -4863,7 +4863,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
         except Exception as e:
             # If parsing fails, return original
-            print(f"Warning: Could not enhance materials with yields and TPH: {e}")
+            log.warning(f"Warning: Could not enhance materials with yields and TPH: {e}")
             return materials_breakdown_raw
 
 
@@ -5205,7 +5205,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     self.reports_tree_tab.move(item, '', index)
                 tab_sort_dirs[col] = not reverse
             except Exception as e:
-                print(f"Tab sorting error for column {col}: {e}")
+                log.error(f"Tab sorting error for column {col}: {e}")
                 import traceback
                 traceback.print_exc()
                 # Fallback to simple string sort
@@ -5216,7 +5216,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         self.reports_tree_tab.move(item, '', index)
                     tab_sort_dirs[col] = not tab_sort_dirs.get(col, False)
                 except Exception as e2:
-                    print(f"Tab fallback sorting failed: {e2}")
+                    log.error(f"Tab fallback sorting failed: {e2}")
             
             # CRITICAL: Rebuild tab session_lookup after sorting
             if hasattr(self, 'reports_tab_session_lookup') and hasattr(self, 'reports_tab_original_sessions'):
@@ -5958,11 +5958,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                         if os.path.exists(card_path):
                                             os.remove(card_path)
                                     except Exception as e:
-                                        print(f"[DELETE] Error deleting mining card: {e}")
+                                        log.error(f"[DELETE] Error deleting mining card: {e}")
                                         import traceback
                                         traceback.print_exc()
                             except Exception as e:
-                                print(f"[DELETE] Error in card deletion: {e}")
+                                log.error(f"[DELETE] Error in card deletion: {e}")
                             
                             # Delete screenshots and HTML report
                             try:
@@ -6135,7 +6135,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     # Track which column we're showing tooltip for
                     self._current_tooltip_column = column
         except Exception as e:
-            print(f"Tooltip error: {e}")
+            log.error(f"Tooltip error: {e}")
 
     def _show_prospector_header_tooltip(self, event, tree):
         """Show tooltip for Prospector Reports column headers"""
@@ -6178,7 +6178,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     
                     self._current_prospector_tooltip_column = column
         except Exception as e:
-            print(f"Prospector tooltip error: {e}")
+            log.error(f"Prospector tooltip error: {e}")
 
     def _show_mineral_header_tooltip(self, event, tree):
         """Show tooltip for Mineral Analysis column headers"""
@@ -6230,7 +6230,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     
                     self._current_mineral_tooltip_column = column
         except Exception as e:
-            print(f"Mineral tooltip error: {e}")
+            log.error(f"Mineral tooltip error: {e}")
 
     def _on_filter_changed(self, event=None) -> None:
         """Handle any of the 3 filter dropdowns changing"""
@@ -6815,7 +6815,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         })
                             
             except Exception as e:
-                print(f"Loading CSV failed: {e}")
+                log.error(f"Loading CSV failed: {e}")
                 # Fallback to old file listing method
                 try:
                     for fn in os.listdir(self.reports_dir):
@@ -7277,7 +7277,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             self._update_reports_paging(len(sessions_data), total_filtered)
 
         except Exception as e:
-            print(f"Failed to refresh reports tab: {e}")
+            log.error(f"Failed to refresh reports tab: {e}")
 
     def _update_reports_paging(self, shown: int, total: int) -> None:
         """Show 'Showing N of M' + Load more only while rows are hidden"""
@@ -7752,7 +7752,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                             else:
                                 print(f"[STARTUP DEBUG] Processing fresh event (<{30}s old)")
                         except Exception as e:
-                            print(f"[STARTUP DEBUG] Timestamp parse error: {e}, processing anyway")
+                            log.error(f"[STARTUP DEBUG] Timestamp parse error: {e}, processing anyway")
                             pass  # If timestamp parsing fails, process the event
                 materials_txt, content_txt, time_txt, panel_summary, speak_summary, triggered = self._summaries_from_event(evt)
                 self.history.insert(0, (materials_txt, content_txt, time_txt))
@@ -8039,7 +8039,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             
         except Exception as e:
             # Show errors for debugging
-            print(f"ERROR in _update_mining_statistics: {e}")
+            log.error(f"ERROR in _update_mining_statistics: {e}")
             import traceback
             traceback.print_exc()
 
@@ -8075,7 +8075,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 try:
                     self._apply_stats_rows_inplace(rows)
                 except Exception as _e:
-                    print(f"[stats] in-place update failed, falling back: {_e}")
+                    log.error(f"[stats] in-place update failed, falling back: {_e}")
                     self._apply_stats_rows_full(rows)
             else:
                 self._apply_stats_rows_full(rows)
@@ -8124,7 +8124,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 self.charts_panel.update_charts()
 
         except Exception as e:
-            print(f"ERROR in _refresh_statistics_display: {e}")
+            log.error(f"ERROR in _refresh_statistics_display: {e}")
             import traceback; traceback.print_exc()
             try:
                 normal_fg, muted_fg = self._summary_colors()
@@ -8357,7 +8357,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     if hasattr(self, 'nb') and self.nb:
                         self.nb.select(0)
         except Exception as e:
-            print(f"[AUTO-TAB] Error switching to mining tab: {e}")
+            log.error(f"[AUTO-TAB] Error switching to mining tab: {e}")
     
     def _auto_switch_to_ring_finder_tab(self) -> None:
         """Auto-switch to Hotspots Finder tab if the setting is enabled
@@ -8385,7 +8385,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         self.main_app.switch_to_tab('hotspots_finder')
                         self._sc_tab_switched = True
         except Exception as e:
-            print(f"[AUTO-TAB] Error switching to hotspots finder tab: {e}")
+            log.error(f"[AUTO-TAB] Error switching to hotspots finder tab: {e}")
 
     def _schedule_ring_finder_switch(self) -> None:
         # Switching the moment supercruise starts feels abrupt; the guards are re-checked when it fires
@@ -8424,7 +8424,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         self._pending_ring_finder_switch = True
                         print("[AUTO-TAB] Session ended - will switch to ring finder on next supercruise/FSD jump")
         except Exception as e:
-            print(f"[AUTO-TAB] Error setting pending switch: {e}")
+            log.error(f"[AUTO-TAB] Error setting pending switch: {e}")
 
     def _find_hotspot_for_commodity(self, commodity: str) -> None:
         """Open Ring Finder with pre-selected commodity from mining mission"""
@@ -8449,7 +8449,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     if hasattr(ring_finder, '_on_search'):
                         self.main_app.after(100, ring_finder._on_search)
         except Exception as e:
-            print(f"[MISSIONS] Error opening Ring Finder: {e}")
+            log.error(f"[MISSIONS] Error opening Ring Finder: {e}")
 
     def _session_start(self) -> None:
         if self.session_active:
@@ -8560,7 +8560,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 f.write(value_to_write)
             print(f"[DEBUG] Auto-start file saved successfully")
         except Exception as e:
-            print(f"[DEBUG] Error saving auto-start file: {e}")
+            log.error(f"[DEBUG] Error saving auto-start file: {e}")
             pass
         
         self._set_status(f"Auto-start session on first prospector {'enabled' if enabled else 'disabled'}")
@@ -8594,7 +8594,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 f.write(value_to_write)
             print(f"[DEBUG] Prompt-when-full file saved successfully")
         except Exception as e:
-            print(f"[DEBUG] Error saving prompt-when-full file: {e}")
+            log.error(f"[DEBUG] Error saving prompt-when-full file: {e}")
             pass
         
         self._set_status(f"Prompt when cargo full {'enabled' if enabled else 'disabled'}")
@@ -8630,7 +8630,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 f.write(value_to_write)
             print(f"[DEBUG] Multi-session file saved successfully")
         except Exception as e:
-            print(f"[DEBUG] Error saving multi-session file: {e}")
+            log.error(f"[DEBUG] Error saving multi-session file: {e}")
             pass
 
     def _check_cargo_full_idle(self) -> None:
@@ -8721,7 +8721,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             # Play Windows notification sound (SystemAsterisk is a gentle sound)
             winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
         except Exception as e:
-            print(f"[DEBUG] Could not play warning sound: {e}")
+            log.warning(f"[DEBUG] Could not play warning sound: {e}")
         
         # Create a non-modal dialog that doesn't block TTS announcements
         import tkinter as tk
@@ -9663,7 +9663,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         print(f"Added refinery materials before session end: {refinery_result}")
                         
                 except Exception as e:
-                    print(f"Error showing refinery dialog: {e}")
+                    log.error(f"Error showing refinery dialog: {e}")
             
             # Get cargo tracking data for material breakdown (NOW with refinery materials included)
             if self.main_app and hasattr(self.main_app, 'cargo_monitor'):
@@ -9686,7 +9686,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             # This ensures ejected materials don't count - only what you bring home matters
         
         except Exception as e:
-            print(f"Error during session end dialogs: {e}")
+            log.error(f"Error during session end dialogs: {e}")
             import traceback
             traceback.print_exc()
         
@@ -9714,7 +9714,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         else:
             # Fallback if cargo tracking wasn't available
             total_tons = 0.0
-            print(f"[SESSION] Warning: No cargo_session_data available, total_tons = 0")
+            log.warning(f"[SESSION] Warning: No cargo_session_data available, total_tons = 0")
 
         # Generate lines using actual mined materials from cargo data
         if cargo_session_data and 'materials_mined' in cargo_session_data:
@@ -9725,7 +9725,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 lines.append(f"{mat} {tons:.0f}t ({tph:.2f} t/hr)")
         else:
             # No cargo data available - empty session
-            print(f"[SESSION] Warning: No materials_mined in cargo data")
+            log.warning(f"[SESSION] Warning: No materials_mined in cargo data")
 
         if cargo_session_data and total_tons <= 0:
             self._set_status("Session ended with nothing mined; no report saved.")
@@ -9783,7 +9783,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         session_timestamp=session_timestamp
                     )
                 except Exception as graph_error:
-                    print(f"Warning: Could not auto-save graphs: {graph_error}")
+                    log.warning(f"Warning: Could not auto-save graphs: {graph_error}")
             
             # Refresh saved-session views once.
             try:
@@ -9870,7 +9870,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             else:
                 self.bookmarks_data = []
         except Exception as e:
-            print(f"Error loading bookmarks: {e}")
+            log.error(f"Error loading bookmarks: {e}")
             self.bookmarks_data = []
 
     def _save_bookmarks(self, bookmarks=None) -> bool:
@@ -10391,7 +10391,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             if changed and self._save_bookmarks(updated):
                 self.bookmarks_data = updated
         except Exception as e:
-            print(f"Bookmark last-mined sync failed: {e}")
+            log.error(f"Bookmark last-mined sync failed: {e}")
 
     def _refresh_bookmarks(self, reuse_derived=False) -> None:
         """Refresh the bookmarks display with current filter/search"""
@@ -11001,7 +11001,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     if db_res and not res_var.get():
                         res_var.set(db_res)
             except Exception as e:
-                print(f"Error loading from database: {e}")
+                log.error(f"Error loading from database: {e}")
         
         # Bind material change to reload from database
         def on_material_change(*args):
@@ -11069,7 +11069,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 if _density_user_db:
                     _density_user_db.set_ring_density(system, body, _density_by_display.get(density_var.get(), ''))
             except Exception as e:
-                print(f"Error saving density: {e}")
+                log.error(f"Error saving density: {e}")
 
             # Sync overlap/RES to database for Ring Finder integration
             try:
@@ -11104,7 +11104,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     if prev_res_mat and prev_res_mat != res_mat:
                         user_db.set_res_tag(system, body, prev_res_mat, None)
             except Exception as e:
-                print(f"Error syncing bookmark to database: {e}")
+                log.error(f"Error syncing bookmark to database: {e}")
             
             self._refresh_bookmarks()
             dialog.destroy()
@@ -11451,7 +11451,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             return stats
             
         except Exception as e:
-            print(f"Error calculating session statistics: {e}")
+            log.error(f"Error calculating session statistics: {e}")
             return {}
     
     def _parse_elapsed_to_hours(self, elapsed_str: str) -> float:
@@ -11549,7 +11549,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         copied_files.append(str(dest_path))
                         
                     except Exception as e:
-                        print(f"Error copying {file_path}: {e}")
+                        log.error(f"Error copying {file_path}: {e}")
                 
                 if copied_files:
                     # Get report identifier to link screenshots
@@ -11570,7 +11570,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     centered_message(tree.winfo_toplevel(), "Copy Failed", "No screenshots were successfully copied.")
                     
         except Exception as e:
-            print(f"Error adding screenshots: {e}")
+            log.error(f"Error adding screenshots: {e}")
             messagebox.showerror("Screenshot Error", f"Failed to add screenshots:\n{e}", parent=tree.winfo_toplevel())
     
     def _add_screenshots_to_report_internal(self, tree, item):
@@ -11621,7 +11621,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         copied_files.append(dest_path)
                         
                     except Exception as e:
-                        print(f"Error copying {file_path}: {e}")
+                        log.error(f"Error copying {file_path}: {e}")
                 
                 if copied_files:
                     # Get report identifier to link screenshots
@@ -11633,7 +11633,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     self._store_report_screenshots(report_id, copied_files)
                     
         except Exception as e:
-            print(f"Error in internal screenshot function: {e}")
+            log.error(f"Error in internal screenshot function: {e}")
     
     def _parse_duration_to_minutes(self, duration_str):
         """Convert duration string (HH:MM:SS) to minutes"""
@@ -11678,7 +11678,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 json.dump(mappings, f, indent=2)
                 
         except Exception as e:
-            print(f"Error storing screenshot mappings: {e}")
+            log.error(f"Error storing screenshot mappings: {e}")
     
     def _get_report_screenshots(self, report_id):
         """Get screenshots associated with a specific report"""
@@ -11696,7 +11696,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             return mappings.get(report_id, [])
             
         except Exception as e:
-            print(f"Error loading screenshot mappings: {e}")
+            log.error(f"Error loading screenshot mappings: {e}")
             return []
     
     def _has_screenshots(self, report_id):
@@ -11718,7 +11718,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 
             return False
         except Exception as e:
-            print(f"Error checking for detailed report: {e}")
+            log.error(f"Error checking for detailed report: {e}")
             return False
             
     def _load_enhanced_report_mappings(self):
@@ -11730,7 +11730,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     return json.load(f)
             return {}
         except Exception as e:
-            print(f"Error loading detailed report mappings: {e}")
+            log.error(f"Error loading detailed report mappings: {e}")
             return {}
     
     def _update_enhanced_report_mapping(self, session_data, html_filename):
@@ -11762,7 +11762,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 json.dump(mappings, f, indent=2, ensure_ascii=False)
                 
         except Exception as e:
-            print(f"Error updating detailed report mapping: {e}")
+            log.error(f"Error updating detailed report mapping: {e}")
 
     def _get_report_filenames(self, report_id):
         """Get HTML filename for a report_id"""
@@ -11779,7 +11779,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     return mapping
             return None
         except Exception as e:
-            print(f"Error getting report filenames: {e}")
+            log.error(f"Error getting report filenames: {e}")
             return None
 
     def _has_detailed_report(self, report_id):
@@ -11788,7 +11788,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             html_filename = self._get_report_filenames(report_id)
             return html_filename is not None
         except Exception as e:
-            print(f"Error checking detailed report existence: {e}")
+            log.error(f"Error checking detailed report existence: {e}")
             return False
 
     def _get_detailed_report_indicator(self, report_id):
@@ -11797,7 +11797,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             html_filename = self._get_report_filenames(report_id)
             return "📊" if html_filename else ""
         except Exception as e:
-            print(f"Error getting detailed report indicator: {e}")
+            log.error(f"Error getting detailed report indicator: {e}")
             return ""
 
     def _migrate_existing_enhanced_reports(self):
@@ -11825,7 +11825,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 json.dump(mappings, f, indent=2, ensure_ascii=False)
                 
         except Exception as e:
-            print(f"Error migrating existing detailed reports: {e}")
+            log.error(f"Error migrating existing detailed reports: {e}")
     
     def _extract_session_info_from_html(self, html_path):
         """Extract session information from existing HTML report"""
@@ -11860,7 +11860,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             return None
             
         except Exception as e:
-            print(f"Error extracting session info from {html_path}: {e}")
+            log.error(f"Error extracting session info from {html_path}: {e}")
             return None
             
     def _open_enhanced_report(self, report_id):
@@ -11894,7 +11894,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                  f"{t('context_menu.create_report_hint')}")
                 
         except Exception as e:
-            print(f"Error opening detailed report: {e}")
+            log.error(f"Error opening detailed report: {e}")
             from app_utils import centered_message
             centered_message(self.winfo_toplevel(), t('common.error'), f"Failed to open detailed report: {e}")
     
@@ -11927,7 +11927,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             self._open_enhanced_report(report_id)
             
         except Exception as e:
-            print(f"Error opening detailed report from menu: {e}")
+            log.error(f"Error opening detailed report from menu: {e}")
             messagebox.showerror("Error", f"Failed to open detailed report: {e}")
     
     def _delete_existing_detailed_report(self, item, tree):
@@ -11961,7 +11961,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     try:
                         os.remove(screenshot_path)
                     except Exception as e:
-                        print(f"Error deleting screenshot {screenshot_path}: {e}")
+                        log.error(f"Error deleting screenshot {screenshot_path}: {e}")
             
             # Remove from screenshot mappings
             screenshots_map_file = os.path.join(self.reports_dir, "Detailed Reports", "screenshot_mappings.json")
@@ -11977,7 +11977,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     with open(screenshots_map_file, 'w') as f:
                         json.dump(screenshot_mappings, f, indent=2)
                 except Exception as e:
-                    print(f"Error updating screenshot mappings: {e}")
+                    log.error(f"Error updating screenshot mappings: {e}")
             
             # Remove from enhanced report mappings
             mappings = self._load_enhanced_report_mappings()
@@ -11993,7 +11993,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             print(f"Deleted existing detailed report for session: {display_date} - {system} {body}")
             
         except Exception as e:
-            print(f"Warning: Could not delete existing detailed report: {e}")
+            log.warning(f"Warning: Could not delete existing detailed report: {e}")
     
     def _delete_enhanced_report_from_menu(self, tree):
         """Delete detailed HTML report(s) from context menu for selected item(s)"""
@@ -12172,7 +12172,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     deleted_count += 1
                     
                 except Exception as e:
-                    print(f"Error deleting detailed report for {session['display_date']}: {e}")
+                    log.error(f"Error deleting detailed report for {session['display_date']}: {e}")
             
             # Refresh tree to remove icons
             if deleted_count > 0:
@@ -12186,7 +12186,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     centered_message(self.winfo_toplevel(), "Success", f"{deleted_count} detailed reports deleted successfully.")
                 
         except Exception as e:
-            print(f"Error deleting detailed report: {e}")
+            log.error(f"Error deleting detailed report: {e}")
             from app_utils import centered_message
             centered_message(self.winfo_toplevel(), "Error", f"Failed to delete detailed report: {e}")
     
@@ -12243,7 +12243,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 return None
                 
             except Exception as e:
-                print(f"Error in enhanced click handler: {e}")
+                log.error(f"Error in enhanced click handler: {e}")
                 return None
         
         return enhanced_click_handler
@@ -12353,7 +12353,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     
         except Exception as e:
             messagebox.showerror("Error", f"Failed to add refinery contents:\n{str(e)}")
-            print(f"Error adding refinery to session: {e}")
+            log.error(f"Error adding refinery to session: {e}")
             import traceback
             traceback.print_exc()
             
@@ -12471,7 +12471,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         print("DEBUG YIELDS: No individual_yields parsed")
                 except Exception as e:
                     log.warning(f"Error parsing individual yields from quality string: {e}")
-                    print(f"DEBUG YIELDS: Exception: {e}")
+                    log.error(f"DEBUG YIELDS: Exception: {e}")
         
         return converted
     
@@ -12527,7 +12527,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 self._delete_existing_detailed_report(item, tree)
             except Exception as delete_error:
                 # If deletion fails, log it but continue with report generation
-                print(f"Warning: Could not delete existing report: {delete_error}")
+                log.warning(f"Warning: Could not delete existing report: {delete_error}")
             
             # Try to get detailed session data first
             session_data = None
@@ -12582,7 +12582,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                             if material and material != "":
                                                 materials_mined[material] = tons_per_material
                         except Exception as e:
-                            print(f"Error parsing materials: {e}")
+                            log.error(f"Error parsing materials: {e}")
                             pass
                     
                     # Try to get prospectors used from the prospectors column (index 12 after shift)
@@ -12717,7 +12717,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                         if csv_materials:
                                             session_data['materials_mined'] = csv_materials
                                     except Exception as e:
-                                        print(f"Warning: Could not parse materials_breakdown from CSV: {e}")
+                                        log.warning(f"Warning: Could not parse materials_breakdown from CSV: {e}")
 
                                     # Individual yields
                                     try:
@@ -12738,14 +12738,14 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                             if individual_yields:
                                                 session_data['individual_yields'] = individual_yields
                                     except Exception as e:
-                                        print(f"Warning: Could not parse individual yields: {e}")
+                                        log.warning(f"Warning: Could not parse individual yields: {e}")
 
                                     # Comment and timestamp
                                     session_data['comment'] = row.get('comment', session_data.get('comment', ''))
                                     session_data['timestamp_raw'] = row.get('timestamp_utc', session_data.get('timestamp_raw', ''))
                                     break
                     except Exception as e:
-                        print(f"Warning: Could not load CSV analytics: {e}")
+                        log.warning(f"Warning: Could not load CSV analytics: {e}")
                         pass
                 else:
                     messagebox.showwarning("No Data", 
@@ -12770,7 +12770,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                             mat_name, qty = pair.split(':', 1)
                             engineering_materials_dict[mat_name.strip()] = int(qty.strip())
                 except Exception as e:
-                    print(f"Warning: Could not parse engineering_materials: {e}")
+                    log.warning(f"Warning: Could not parse engineering_materials: {e}")
             elif isinstance(eng_materials_raw, dict):
                 engineering_materials_dict = eng_materials_raw
             
@@ -12939,7 +12939,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     enhanced_session_data['tons_per'] = f"{derived_tpa:.1f}t"
             except Exception as e:
                 # Don't block report generation on errors here
-                print(f"Warning: Could not add derived hits/tons for HTML: {e}")
+                log.warning(f"Warning: Could not add derived hits/tons for HTML: {e}")
             
             # Only trust in-memory session_analytics if it actually belongs to THIS
             # session (matching system/body while a session is active) — otherwise
@@ -13107,7 +13107,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 t('context_menu.report_error_msg')
             )
         except Exception as e:
-            print(f"Error generating enhanced report from menu: {e}")
+            log.error(f"Error generating enhanced report from menu: {e}")
             messagebox.showerror("Report Error", f"Failed to generate enhanced report:\n{e}", parent=tree.winfo_toplevel())
             
     def _parse_filtered_yields_from_session_file(self, session_file_path):
@@ -13150,7 +13150,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                 enhanced_session_data['total_finds'] = parsed_hits
                                 print(f"DEBUG: Parsed Total Material Hits from file path: {parsed_hits}")
                 except Exception as e:
-                    print(f"Warning: Could not parse total hits from file {text_report_path}: {e}")
+                    log.warning(f"Warning: Could not parse total hits from file {text_report_path}: {e}")
 
             # Ensure total_finds / total_hits and tons_per values are present for the HTML report
             try:
@@ -13161,7 +13161,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 if derived_tpa is not None:
                     enhanced_session_data['tons_per'] = f"{derived_tpa:.1f}t"
             except Exception as e:
-                print(f"Warning: Could not add derived hits/tons (batch): {e}")
+                log.warning(f"Warning: Could not add derived hits/tons (batch): {e}")
             
             # Generate HTML content
             html_content = generator.generate_report(
@@ -13203,7 +13203,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 parent=self.winfo_toplevel()
             )
         except Exception as e:
-            print(f"Error in enhanced report generation: {e}")
+            log.error(f"Error in enhanced report generation: {e}")
             raise
             
     def _open_batch_reports_dialog(self, parent_window):
@@ -13304,7 +13304,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
 
                             item_id = session_tree.insert('', 'end', values=('☐', date_str, system, tonnage, tph))
             except Exception as e:
-                print(f"Error loading session data: {e}")
+                log.error(f"Error loading session data: {e}")
             
             # Selection buttons
             btn_frame = ttk.Frame(selection_frame)
@@ -13348,7 +13348,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                             count += 1
                         except Exception as e:
                             errors += 1
-                            print(f"Error generating report for session: {e}")
+                            log.error(f"Error generating report for session: {e}")
                     
                     from app_utils import centered_message
                     centered_message(batch_window, "Batch Generation Complete",
@@ -13371,7 +13371,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             batch_window.grab_set()
             
         except Exception as e:
-            print(f"Error opening batch reports dialog: {e}")
+            log.error(f"Error opening batch reports dialog: {e}")
             messagebox.showerror("Dialog Error", f"Could not open batch reports dialog: {e}", parent=parent_window)
 
 
