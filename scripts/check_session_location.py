@@ -1,4 +1,5 @@
 import ast
+import csv
 import datetime as dt
 import glob
 import json
@@ -33,7 +34,8 @@ NAMESPACE = dict(globals(), MISSIONS_AVAILABLE=False, CHARTS_AVAILABLE=False,
 METHODS = load_methods(ROOT / 'app/prospector_panel.py', {
     '_read_initial_location_from_journal', '_extract_location_display',
     '_attach_journal', '_handle_journal_events', '_session_start', '_session_stop',
-    '_save_session_report_with_timestamp',
+    '_save_session_report_with_timestamp', '_resolve_session_ring',
+    'get_last_mined_lookup', '_get_csv_path',
 }, NAMESPACE)
 DB_METHODS = load_methods(ROOT / 'app/user_database.py',
                           {'_normalize_body_name', 'bulk_get_ring_types'}, dict(globals()))
@@ -66,6 +68,7 @@ class SessionLocationChecks(unittest.TestCase):
         for name, method in METHODS.items():
             if name.startswith('_') and name != '_extract_location_display':
                 setattr(p, name, method.__get__(p))
+        p.get_last_mined_lookup = METHODS['get_last_mined_lookup'].__get__(p)
         p.main_app = None
         p.journal_dir = self.folder.name
         p.reports_dir = self.folder.name
@@ -105,6 +108,38 @@ class SessionLocationChecks(unittest.TestCase):
         p._session_stop(silent=True)
         p._update_csv_with_session.assert_called_once()
         return p._update_csv_with_session.call_args.args[:2]
+
+    def test_planet_location_resolves_to_mined_ring(self):
+        p = self.panel
+        system = 'Wregoe MD-K d8-19'
+        with open(Path(self.folder.name) / 'sessions_index.csv', 'w', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=['timestamp_utc', 'system', 'body'])
+            writer.writeheader()
+            writer.writerow(dict(timestamp_utc='2026-11-19T21:32:58', system=system, body='2 B Ring'))
+            writer.writerow(dict(timestamp_utc='2026-11-20T19:26:27', system=system, body='2 A Ring'))
+            writer.writerow(dict(timestamp_utc='2026-11-20T19:27:00', system=system, body='5 A Ring'))
+        self.assertEqual(p._resolve_session_ring(system, '2 A'), '2 A Ring')  # moon "2 a" inside planet 2's rings
+        self.assertEqual(p._resolve_session_ring(system, '2'), '2 A Ring')
+        self.assertEqual(p._resolve_session_ring(system, '3'), '3')
+        self.assertEqual(p._resolve_session_ring('Other', '2 A'), '2 A')
+
+        p.main_app = Mock()
+        p.main_app.cargo_monitor.user_db.get_system_hotspots.return_value = [
+            dict(body_name='7 A Ring'), dict(body_name='8 A Ring'), dict(body_name='8 B Ring')]
+        self.assertEqual(p._resolve_session_ring(system, '7'), '7 A Ring')
+        self.assertEqual(p._resolve_session_ring(system, '8'), '8')  # two rings and no history: leave it
+
+    def test_nothing_mined_saves_no_report(self):
+        p = self.panel
+        p.main_app = Mock()
+        p.main_app.cargo_monitor.get_live_session_materials.return_value = {'Tritium': 1}
+        p.main_app.cargo_monitor.end_session_tracking.return_value = {
+            'materials_mined': {}, 'total_tons_mined': 0,
+        }
+        p._session_stop(silent=True)
+        p._update_csv_with_session.assert_not_called()
+        self.assertEqual(list(Path(self.folder.name).glob('Session_*.txt')), [])
+        self.assertFalse(p.session_active)
 
     def test_restart_already_in_ring(self):
         self.mine()

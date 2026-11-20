@@ -121,6 +121,8 @@ ANNOUNCEMENT_TOGGLES = {
 
 log = logging.getLogger(__name__)
 
+RING_FINDER_SWITCH_DELAY_MS = 3000
+
 # ToolTip class will be provided by main application to ensure consistency
 
 # ProspectorPanel and helpers extracted
@@ -1391,6 +1393,38 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         except Exception as e:
             log.error(f"Error building last-mined lookup: {e}")
         return result
+
+    def _resolve_session_ring(self, system: str, body: str) -> str:
+        """Turn a planet location into the ring being mined.
+
+        The game names only the planet when you drop at it or undock from a carrier
+        parked in its ring, so the report would otherwise have no ring type.
+        """
+        if not system or not body or "ring" in body.lower():
+            return body
+        parts = body.split()
+        parents = [body]
+        # A moon such as "2 a" sits inside planet 2's rings ("2 A Ring")
+        if len(parts) > 1 and len(parts[-1]) == 1 and parts[-1].isalpha() and parts[-2][-1:].isdigit():
+            parents.append(" ".join(parts[:-1]))
+
+        def on_planet(ring: str) -> bool:
+            ring_l = ring.lower()
+            return "ring" in ring_l and any(ring_l.startswith(p.lower() + " ") for p in parents)
+
+        # Prefer the ring last mined around this planet
+        mined = [(ts, ring) for (sys_name, ring), (_, ts) in self.get_last_mined_lookup([system]).items()
+                 if sys_name.lower() == system.lower() and on_planet(ring)]
+        if mined:
+            return max(mined)[1]
+
+        user_db = getattr(getattr(self.main_app, 'cargo_monitor', None), 'user_db', None)
+        if user_db:
+            rings = {h.get('body_name', '') for h in user_db.get_system_hotspots(system)}
+            rings = [r for r in rings if on_planet(r)]
+            if len(rings) == 1:
+                return rings[0]
+        return body
 
     def open_report_file_by_timestamp(self, system: str, body: str, timestamp_raw: str) -> bool:
         """Open the Session_*.txt report matching the given timestamp.
@@ -7429,12 +7463,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 
                     # Auto-switch to Hotspots Finder on FSD jump (not during startup)
                     if ev == "FSDJump" and not self.startup_processing:
-                        # Check if there's a pending switch from session end
-                        if getattr(self, '_pending_ring_finder_switch', False):
-                            self._pending_ring_finder_switch = False
-                            self._auto_switch_to_ring_finder_tab()
-                        else:
-                            self._auto_switch_to_ring_finder_tab()
+                        self._pending_ring_finder_switch = False
+                        self._schedule_ring_finder_switch()
             
             # Track Fleet Carrier location changes
             if ev == "CarrierLocation":
@@ -7443,8 +7473,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     print(f"[FLEET CARRIER] CarrierLocation: system={carrier_system}")
                     
                     # Update fleet carrier system in distance calculator
-                    if hasattr(self.app, 'distance_fc_system'):
-                        self.app.distance_fc_system.set(carrier_system)
+                    if hasattr(self.main_app, 'distance_fc_system'):
+                        self.main_app.distance_fc_system.set(carrier_system)
                     
                     # ALSO UPDATE PLAYER'S CURRENT SYSTEM since CarrierLocation indicates where the player is
                     if carrier_system != self.last_system:
@@ -7554,6 +7584,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 # Handle SupercruiseExit during startup to get accurate BodyType for rings
                 if ev == "SupercruiseExit":
                     self._sc_tab_switched = False  # Allow switch again on next entry
+                    self._cancel_ring_finder_switch()
                     body_name = evt.get("Body") or evt.get("BodyName")
                     if body_name:
                         self.last_body = body_name
@@ -7579,12 +7610,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 
                 # Handle SupercruiseEntry - auto-switch to Hotspots Finder
                 if ev == "SupercruiseEntry" and not self.startup_processing:
-                    # Check if there's a pending switch from session end
-                    if getattr(self, '_pending_ring_finder_switch', False):
-                        self._pending_ring_finder_switch = False
-                        self._auto_switch_to_ring_finder_tab()
-                    else:
-                        self._auto_switch_to_ring_finder_tab()
+                    self._pending_ring_finder_switch = False
+                    self._schedule_ring_finder_switch()
                             
                 # Real-time supercruise events (not during startup)
                 if not self.startup_processing:
@@ -8359,7 +8386,22 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                         self._sc_tab_switched = True
         except Exception as e:
             print(f"[AUTO-TAB] Error switching to hotspots finder tab: {e}")
-    
+
+    def _schedule_ring_finder_switch(self) -> None:
+        # Switching the moment supercruise starts feels abrupt; the guards are re-checked when it fires
+        self._cancel_ring_finder_switch()
+        self._ring_finder_switch_job = self.after(RING_FINDER_SWITCH_DELAY_MS, self._run_ring_finder_switch)
+
+    def _cancel_ring_finder_switch(self) -> None:
+        job = getattr(self, '_ring_finder_switch_job', None)
+        if job:
+            self.after_cancel(job)
+        self._ring_finder_switch_job = None
+
+    def _run_ring_finder_switch(self) -> None:
+        self._ring_finder_switch_job = None
+        self._auto_switch_to_ring_finder_tab()
+
     def _set_pending_ring_finder_switch(self) -> None:
         """Set a flag to switch to Ring Finder on next supercruise/FSD event
         
@@ -8376,8 +8418,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     in_supercruise = bool(flags & 16)
                     
                     if in_supercruise:
-                        # Already in supercruise - check whether switching is allowed
-                        self._auto_switch_to_ring_finder_tab()
+                        self._schedule_ring_finder_switch()
                     else:
                         # Not in supercruise - wait for next supercruise/FSD event
                         self._pending_ring_finder_switch = True
@@ -9686,9 +9727,16 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             # No cargo data available - empty session
             print(f"[SESSION] Warning: No materials_mined in cargo data")
 
+        if cargo_session_data and total_tons <= 0:
+            self._set_status("Session ended with nothing mined; no report saved.")
+            self._set_pending_ring_finder_switch()
+            return
+
         sysname = self.session_mining_system or self.session_system.get().strip() or self.last_system or "Unknown System"
         # Keep the mining system and body paired when the current location changes.
         body = self.session_mining_body or self.session_body.get().strip() or self.last_body or "Unknown Body"
+        body = self._resolve_session_ring(sysname, body)
+        self.session_mining_system, self.session_mining_body = sysname, body
         elapsed_txt = self.session_elapsed.get()
         
         # Determine session type for report

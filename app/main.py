@@ -12979,6 +12979,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
     
     def _on_cargo_capacity_detected(self, detected_capacity: int) -> None:
         """Called when CargoMonitor detects cargo capacity from Elite Dangerous"""
+        if not hasattr(self, 'cargo_max_capacity'):
+            # The startup scan runs before the capacity setting exists; apply it once startup finishes
+            self.after(0, self._on_cargo_capacity_detected, detected_capacity)
+            return
         current_capacity = int(self.cargo_max_capacity.get())
         if detected_capacity != current_capacity and detected_capacity > 0:
             # Update the UI setting to match the detected capacity

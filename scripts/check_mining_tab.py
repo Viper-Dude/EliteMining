@@ -188,7 +188,8 @@ class ReportChecks(unittest.TestCase):
             _refresh_reports_tab=Mock(), _refresh_session_statistics=Mock(),
             _set_pending_ring_finder_switch=Mock(),
             _rebuild_csv_from_files_tab=Mock(side_effect=AssertionError('Unexpected rebuild'))),
-            '_session_stop', '_save_session_report_with_timestamp', '_update_csv_with_session')
+            '_session_stop', '_save_session_report_with_timestamp', '_update_csv_with_session',
+            '_resolve_session_ring')
         with contextlib.redirect_stdout(io.StringIO()):
             obj._session_stop(silent=True)
         files = list(Path(self.folder.name).glob('Session_*.txt'))
