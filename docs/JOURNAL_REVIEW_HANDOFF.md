@@ -73,7 +73,7 @@ Origin: an honest review of the GUI, features, performance, the file watcher (wa
    - A session started after undocking from the carrier in the ring shows "2 A Ring / Metallic" in Reports.
    - Starting and stopping a session without mining saves no report.
    - No "Journal capacity/ship scan failed" or "Journal listener ... failed" lines in the startup log.
-2. Not yet covered by the first test: changing the journal folder, restarting the game while the app runs, German session summary, importing journal history, and the `894b740` smoke test (delete a report, Ring Finder filters, announcement preset, Auto Search and prefetch prices toggles). Unless the user reports otherwise, treat these as untested.
+2. The user will not test changing the journal folder (needs moving the game's journal location). The carrier fix and 0 t comment skip (`49362e8`) were checked on the installer build. Not yet covered by the first test: restarting the game while the app runs, German session summary, importing journal history, and the `894b740` smoke test (delete a report, Ring Finder filters, announcement preset, Auto Search and prefetch prices toggles). Unless the user reports otherwise, treat these as untested.
 
 ## Deliberately skipped (and why)
 
