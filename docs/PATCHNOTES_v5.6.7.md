@@ -12,6 +12,7 @@
 ## Bug Fixes
 
 - General stability and code optimization: settings such as the journal folder now apply immediately, journal handling and jumps-left tracking are more reliable, and mining events are no longer missed right after startup.
+- Typed timer values in VoiceAttack Controls are now saved right away.
 
 
 ### Voiceattack Profile -update to V5.6.7
