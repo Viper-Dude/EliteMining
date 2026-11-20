@@ -11,11 +11,7 @@
 
 ## Bug Fixes
 
-- Typed timer values in VoiceAttack Controls are now saved right away.
-- Changing the journal folder now takes effect right away for jumps-left and shared market data, without a restart.
-- Jumps-left no longer misses a route update or clear when several game events arrive at the same time.
-- Fixed mining events being skipped right after the app starts.
-- The journal history import window no longer stays open if the import fails, and now shows an error instead.
+- General stability and code optimization: settings such as the journal folder now apply immediately, journal handling and jumps-left tracking are more reliable, and mining events are no longer missed right after startup.
 
 
 ### Voiceattack Profile -update to V5.6.7
