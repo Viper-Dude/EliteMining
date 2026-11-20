@@ -32,7 +32,7 @@ NAMESPACE = dict(globals(), MISSIONS_AVAILABLE=False, CHARTS_AVAILABLE=False,
                  _atomic_write_text=lambda path, text: Path(path).write_text(text, encoding='utf-8'))
 METHODS = load_methods(ROOT / 'app/prospector_panel.py', {
     '_read_initial_location_from_journal', '_extract_location_display',
-    '_watch_once', '_session_start', '_session_stop',
+    '_attach_journal', '_handle_journal_events', '_session_start', '_session_stop',
     '_save_session_report_with_timestamp',
 }, NAMESPACE)
 DB_METHODS = load_methods(ROOT / 'app/user_database.py',
@@ -86,12 +86,12 @@ class SessionLocationChecks(unittest.TestCase):
         p.session_analytics.get_session_info.return_value = {}
         p._read_initial_location_from_journal()
         p._session_start()
-        p._watch_once()
+        p._attach_journal()
 
     def mine(self):
         with self.journal.open('a', encoding='utf-8') as stream:
             stream.write(json.dumps(dict(event='MiningRefined', Type='Tritium')) + '\n')
-        self.panel._watch_once()
+        self.panel._handle_journal_events([dict(event='MiningRefined', Type='Tritium')])
 
     def save(self, ring_type='Icy'):
         p = self.panel
@@ -119,7 +119,7 @@ class SessionLocationChecks(unittest.TestCase):
         p.last_body_type = 'PlanetaryRing'
         p.session_body.set('')
         p._journal_attached = False
-        p._watch_once()
+        p._attach_journal()
         self.assertEqual(p.last_body, f'{self.system} {self.body}')
         p._update_location_display.assert_called()
 

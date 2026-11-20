@@ -21,6 +21,14 @@ except ImportError:
     print("[FileWatcher] Watchdog not available, using optimized polling fallback")
 
 
+def _is_elite_file(file_path: str) -> bool:
+    """Check if file is an Elite Dangerous file we care about"""
+    file_name = os.path.basename(file_path).lower()
+    if file_name.startswith("journal.") and file_name.endswith(".log"):
+        return True
+    return file_name in ("status.json", "cargo.json", "market.json", "outfitting.json", "navroute.json")
+
+
 class EliteFileHandler(FileSystemEventHandler):
     """Handles file system events for Elite Dangerous files"""
     
@@ -45,25 +53,12 @@ class EliteFileHandler(FileSystemEventHandler):
         self.last_event_time[file_path] = current_time
         
         # Only process Elite Dangerous files
-        if self._is_elite_file(file_path):
+        if _is_elite_file(file_path):
             try:
                 self.callback(file_path)
             except Exception as e:
                 print(f"[FileWatcher] Error in callback for {file_path}: {e}")
     
-    def _is_elite_file(self, file_path: str) -> bool:
-        """Check if file is an Elite Dangerous file we care about"""
-        file_name = os.path.basename(file_path).lower()
-        
-        # Journal files
-        if file_name.startswith("journal.") and file_name.endswith(".log"):
-            return True
-        
-        # Status files
-        if file_name in ["status.json", "cargo.json", "market.json", "outfitting.json", "navroute.json"]:
-            return True
-        
-        return False
 
 
 class EliteFileWatcher:
@@ -78,6 +73,7 @@ class EliteFileWatcher:
         self.stop_event = threading.Event()
         self.callbacks = {}
         self.watched_directories = set()
+        self.watches = {}
         self.use_watchdog = WATCHDOG_AVAILABLE
         self.last_poll_times = {}
         self.polling_interval = 2.0  # Optimized polling interval (vs 0.5s)
@@ -110,7 +106,7 @@ class EliteFileWatcher:
             
             if self.use_watchdog and self.observer:
                 handler = EliteFileHandler(callback)
-                self.observer.schedule(handler, directory, recursive=False)
+                self.watches[directory] = self.observer.schedule(handler, directory, recursive=False)
                 print(f"[FileWatcher] Added watchdog watch for: {directory}")
             
             return True
@@ -158,7 +154,7 @@ class EliteFileWatcher:
                             if not os.path.isfile(file_path):
                                 continue
                             
-                            if not self._is_elite_file(file_path):
+                            if not _is_elite_file(file_path):
                                 continue
                             
                             try:
@@ -187,20 +183,6 @@ class EliteFileWatcher:
                 print(f"[FileWatcher] Polling error: {e}")
                 self.stop_event.wait(1.0)  # Wait before retrying
     
-    def _is_elite_file(self, file_path: str) -> bool:
-        """Check if file is an Elite Dangerous file we care about"""
-        file_name = os.path.basename(file_path).lower()
-        
-        # Journal files
-        if file_name.startswith("journal.") and file_name.endswith(".log"):
-            return True
-        
-        # Status files
-        if file_name in ["status.json", "cargo.json", "market.json", "outfitting.json"]:
-            return True
-        
-        return False
-    
     def remove_watch(self, directory: str):
         """Remove a directory watch"""
         directory = str(Path(directory).resolve())
@@ -210,6 +192,13 @@ class EliteFileWatcher:
         
         if directory in self.watched_directories:
             self.watched_directories.remove(directory)
+
+        watch = self.watches.pop(directory, None)
+        if watch is not None and self.observer:
+            try:
+                self.observer.unschedule(watch)
+            except Exception as e:
+                print(f"[FileWatcher] Error unscheduling watch for {directory}: {e}")
         
         print(f"[FileWatcher] Removed watch for: {directory}")
     
@@ -231,6 +220,7 @@ class EliteFileWatcher:
         
         self.callbacks.clear()
         self.watched_directories.clear()
+        self.watches.clear()
 
 
 # Global file watcher instance

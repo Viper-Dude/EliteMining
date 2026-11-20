@@ -4,6 +4,7 @@ import ast
 import contextlib
 import glob
 import io
+import itertools
 import json
 import logging
 import os
@@ -29,7 +30,7 @@ def load_methods(filename, class_name, names):
         name=class_name, bases=[], keywords=[], decorator_list=[],
         body=[n for n in original.body if isinstance(n, ast.FunctionDef) and n.name in names],
     )], type_ignores=[]))
-    namespace = dict(os=os, glob=glob, json=json, time=time, Optional=Optional, MISSIONS_AVAILABLE=False,
+    namespace = dict(os=os, glob=glob, json=json, time=time, threading=threading, Optional=Optional, MISSIONS_AVAILABLE=False,
                      logging=logging, log=logging.getLogger('journal-check'),
                      t=lambda key: key,
                      journal_resume_offset=journal_resume_offset,
@@ -41,8 +42,10 @@ def load_methods(filename, class_name, names):
 Monitor = load_methods('app/main.py', 'CargoMonitor', {
     'start_journal_monitoring', 'find_latest_journal', '_poll_journal',
     'read_new_journal_entries', '_read_new_journal_entries',
+    'add_journal_listener', '_dispatch_journal_events', '_deliver_journal_events',
+    '_start_background_monitoring',
 })
-Panel = load_methods('app/prospector_panel.py', 'ProspectorPanel', {'_watch_once', '_find_latest_journal'})
+Panel = load_methods('app/prospector_panel.py', 'ProspectorPanel', {'_attach_journal', '_handle_journal_events'})
 App = load_methods('app/main.py', 'App', {
     '_process_journals_for_catchup', '_get_new_journals_since_checkpoint',
 })
@@ -62,6 +65,11 @@ class ReaderCases:
         self.addCleanup(output.__exit__, None, None, None)
         self.path = Path(self.folder.name) / 'Journal.2026-11-17T100000.01.log'
         self.events = []
+        # Each clock read moves past the 5-second folder-listing throttle
+        clock = itertools.count(1000, 10)
+        clock_patch = patch.object(time, 'time', side_effect=lambda: next(clock))
+        clock_patch.start()
+        self.addCleanup(clock_patch.stop)
         self.make_reader()
 
     def append(self, data, path=None):
@@ -75,6 +83,9 @@ class ReaderCases:
             return None
         self.events.append(event)
         return event
+
+    def capture_batch(self, events):
+        self.events.extend(events)
 
     def numbers(self):
         return [event['number'] for event in self.events]
@@ -117,6 +128,19 @@ class ReaderCases:
         self.assertEqual(self.events, [])
         self.append(record(1))
         self.poll(); self.poll()
+        self.assertEqual(self.numbers(), [1])
+
+    def test_folder_is_not_relisted_within_five_seconds(self):
+        self.path.write_bytes(record(0))
+        self.start()
+        self.poll()
+        new = self.path.with_name('Journal.2026-11-17T110000.01.log')
+        new.write_bytes(record(1))
+        with patch.object(time, 'time', return_value=0.0):
+            self.poll(); self.poll()
+        self.assertEqual(self.events, [])
+        with patch.object(time, 'time', return_value=1e9):
+            self.poll(); self.poll()
         self.assertEqual(self.numbers(), [1])
 
     def test_first_file_created_after_startup_is_read(self):
@@ -198,7 +222,7 @@ class CargoReaderChecks(ReaderCases, unittest.TestCase):
         self.reader.last_file_size = 0
         self.reader._lock = threading.RLock()
         self.reader.scan_journal_for_cargo_capacity = Mock()
-        self.reader.process_journal_event = self.capture
+        self.reader._dispatch_journal_events = self.capture_batch
         self.start = self.reader.start_journal_monitoring
         self.poll = self.reader._poll_journal
 
@@ -213,11 +237,11 @@ class CargoReaderChecks(ReaderCases, unittest.TestCase):
             self.assertTrue(release.wait(3))
             return read_complete_journal_lines(path, offset)
         errors = []
-        def dispatch(line):
+        def dispatch(events):
             if self.reader._lock._is_owned():
                 errors.append('dispatch owns cursor lock')
-            self.capture(line)
-        self.reader.process_journal_event = dispatch
+            self.capture_batch(events)
+        self.reader._dispatch_journal_events = dispatch
         with patch.dict(namespace, read_complete_journal_lines=delayed_read):
             first = threading.Thread(target=self.reader.read_new_journal_entries)
             second = threading.Thread(target=self.reader.read_new_journal_entries)
@@ -266,40 +290,57 @@ class CargoReaderChecks(ReaderCases, unittest.TestCase):
         self.path.write_bytes(record(0))
         self.start()
         self.append(record(1) + record(2))
-        def dispatch(line):
-            event = self.capture(line)
-            if event['number'] == 1:
+        def dispatch(events):
+            self.capture_batch(events)
+            if any(event['number'] == 1 for event in events):
                 self.append(record(3))
                 self.assertFalse(self.reader.read_new_journal_entries())
-        self.reader.process_journal_event = dispatch
+        self.reader._dispatch_journal_events = dispatch
         self.poll(); self.poll()
         self.assertEqual(self.numbers(), [1, 2, 3])
 
 
-class ProspectorReaderChecks(ReaderCases, unittest.TestCase):
+class SharedReaderChecks(ReaderCases, unittest.TestCase):
+    """One reader feeds the cargo monitor and then each listener, such as the prospector panel."""
+
     def make_reader(self):
-        self.reader = Panel()
+        self.reader = Monitor()
         self.reader.journal_dir = self.folder.name
-        self.reader._jrnl_path = None
-        self.reader._jrnl_pos = 0
-        self.reader._journal_attached = False
-        self.reader.auto_start_on_prospector = True
-        self.reader.session_active = False
-        self.reader.after = Mock()
-        self.reader._session_start = Mock()
-        self.reader._auto_switch_to_mining_tab = Mock()
-        self.reader._read_initial_location_from_journal = Mock()
-        self.reader.last_system = self.reader.last_body = None
-        self.start = self.reader._watch_once
-        self.poll = self.reader._watch_once
-        namespace = self.poll.__func__.__globals__
-        saved_json = namespace['json']
-        def parse(line):
-            event = json.loads(line)
-            self.events.append(event)
-            return event
-        namespace['json'] = SimpleNamespace(loads=parse)
-        self.addCleanup(namespace.__setitem__, 'json', saved_json)
+        self.reader.last_journal_file = None
+        self.reader.last_file_size = 0
+        self.reader._lock = threading.RLock()
+        self.reader._journal_listeners = []
+        self.reader.scan_journal_for_cargo_capacity = Mock()
+        self.reader._process_journal_event_impl = Mock()
+        self.panel = Panel()
+        self.panel.journal_dir = self.folder.name
+        self.panel._journal_attached = False
+        self.panel.auto_start_on_prospector = True
+        self.panel.session_active = False
+        self.panel.after = Mock()
+        self.panel._session_start = Mock()
+        self.panel._auto_switch_to_mining_tab = Mock()
+        self.panel._read_initial_location_from_journal = Mock()
+        self.panel.last_system = self.panel.last_body = None
+        def to_panel(events):
+            self.capture_batch(events)
+            self.panel._handle_journal_events(events)
+        self.reader.add_journal_listener(to_panel)
+        self.poll = self.reader._poll_journal
+
+    def start(self):
+        self.reader.start_journal_monitoring()
+        self.panel._attach_journal()
+
+    def test_cargo_sees_the_same_events_before_listeners(self):
+        self.path.write_bytes(record(0))
+        self.start()
+        order = []
+        self.reader._process_journal_event_impl.side_effect = lambda event: order.append(('cargo', event['number']))
+        self.reader.add_journal_listener(lambda events: order.extend(('listener', e['number']) for e in events))
+        self.append(record(1) + record(2))
+        self.poll()
+        self.assertEqual(order, [('cargo', 1), ('cargo', 2), ('listener', 1), ('listener', 2)])
 
     def test_first_prospector_launch_in_new_file_still_auto_starts(self):
         self.path.write_bytes(record(0))
@@ -307,8 +348,76 @@ class ProspectorReaderChecks(ReaderCases, unittest.TestCase):
         new = self.path.with_name('Journal.2026-11-17T110000.01.log')
         new.write_bytes(record(1, event='LaunchDrone', Type='Prospector'))
         self.poll(); self.poll()
-        self.reader.after.assert_called_once_with(100, self.reader._session_start)
-        self.reader._auto_switch_to_mining_tab.assert_called_once_with()
+        self.panel.after.assert_called_once_with(100, self.panel._session_start)
+        self.panel._auto_switch_to_mining_tab.assert_called_once_with()
+
+    def test_panel_ignores_events_until_attached(self):
+        self.panel._handle_journal_events([dict(event='LaunchDrone', Type='Prospector')])
+        self.panel.after.assert_not_called()
+        self.panel._attach_journal()
+        self.panel._attach_journal()
+        self.panel._read_initial_location_from_journal.assert_called_once_with()
+
+    def test_failing_listener_does_not_block_cargo_or_other_listeners(self):
+        reader = Monitor()
+        reader._journal_listeners = []
+        reader._process_journal_event_impl = Mock(side_effect=[RuntimeError('cargo'), None])
+        received = []
+        reader.add_journal_listener(Mock(side_effect=RuntimeError('listener')))
+        reader.add_journal_listener(received.extend)
+        events = [dict(event='A'), dict(event='B')]
+        with self.assertLogs('journal-check', level='ERROR'):
+            reader._deliver_journal_events(events)
+        self.assertEqual(reader._process_journal_event_impl.call_count, 2)
+        self.assertEqual(received, events)
+
+    def test_listener_is_added_once(self):
+        reader = Monitor()
+        reader._journal_listeners = []
+        reader.add_journal_listener(self.panel._handle_journal_events)
+        reader.add_journal_listener(self.panel._handle_journal_events)
+        self.assertEqual(len(reader._journal_listeners), 1)
+
+    def test_background_batch_is_one_main_thread_callback(self):
+        reader = Monitor()
+        reader.main_app_ref = Mock()
+        reader._deliver_journal_events = Mock()
+        events = [dict(event='A'), dict(event='B')]
+        worker = threading.Thread(target=reader._dispatch_journal_events, args=(events,))
+        worker.start(); worker.join(3)
+        reader.main_app_ref.after.assert_called_once_with(0, reader._deliver_journal_events, events)
+        reader._deliver_journal_events.assert_not_called()
+
+
+class BackgroundMonitorChecks(unittest.TestCase):
+    def test_paused_monitoring_does_not_end_the_monitor_thread(self):
+        monitor = Monitor()
+        monitor._stop_event = threading.Event()
+        monitor._lock = threading.RLock()
+        monitor.materials_collected = {}
+        monitor.journal_monitor_active = False
+        monitor._check_status_for_ship_changes = Mock()
+        monitor._validate_cargo_capacity = Mock(return_value=True)
+        monitor.read_cargo_json = Mock()
+        polled = threading.Event()
+        def poll():
+            polled.set()
+            monitor._stop_event.set()
+        monitor._poll_journal = Mock(side_effect=poll)
+        real_sleep = time.sleep
+        paused_ticks = []
+        def fast_sleep(seconds):
+            if not monitor.journal_monitor_active:
+                paused_ticks.append(seconds)
+                if len(paused_ticks) >= 3:
+                    monitor.journal_monitor_active = True
+            real_sleep(0.001)
+        self.addCleanup(monitor._stop_event.set)
+        with patch.object(time, 'sleep', fast_sleep):
+            monitor._start_background_monitoring()
+            self.assertTrue(polled.wait(3))
+        self.assertGreaterEqual(len(paused_ticks), 3)
+        monitor._check_status_for_ship_changes.assert_called()
 
 
 class CatchupCheckpointChecks(unittest.TestCase):

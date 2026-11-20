@@ -1122,6 +1122,7 @@ class CargoMonitor:
         self.journal_monitor_active = False
         self.last_journal_file = None
         self.last_file_size = 0
+        self._journal_listeners = []
         
         # Elite Dangerous journal directory - load from config or use default
         cfg = _load_cfg()
@@ -1526,106 +1527,6 @@ class CargoMonitor:
         
         return " ".join(parts) if parts else ""
 
-    def reset_cargo_hold(self):
-        """Reset cargo hold to actual game state using real-time Status.json data"""
-        print("Resetting cargo hold...")
-        
-        # Temporarily stop journal monitoring to prevent interference
-        old_monitor_state = getattr(self, 'journal_monitor_active', False)
-        self.journal_monitor_active = False
-        print(f"Reset: Temporarily stopped journal monitoring (was {old_monitor_state})")
-        
-        # Clear all cargo items and reset counters
-        self.cargo_items.clear()
-        self.current_cargo = 0
-        
-        # Reset file timestamps to force fresh read
-        self.last_cargo_mtime = 0
-        self.last_file_size = 0
-        
-        success = False
-        status_cargo_weight = 0
-        
-        # Get real-time cargo weight from Status.json (always current)
-        if self.read_status_json_cargo():
-            status_cargo_weight = self.current_cargo
-            success = True
-            print(f"Reset: Status.json shows {status_cargo_weight}t total cargo (real-time)")
-        
-        # Try to get detailed items from Cargo.json, but validate against Status.json
-        cargo_json_weight = 0
-        if self.read_cargo_json():
-            # Calculate total weight from Cargo.json items
-            try:
-                cargo_json_weight = 0
-                for name, item in self.cargo_items.items():
-                    if isinstance(item, dict):
-                        count = item.get('Count', 0)
-                        cargo_json_weight += count
-                    elif isinstance(item, (int, float)):
-                        cargo_json_weight += item
-                    else:
-                        print(f"Warning: Unknown cargo item format: {type(item)}")
-                
-                print(f"Reset: Cargo.json shows {cargo_json_weight}t total cargo")
-            except Exception as e:
-                print(f"Error calculating Cargo.json weight: {e}")
-                cargo_json_weight = 0
-            
-            # Check if Cargo.json data matches Status.json (within 1 ton tolerance)
-            if abs(cargo_json_weight - status_cargo_weight) <= 1:
-                print("Reset: Cargo.json data matches Status.json - using detailed items")
-                success = True
-            else:
-                print(f"Reset: Cargo.json data is outdated ({cargo_json_weight}t vs {status_cargo_weight}t)")
-                print("Reset: Clearing outdated Cargo.json data, using Status.json weight only")
-                # Clear the outdated detailed items but keep the accurate weight
-                self.cargo_items.clear()
-                self.current_cargo = status_cargo_weight
-                success = True
-        
-        # If we only have weight but no detailed items, show a placeholder entry
-        if success and not self.cargo_items and self.current_cargo > 0:
-            self.cargo_items['Unknown Cargo'] = {
-                'Name': 'Unknown Cargo',
-                'Count': self.current_cargo,
-                'Description': 'Open cargo hold in Elite Dangerous to see details'
-            }
-            print(f"Reset: Created placeholder for {self.current_cargo}t of unknown cargo")
-        
-        # If no data from either source, try journal as last resort
-        if not success or (not self.cargo_items and self.current_cargo == 0):
-            print("Reset: Trying journal data as fallback...")
-            self.force_cargo_update()
-            if self.cargo_items or self.current_cargo > 0:
-                success = True
-                print("Reset: Loaded cargo from journal")
-
-        
-        # Update display again to ensure changes are shown
-        
-        # Notify main app
-        if self.update_callback:
-            self.update_callback()
-        
-        status_msg = f"Cargo reset: {len(self.cargo_items)} items, {self.current_cargo}t total"
-        print(status_msg)
-        
-        # Wait a moment then restart journal monitoring to prevent immediate override
-        import threading
-        def restart_monitoring():
-            import time
-            time.sleep(3)  # Wait 3 seconds before restarting monitoring
-            self.journal_monitor_active = old_monitor_state
-            print(f"Reset: Journal monitoring restarted (set to {old_monitor_state})")
-        
-        if old_monitor_state:
-            thread = threading.Thread(target=restart_monitoring, daemon=True)
-            thread.start()
-            print("Reset: Scheduled journal monitoring restart in 3 seconds")
-        
-        return success
-    
     def read_cargo_json(self):
         """Read detailed cargo data from Cargo.json file"""
         try:
@@ -1877,7 +1778,11 @@ class CargoMonitor:
         self.last_heartbeat = time.time()  # Track thread health
         
         def background_monitor():
-            while self.journal_monitor_active and not self._stop_event.is_set():
+            while not self._stop_event.is_set():
+                # The thread must survive a pause in monitoring
+                if not self.journal_monitor_active:
+                    time.sleep(0.5)
+                    continue
                 try:
                     # Heartbeat: Log every 60 seconds to verify thread is alive
                     current_time = time.time()
@@ -1940,9 +1845,11 @@ class CargoMonitor:
                                 
                             # Force refresh cargo data after ship change
                             self.read_cargo_json()
-                            
-        except Exception as e:
-            pass  # Silent fail in background monitoring
+
+        except json.JSONDecodeError:
+            pass  # Game is mid-write; the next change re-reads it
+        except Exception:
+            log.exception("Status.json check failed")
     
     def read_status_json_cargo(self):
         """Read current cargo weight from Status.json (real-time data)"""
@@ -2003,7 +1910,6 @@ class CargoMonitor:
         if getattr(self, '_journal_initializing', False):
             self.find_latest_journal(skip_existing=True)
             return
-        journal_files = glob.glob(os.path.join(self.journal_dir, "Journal.*.log"))
         with self._lock:
             current = self.last_journal_file
         if current and os.path.normcase(os.path.abspath(os.path.dirname(current))) != os.path.normcase(os.path.abspath(self.journal_dir)):
@@ -2013,10 +1919,17 @@ class CargoMonitor:
             self._journal_initializing = True
             self.find_latest_journal(skip_existing=True)
             return
-        if current:
-            paths = [current] + sorted(path for path in journal_files if path > current)
+        # A new journal only appears when the game restarts, so listing the folder every tick is wasted work
+        now = time.time()
+        if current and os.path.exists(current) and now - getattr(self, '_journal_list_time', 0) < 5:
+            paths = [current]
         else:
-            paths = sorted(journal_files)
+            self._journal_list_time = now
+            journal_files = glob.glob(os.path.join(self.journal_dir, "Journal.*.log"))
+            if current:
+                paths = [current] + sorted(path for path in journal_files if path > current)
+            else:
+                paths = sorted(journal_files)
         for path in paths:
             if not os.path.exists(path):
                 continue
@@ -2174,8 +2087,8 @@ class CargoMonitor:
                     continue  # Skip invalid JSON lines
             if self.ship_info_changed_callback:
                 self.ship_info_changed_callback()
-        except Exception as e:
-            pass
+        except Exception:
+            log.exception("Journal capacity/ship scan failed")
 
     def check_session_end(self):
         """Check if mining session has ended and show refinery dialog if needed"""
@@ -2371,10 +2284,17 @@ class CargoMonitor:
                     new_lines, position = read_complete_journal_lines(self.last_journal_file, self.last_file_size)
                     self.last_file_size = position
 
+                events = []
                 for line in new_lines:
                     line = line.strip()
-                    if line:
-                        self.process_journal_event(line)
+                    if not line:
+                        continue
+                    try:
+                        events.append(json.loads(line))
+                    except ValueError:
+                        continue
+                if events:
+                    self._dispatch_journal_events(events)
 
                 return True
                         
@@ -2395,6 +2315,31 @@ class CargoMonitor:
                 return False
         return False
     
+    def add_journal_listener(self, callback):
+        """Receive each batch of new live journal events (parsed dicts) on the main thread"""
+        if callback not in self._journal_listeners:
+            self._journal_listeners.append(callback)
+
+    def _dispatch_journal_events(self, events):
+        main_app = getattr(self, 'main_app_ref', None)
+        if main_app is not None and threading.current_thread() is not threading.main_thread():
+            main_app.after(0, self._deliver_journal_events, events)
+            return
+        self._deliver_journal_events(events)
+
+    def _deliver_journal_events(self, events):
+        # Cargo handles the whole batch before listeners, so they see up-to-date cargo totals
+        for event in events:
+            try:
+                self._process_journal_event_impl(event)
+            except Exception:
+                log.exception("Cargo monitor failed on journal event")
+        for listener in list(self._journal_listeners):
+            try:
+                listener(events)
+            except Exception:
+                log.exception(f"Journal listener {getattr(listener, '__qualname__', listener)} failed")
+
     def process_journal_event(self, line: str):
         """Process a single journal event.
 
@@ -2434,10 +2379,13 @@ class CargoMonitor:
                 and main_app is not None):
             main_app.after(0, main_app._fetch_reserve_levels_for_system, system_name)
 
-    def _process_journal_event_impl(self, line: str):
+    def _process_journal_event_impl(self, line):
         try:
-            event = json.loads(line)
+            event = line if isinstance(line, dict) else json.loads(line)
             event_type = event.get("event", "")
+            market_handler = getattr(getattr(self, 'main_app_ref', None), 'market_handler', None)
+            if market_handler is not None:
+                market_handler.process_journal_event(event)
             self.journal_parser.process_carrier_event(event)
             
             # Track ship information from LoadGame and Loadout events
@@ -2969,8 +2917,8 @@ class CargoMonitor:
 
         except json.JSONDecodeError:
             pass  # Skip invalid JSON lines
-        except Exception as e:
-            pass
+        except Exception:
+            log.exception("Journal event processing failed")
     
     def extract_cargo_capacity(self, module):
         """Extract cargo capacity from a module entry"""
@@ -3057,8 +3005,8 @@ class CargoMonitor:
                 self.scan_journal_for_cargo_capacity(self.last_journal_file)
             else:
                 self.find_latest_journal()
-        except Exception as e:
-            pass  # Silent recovery attempt
+        except Exception:
+            log.exception("Capacity recovery from journal failed")
     
     def _force_loadout_scan(self):
         """Aggressively scan journal for recent Loadout events"""
@@ -3076,8 +3024,8 @@ class CargoMonitor:
                             break
                     except json.JSONDecodeError:
                         continue
-        except Exception as e:
-            pass
+        except Exception:
+            log.exception("Forced Loadout scan failed")
 
     def _force_cargo_refresh(self):
         """Force immediate cargo data refresh from all sources"""
@@ -3091,8 +3039,8 @@ class CargoMonitor:
             if not self.cargo_items and self.last_journal_file:
                 self.read_new_journal_entries()
 
-        except Exception as e:
-            pass  # Silent fail
+        except Exception:
+            log.exception("Forced cargo refresh failed")
     
     def start_session_tracking(self):
         """Start tracking cargo changes for a mining session"""
@@ -5702,43 +5650,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     pass
         except Exception as e:
             print(f"Warning: Ring Finder refresh failed: {e}")
-
-    def reset_cargo_hold(self):
-        """
-        Reset cargo hold to actual game state by calling cargo monitor reset.
-        
-        This method provides UI feedback and delegates to the CargoMonitor's reset functionality.
-        Refreshes the integrated cargo display.
-        """
-        if hasattr(self, 'cargo_monitor') and self.cargo_monitor is not None:
-            success = self.cargo_monitor.reset_cargo_hold()
-            if success:
-                item_count = len(self.cargo_monitor.cargo_items)
-                total_weight = self.cargo_monitor.current_cargo
-                from app_utils import centered_message
-                centered_message(self, "Reset Complete", 
-                                 f"Cargo hold reset to actual game state.\n\n"
-                                 f"Found: {item_count} item types\n"
-                                 f"Total: {total_weight} tons")
-            else:
-                messagebox.showwarning("Reset Issue", 
-                    "Cargo hold was cleared but no game data was found.\n"
-                    "Make sure Elite Dangerous is running and you have opened your cargo hold in-game.")
-        else:
-            messagebox.showwarning("No Cargo Monitor", "Cargo monitor is not available.")
-
-    def _validate_cargo_monitor(self):
-        """Validate that cargo monitor is properly initialized - for debugging"""
-        if not hasattr(self, 'cargo_monitor'):
-            print("ERROR: App instance missing cargo_monitor attribute")
-            return False
-        if self.cargo_monitor is None:
-            print("ERROR: cargo_monitor is None")
-            return False
-        if not hasattr(self.cargo_monitor, 'reset_cargo_hold'):
-            print("ERROR: cargo_monitor missing reset_cargo_hold method")
-            return False
-        return True
 
     # ---------- Comprehensive Dashboard with Sub-tabs ----------
     def _build_mining_session_tab(self, frame: ttk.Frame) -> None:
@@ -12492,120 +12403,96 @@ class App(tk.Tk, ColumnVisibilityMixin):
         if file_name == 'market.json' and hasattr(self, 'market_handler'):
             self.market_handler.process_market_file(file_path)
         
-        # Process journal files for LoadGame and location tracking
-        elif file_name.startswith('journal.') and file_name.endswith('.log') and hasattr(self, 'market_handler'):
-            try:
-                # Read last line of journal to get latest event
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    # Seek to end and read backwards to get last complete line
-                    f.seek(0, 2)  # Go to end
-                    file_size = f.tell()
-                    if file_size > 0:
-                        # Read last 2KB to get recent events
-                        f.seek(max(0, file_size - 2048))
-                        lines = f.readlines()
-                        
-                        # Get the very last event first for immediate response
-                        last_event = None
-                        for line in reversed(lines):
-                            if line.strip():
-                                try:
-                                    last_event = json.loads(line)
-                                    break
-                                except json.JSONDecodeError:
-                                    continue
-                        
-                        # Process the most recent event immediately for route tracking
-                        if last_event:
-                            event_type = last_event.get('event')
-                            log.debug(f"Latest journal event: {event_type}")
-                            if event_type == 'FSDTarget':
-                                jumps_remaining = last_event.get('RemainingJumpsInRoute')
-                                if jumps_remaining is not None:
-                                    self._write_jumps_left(jumps_remaining)
-                                    log.info(f"Route update: {jumps_remaining} jumps remaining")
-                                    print(f"[jumpsleft] Updated to {jumps_remaining}")
-                            elif event_type in ['NavRouteClear', 'Docked', 'Touchdown']:
-                                self._write_jumps_left(0)
-                                log.info(f"Route cleared/completed: {event_type}")
-                                print(f"[jumpsleft] Reset to 0 ({event_type})")
-                        
-                        # Process last few events for EDDN
-                        for line in lines[-10:]:  # Last 10 events
-                            if line.strip():
-                                try:
-                                    event = json.loads(line)
-                                    self.market_handler.process_journal_event(event)
-                                except json.JSONDecodeError:
-                                    pass
-            except Exception as e:
-                log.error(f"Error processing journal for EDDN: {e}")
 
     # ---------- Journal folder preference handling ----------
+    def _rewatch_journal_dir(self, old_dir, new_dir):
+        """Move the Market.json/NavRoute.json watch to a newly selected journal folder"""
+        try:
+            from file_watcher import get_file_watcher
+            watcher = get_file_watcher()
+            if old_dir:
+                watcher.remove_watch(old_dir)
+            if new_dir and os.path.isdir(new_dir):
+                watcher.add_watch(new_dir, self._on_journal_file_change)
+        except Exception as e:
+            log.error(f"Could not move journal folder watch: {e}")
+
     def _import_journal_history(self):
         """Import journal history from existing journal files"""
         try:
             journal_dir = self.cargo_monitor.journal_dir
             if not os.path.exists(journal_dir):
-                messagebox.showwarning("Invalid Path", "Journal directory not found.")
+                centered_info_dialog(self, t('common.warning'), t('dialogs.journal_dir_not_found'))
                 return
-                
+
+            from config import load_theme
+            from ui.theme import get_theme_colors
+            colors = get_theme_colors(load_theme())
+
             # Create progress window
             progress = tk.Toplevel(self)
+            progress.withdraw()
             progress.title(t('dialogs.importing_journal'))
-            progress.geometry("400x200")
             progress.resizable(False, False)
-            progress.configure(bg="#1e1e1e")
-            progress.transient(self)
-            progress.grab_set()
-            
-            # Position relative to main window
-            self.update_idletasks()
-            x = self.winfo_x() + (self.winfo_width() // 2) - 200
-            y = self.winfo_y() + (self.winfo_height() // 2) - 100
-            progress.geometry(f"400x200+{x}+{y}")
-            
-            # Set icon
+            progress.configure(bg=colors["bg"])
             set_window_icon(progress)
-            
-            tk.Label(progress, text="Processing journal files...", bg="#1e1e1e", fg="#ffffff").pack(pady=20)
-            progress_var = tk.StringVar(value="Starting...")
-            progress_label = tk.Label(progress, textvariable=progress_var, bg="#1e1e1e", fg="#cccccc")
-            progress_label.pack(pady=10)
-            
+
+            tk.Label(progress, text=t('dialogs.processing_journal_files'), bg=colors["bg"], fg=colors["fg"],
+                     font=self._scaled_font(10)).pack(padx=60, pady=(25, 10))
+            progress_var = tk.StringVar(value=t('dialogs.import_starting'))
+            tk.Label(progress, textvariable=progress_var, bg=colors["bg"], fg=colors["fg_dim"],
+                     font=self._scaled_font(9)).pack(padx=60, pady=(0, 25))
+
+            progress.update_idletasks()
+            center_window(progress, self)
+            progress.deiconify()
+            progress.attributes('-topmost', True)
+            progress.lift()
+            progress.focus_force()
+            try:
+                progress.grab_set()
+            except Exception:
+                pass
+
+            def finish(stats, error):
+                if progress.winfo_exists():
+                    progress.destroy()
+                if error is not None:
+                    centered_info_dialog(self, t('common.error'), t('dialogs.import_error').format(error=error))
+                    return
+                centered_info_dialog(self, t('dialogs.import_complete_title'),
+                                     t('dialogs.import_complete_body').format(
+                                         systems=stats['systems_visited'],
+                                         hotspots=stats['hotspots_found'],
+                                         files=stats['files_processed']))
+
             def process_files():
-                # Use JournalParser class which already handles everything correctly
-                from journal_parser import JournalParser
-                
-                # Get user_db from cargo_monitor which has it
-                user_db = self.cargo_monitor.user_db if hasattr(self.cargo_monitor, 'user_db') else self.user_db
-                parser = JournalParser(journal_dir, user_db)
-                
-                # Progress callback to update UI
-                def progress_callback(current_file, total_files, stats):
-                    progress_var.set(f"Processing file {current_file}/{total_files}...")
-                    progress.update()
-                
-                # Parse all journals
-                stats = parser.parse_all_journals(progress_callback)
-                
-                # Close progress window
-                progress.destroy()
-                
-                # Show results
-                from app_utils import centered_message
-                centered_message(self, "Import Complete",
-                                 f"Successfully imported:\n"
-                                 f"• {stats['systems_visited']} visited systems\n"
-                                 f"• {stats['hotspots_found']} hotspots\n"
-                                 f"• Processed {stats['files_processed']} journal files")
-            
+                stats, error = None, None
+                try:
+                    # Use JournalParser class which already handles everything correctly
+                    from journal_parser import JournalParser
+
+                    # Get user_db from cargo_monitor which has it
+                    user_db = self.cargo_monitor.user_db if hasattr(self.cargo_monitor, 'user_db') else self.user_db
+                    parser = JournalParser(journal_dir, user_db)
+
+                    def progress_callback(current_file, total_files, _stats):
+                        text = t('dialogs.import_progress').format(current=current_file, total=total_files)
+                        self.after(0, lambda: progress.winfo_exists() and progress_var.set(text))
+
+                    stats = parser.parse_all_journals(progress_callback)
+                except Exception as e:
+                    log.exception("Journal history import failed")
+                    error = e
+                self.after(0, finish, stats, error)
+
             # Run in thread to keep UI responsive
             threading.Thread(target=process_files, daemon=True).start()
-            
+
         except Exception as e:
-            messagebox.showerror("Import Error", f"Error importing journal history: {e}")
-    
+            log.exception("Could not start journal history import")
+            centered_info_dialog(self, t('common.error'), t('dialogs.import_error').format(error=e))
+
     def _change_journal_dir(self) -> None:
         """Change the Elite Dangerous journal folder"""
         from tkinter import filedialog
@@ -12625,8 +12512,6 @@ class App(tk.Tk, ColumnVisibilityMixin):
             # Update prospector panel if it exists
             if hasattr(self, 'prospector_panel'):
                 self.prospector_panel.journal_dir = sel
-                self.prospector_panel._jrnl_path = None
-                self.prospector_panel._jrnl_pos = 0
                 self.prospector_panel._journal_attached = False
             
             # Update cargo_monitor to keep them synchronized
@@ -12636,6 +12521,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.cargo_monitor.cargo_json_path = os.path.join(sel, "Cargo.json")
                 self.cargo_monitor.status_json_path = os.path.join(sel, "Status.json")
             
+            self._rewatch_journal_dir(current_dir, sel)
+
             # Save to config.json so it persists across restarts
             from config import update_config_value
             update_config_value("journal_dir", sel)
@@ -12836,6 +12723,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                             self.cargo_monitor.cargo_json_path = os.path.join(default_dir, "Cargo.json")
                             self.cargo_monitor.status_json_path = os.path.join(default_dir, "Status.json")
                         
+                        self._rewatch_journal_dir(None, default_dir)
+
                         # Save to config
                         from config import update_config_value
                         update_config_value("journal_dir", default_dir)

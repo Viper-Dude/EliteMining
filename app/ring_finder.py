@@ -10097,25 +10097,20 @@ class RingFinder(ColumnVisibilityMixin):
                 if hasattr(self.prospector_panel, 'main_app') and self.prospector_panel.main_app:
                     cargo_monitor = getattr(self.prospector_panel.main_app, 'cargo_monitor', None)
                     if cargo_monitor:
-                        # Add our callback to the journal monitoring
-                        original_process = cargo_monitor.process_journal_event
-                        def enhanced_process(line):
-                            # Call original processing first
-                            original_process(line)
-                            # Then check for auto-search triggers
-                            self._check_journal_event_for_auto_search(line)
-                        cargo_monitor.process_journal_event = enhanced_process
+                        cargo_monitor.add_journal_listener(self._on_journal_events)
         except Exception as e:
             pass
 
-    def _check_journal_event_for_auto_search(self, line: str):
+    def _on_journal_events(self, events):
+        for event in events:
+            self._check_journal_event_for_auto_search(event)
+
+    def _check_journal_event_for_auto_search(self, event: dict):
         """Check journal events for FSD jumps and trigger auto-search / price prefetch"""
         if not self.auto_search_var.get() and not self.prefetch_prices_var.get():
             return
 
         try:
-            import json
-            event = json.loads(line.strip())
             event_type = event.get("event", "")
 
             # Log ALL events that contain StarSystem for debugging

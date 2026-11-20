@@ -15,7 +15,6 @@ import os
 import sys
 import json
 import glob
-from journal_reader import journal_resume_offset, read_complete_journal_lines
 import re
 import csv
 import logging
@@ -765,8 +764,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.status_json_path = os.path.join(self.journal_dir, "Status.json")
 
         # Watcher state
-        self._jrnl_path: Optional[str] = None
-        self._jrnl_pos: int = 0
         self._journal_attached = False
 
         # Last known system/body and location context
@@ -901,6 +898,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         # Link cargo monitor back to this prospector panel for multi-session mode detection
         if self.main_app and hasattr(self.main_app, 'cargo_monitor'):
             self.main_app.cargo_monitor.prospector_panel = self
+            self.main_app.cargo_monitor.add_journal_listener(self._handle_journal_events)
         
         # Switch to real-time mode after startup processing is complete
         self.after(2000, self._enable_realtime_mode)
@@ -2140,7 +2138,8 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         summary_frame.columnconfigure(1, weight=1)
         
         ttk.Label(summary_frame, text=t('mining_session.session_summary'), font=scaled_font(9, "bold")).grid(row=0, column=0, sticky="w")
-        self.stats_summary_label = ttk.Label(summary_frame, text=t('mining_session.no_data_yet'), foreground="#888888")
+        self.stats_summary_label = ttk.Label(summary_frame, text=t('mining_session.no_data_yet'),
+                                             foreground=self._summary_colors()[1])
         self.stats_summary_label.grid(row=0, column=1, sticky="w", padx=(10, 0))
         
         # Session controls (moved from Session tab)
@@ -3889,8 +3888,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         if sel and os.path.isdir(sel):
             self.journal_dir = sel
             self.journal_lbl.config(text=sel)
-            self._jrnl_path = None
-            self._jrnl_pos = 0
             self._journal_attached = False
             
             # Save to config.json so it persists across restarts
@@ -7296,15 +7293,17 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
     def _tick(self) -> None:
         try:
             if self.journal_dir and os.path.isdir(self.journal_dir):
-                self._watch_once()
+                self._attach_journal()
             if self.session_active and not self.session_paused:
                 self._update_elapsed()
                 self._update_live_session_summary()
             
             # Status.json checking is now event-driven, not time-based
                 
-        except Exception:
-            pass
+        except Exception as e:
+            if getattr(self, '_tick_last_error', None) != repr(e):
+                self._tick_last_error = repr(e)
+                log.exception("Prospector tick failed")
         finally:
             if self.winfo_exists():  # Check if widget still exists
                 self.after(1000, self._tick)
@@ -7345,72 +7344,42 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 except:
                     pass
             self.live_tph = live_tph if self.session_active else 0.0
+            normal_fg, muted_fg = self._summary_colors()
             if total_asteroids > 0 or live_tons > 0:
-                if live_tons > 0:
-                    summary_text = f"Asteroids scanned: {total_asteroids} | Minerals tracked/hits: {tracked_materials}/{total_hits} | Total tons: {live_tons:.1f} | TPH: {live_tph:.1f}"
-                else:
-                    summary_text = f"Asteroids scanned: {total_asteroids} | Minerals tracked/hits: {tracked_materials}/{total_hits}"
-                self.stats_summary_label.config(text=summary_text, foreground="#e6e6e6")
+                summary_text = self._summary_text(total_asteroids, tracked_materials, total_hits, live_tons, live_tph)
+                self.stats_summary_label.config(text=summary_text, foreground=normal_fg)
             else:
-                self.stats_summary_label.config(text="No data yet", foreground="#888888")
-        except:
-            pass
-
-    def _find_latest_journal(self, directory: str) -> Optional[str]:
-        try:
-            candidates = glob.glob(os.path.join(directory, "Journal*.log"))
+                self.stats_summary_label.config(text=t('mining_session.no_data_yet'), foreground=muted_fg)
         except Exception:
-            return None
-        if not candidates:
-            return None
-        try:
-            # Names embed the timestamp, so a name sort avoids stat-ing every journal each tick
-            return max(candidates)
-        except Exception:
-            return None
+            log.exception("Live session summary update failed")
 
-    def _watch_once(self) -> None:
-        latest = self._find_latest_journal(self.journal_dir)
+    def _summary_colors(self):
+        """Normal and muted text colours of the active theme for the session summary line"""
+        from config import load_theme
+        from ui.theme import get_theme_colors
+        colors = get_theme_colors(load_theme())
+        return colors["fg"], colors["fg_muted"]
+
+    def _summary_text(self, asteroids, tracked, hits, tons=0.0, tph=0.0, extra_parts=()):
+        parts = [t('mining_session.summary_asteroids').format(asteroids=asteroids, tracked=tracked, hits=hits)]
+        if tons > 0:
+            parts.append(t('mining_session.summary_tons').format(tons=f"{tons:.1f}", tph=f"{tph:.1f}"))
+            parts.extend(extra_parts)
+        return " | ".join(parts)
+
+    def _attach_journal(self) -> None:
+        if self._journal_attached:
+            return
+        self._journal_attached = True
+        self._read_initial_location_from_journal()
+        if self.last_system or self.last_body:
+            self._update_location_display()
+
+    def _handle_journal_events(self, events) -> None:
+        """Live journal events, delivered on the main thread by the cargo monitor's shared reader"""
         if not self._journal_attached:
-            try:
-                self._jrnl_pos = journal_resume_offset(latest) if latest else 0
-            except OSError:
-                return
-            self._jrnl_path = latest
-            self._journal_attached = True
-            self._read_initial_location_from_journal()
-            if self.last_system or self.last_body:
-                self._update_location_display()
             return
-        if not latest:
-            return
-
-        paths = [self._jrnl_path] if self._jrnl_path else []
-        if latest != self._jrnl_path:
-            candidates = glob.glob(os.path.join(self.journal_dir, "Journal*.log"))
-            paths.extend(sorted(path for path in candidates if not self._jrnl_path or path > self._jrnl_path))
-        new_lines = []
-        for path in paths:
-            offset = self._jrnl_pos if path == self._jrnl_path else 0
-            try:
-                lines, position = read_complete_journal_lines(path, offset)
-            except FileNotFoundError:
-                continue
-            except OSError:
-                break
-            self._jrnl_path = path
-            self._jrnl_pos = position
-            new_lines.extend(lines)
-
-        for line in new_lines:
-            line = line.strip()
-            if not line or '"event"' not in line:
-                continue
-            try:
-                evt = json.loads(line)
-            except Exception:
-                continue
-
+        for evt in events:
             ev = evt.get("event")
             
             # Auto-start session on first prospector limpet launch
@@ -7752,7 +7721,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                             
                             if time_diff > 30:  # Event is older than 30 seconds (increased to handle app restart delays)
                                 print(f"[STARTUP DEBUG] Skipping old event (>{30}s old)")
-                                return  # Skip only old events
+                                continue  # Skip only old events
                             else:
                                 print(f"[STARTUP DEBUG] Processing fresh event (<{30}s old)")
                         except Exception as e:
@@ -8112,22 +8081,18 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 except Exception:
                     pass
             self.live_tph = live_tph if self.session_active else 0.0
+            normal_fg, muted_fg = self._summary_colors()
             if total_asteroids > 0 or live_tons > 0:
-                if live_tons > 0:
-                    base_text = (f"Asteroids scanned: {total_asteroids} | "
-                                 f"Minerals tracked/hits: {tracked_materials}/{total_hits} | "
-                                 f"Total tons: {live_tons:.1f} | TPH: {live_tph:.1f}")
-                    if self.multi_session_mode and (self.session_sold_transferred > 0 or self.session_ejected > 0):
-                        base_text += f" | Sold/Stored: {self.session_sold_transferred:.0f}t"
-                        if self.session_ejected > 0:
-                            base_text += f" | Lost: {self.session_ejected:.0f}t"
-                    summary_text = base_text
-                else:
-                    summary_text = (f"Asteroids scanned: {total_asteroids} | "
-                                    f"Minerals tracked/hits: {tracked_materials}/{total_hits}")
-                self.stats_summary_label.config(text=summary_text, foreground="#e6e6e6")
+                extra_parts = []
+                if self.multi_session_mode and (self.session_sold_transferred > 0 or self.session_ejected > 0):
+                    extra_parts.append(t('mining_session.summary_sold').format(tons=f"{self.session_sold_transferred:.0f}"))
+                    if self.session_ejected > 0:
+                        extra_parts.append(t('mining_session.summary_lost').format(tons=f"{self.session_ejected:.0f}"))
+                summary_text = self._summary_text(total_asteroids, tracked_materials, total_hits,
+                                                  live_tons, live_tph, extra_parts)
+                self.stats_summary_label.config(text=summary_text, foreground=normal_fg)
             else:
-                self.stats_summary_label.config(text="No data yet", foreground="#888888")
+                self.stats_summary_label.config(text=t('mining_session.no_data_yet'), foreground=muted_fg)
             if self.charts_panel:
                 self.charts_panel.update_charts()
 
@@ -8135,15 +8100,15 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             print(f"ERROR in _refresh_statistics_display: {e}")
             import traceback; traceback.print_exc()
             try:
+                normal_fg, muted_fg = self._summary_colors()
                 total_asteroids = self.session_analytics.get_total_asteroids()
                 if total_asteroids > 0:
-                    self.stats_summary_label.config(
-                        text=f"Asteroids scanned: {total_asteroids} | Minerals tracked/hits: 0/0",
-                        foreground="#e6e6e6")
+                    self.stats_summary_label.config(text=self._summary_text(total_asteroids, 0, 0),
+                                                    foreground=normal_fg)
                 else:
-                    self.stats_summary_label.config(text="No data yet", foreground="#888888")
+                    self.stats_summary_label.config(text=t('mining_session.no_data_yet'), foreground=muted_fg)
             except Exception:
-                self.stats_summary_label.config(text="No data yet", foreground="#888888")
+                self.stats_summary_label.config(text=t('mining_session.no_data_yet'))
 
     # ------------------------------------------------------------------
     # Stats table helpers
