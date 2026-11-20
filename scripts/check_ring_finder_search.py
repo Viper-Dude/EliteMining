@@ -1,8 +1,11 @@
 import ast
+import logging
 import math
+import os
 from pathlib import Path
 import re
 import sys
+import tempfile
 from types import ModuleType, SimpleNamespace
 from typing import Dict, List, Optional
 import unittest
@@ -32,6 +35,7 @@ Finder = load_methods('app/ring_finder.py', 'RingFinder', {
     '_insert_row_batch', '_sort_column', '_update_results', '_search_worker',
 })
 Database = load_methods('app/user_database.py', 'UserDatabase', {'_normalize_body_name'})
+Saves = load_methods('app/ring_finder.py', 'RingFinder', {'_save_filter_settings', '_save_auto_search_state'})
 
 
 class Parent:
@@ -217,6 +221,38 @@ class RingFinderSearchTests(unittest.TestCase):
                 f._sort_column('Visits', reverse)
                 self.assertEqual([f.results_tree.rows[key]['Visits']
                                   for key in f.results_tree.order], expected)
+
+
+class RingFinderSaveFailureTests(unittest.TestCase):
+    def setUp(self):
+        Saves._save_filter_settings.__globals__.update(os=os, log=logging.getLogger('ring-save-test'))
+        app_path = patch.object(sys, 'path', [str(ROOT / 'app')] + sys.path)
+        app_path.start()
+        self.addCleanup(app_path.stop)
+
+    def test_failed_filter_save_is_logged(self):
+        finder = Saves()
+        finder._filters_loaded = True
+        with self.assertLogs('ring-save-test', 'ERROR') as logs:
+            finder._save_filter_settings()
+        self.assertIn('Saving Ring Finder filters failed', logs.output[0])
+
+    def test_auto_search_state_is_written_and_failure_is_logged(self):
+        with tempfile.TemporaryDirectory() as folder:
+            finder = Saves()
+            finder.prospector_panel = None
+            finder.auto_search_var = SimpleNamespace(get=lambda: True)
+            finder.vars_dir = folder
+            finder._save_auto_search_state()
+            self.assertEqual((Path(folder) / 'autoSearch.txt').read_text(encoding='utf-8'), '1')
+            self.assertFalse((Path(folder) / 'autoSearch.txt.tmp').exists())
+
+            blocker = Path(folder) / 'Variables'
+            blocker.write_text('not a folder', encoding='utf-8')
+            finder.vars_dir = str(blocker)
+            with self.assertLogs(level='ERROR') as logs:
+                finder._save_auto_search_state()
+        self.assertIn('Atomic write failed', logs.output[0])
 
 
 if __name__ == '__main__':

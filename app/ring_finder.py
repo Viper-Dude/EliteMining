@@ -13,6 +13,7 @@ from ui.themed_slider import slider_colors
 import tkinter as tk
 from tkinter import ttk, messagebox
 import json
+import logging
 import os
 import glob
 import threading
@@ -44,6 +45,8 @@ except Exception:
         return name
     def to_english(name):
         return name
+
+log = logging.getLogger(__name__)
 
 def translate_reserve_level(reserve_level) -> str:
     """Translate reserve level to localized display text
@@ -2290,7 +2293,7 @@ class RingFinder(ColumnVisibilityMixin):
             save_ring_finder_filters(settings)
             
         except Exception:
-            pass
+            log.exception("Saving Ring Finder filters failed")
     
     def _load_filter_settings(self):
         """Load filter settings from config"""
@@ -2366,7 +2369,7 @@ class RingFinder(ColumnVisibilityMixin):
                     self.system_var.set(settings["reference_system"])
             
         except Exception:
-            pass
+            log.exception("Loading Ring Finder filters failed")
     
     def _get_all_overlaps_for_search(self, reference_system: str, reference_coords: Dict, specific_material: str) -> List[Dict]:
         """Get all overlap entries for Overlaps Only mode (no distance filter)
@@ -5330,7 +5333,7 @@ class RingFinder(ColumnVisibilityMixin):
                         ''', coords_to_update)
                         conn.commit()
                     except Exception:
-                        pass
+                        log.exception("Saving looked-up hotspot coordinates failed")
                 
                 return user_hotspots
                 
@@ -10441,17 +10444,16 @@ class RingFinder(ColumnVisibilityMixin):
     def _save_auto_search_state(self):
         """Save auto-search enabled state to Variables folder and sync with main app"""
         try:
-            os.makedirs(self.vars_dir, exist_ok=True)
+            from config import _atomic_write_text
             auto_search_file = os.path.join(self.vars_dir, "autoSearch.txt")
-            with open(auto_search_file, 'w') as f:
-                f.write("1" if self.auto_search_var.get() else "0")
+            _atomic_write_text(auto_search_file, "1" if self.auto_search_var.get() else "0")
             # Sync with main app if available
             if self.prospector_panel and hasattr(self.prospector_panel, 'main_app'):
                 main_app = self.prospector_panel.main_app
                 if main_app and hasattr(main_app, 'auto_search_enabled'):
                     main_app.auto_search_enabled.set(self.auto_search_var.get())
         except Exception as e:
-            pass
+            log.exception("Saving Auto Search state failed")
 
     def _on_auto_search_toggle(self):
         """Auto-Search checkbox command: save state, then lock/unlock Auto Prices"""
@@ -10481,12 +10483,11 @@ class RingFinder(ColumnVisibilityMixin):
     def _save_prefetch_prices_state(self):
         """Save prefetch-prices-on-jump enabled state to Variables folder"""
         try:
-            os.makedirs(self.vars_dir, exist_ok=True)
+            from config import _atomic_write_text
             prefetch_file = os.path.join(self.vars_dir, "prefetchPrices.txt")
-            with open(prefetch_file, 'w') as f:
-                f.write("1" if self.prefetch_prices_var.get() else "0")
+            _atomic_write_text(prefetch_file, "1" if self.prefetch_prices_var.get() else "0")
         except Exception:
-            pass
+            log.exception("Saving prefetch prices state failed")
 
         if not self.prefetch_prices_var.get():
             self._close_auto_ranking_dialog()

@@ -1708,7 +1708,7 @@ class CargoMonitor:
                             self.update_callback()
 
         except Exception as e:
-            pass
+            log.warning("Forced cargo refresh failed: %s", e)
 
     def set_max_cargo(self, max_cargo: int):
         """Set maximum cargo capacity"""
@@ -6937,7 +6937,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 cfg['active_preset_num'] = num
                 self.prospector_panel._save_cfg(cfg)
             except Exception:
-                pass
+                log.exception("Saving active announcement preset failed")
 
             def _retry_save():
                 try:
@@ -6945,7 +6945,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     cfg2['active_preset_num'] = num
                     self.prospector_panel._save_cfg(cfg2)
                 except Exception:
-                    pass
+                    log.exception("Retry saving active announcement preset failed")
             self.after(800, _retry_save)
         self._ann_update_preset_buttons()
 
@@ -6959,7 +6959,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 cfg.pop('active_preset_num', None)
                 self.prospector_panel._save_cfg(cfg)
             except Exception:
-                pass
+                log.exception("Clearing active announcement preset failed")
         self._ann_update_preset_buttons()
 
     def _ann_update_preset_buttons(self):
@@ -14825,7 +14825,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             cfg['marketplace_exclude_carriers'] = self.marketplace_exclude_carriers.get()
             _save_cfg(cfg)
         except Exception:
-            pass
+            log.exception("Saving marketplace filters on close failed")
         
         self._network_closing = True
         if hasattr(self, 'eddn_sender'):
@@ -20464,6 +20464,7 @@ Your keybinds will need to be reconfigured manually."""
         
         visits_added = 0
         hotspots_added = 0
+        scan_failures = 0
         missions_found = 0
         
         # For MIGRATION: Reset all visit counts AND dates first, then rebuild
@@ -20546,14 +20547,14 @@ Your keybinds will need to be reconfigured manually."""
                                     self.cargo_monitor.journal_parser.process_scan(event)
                                     hotspots_added += 1
                                 except:
-                                    pass
+                                    scan_failures += 1
                             
                             elif event_type == 'SAASignalsFound':
                                 try:
                                     self.cargo_monitor.journal_parser.process_saa_signals_found(event, current_system)
                                     hotspots_added += 1
                                 except:
-                                    pass
+                                    scan_failures += 1
                             
                             elif event_type == 'MissionAccepted':
                                 try:
@@ -20594,6 +20595,8 @@ Your keybinds will need to be reconfigured manually."""
         
         print(f"[FIRST INSTALL] Scan complete: {total} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} missions")
         log.info(f"First install scan complete: {total} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} missions")
+        if scan_failures:
+            log.warning("First install scan: %d hotspot events could not be saved", scan_failures)
         
         # Re-enable carrier notifications and fire a single update
         self.cargo_monitor.journal_parser._suppress_carrier_notifications = False
@@ -20964,7 +20967,7 @@ Your keybinds will need to be reconfigured manually."""
             self._update_cmdr_system_display()
             
         except Exception:
-            pass
+            log.exception("Recording current system visit failed")
 
     def get_current_system(self) -> Optional[str]:
         """Centralized method to get current system - single source of truth"""
@@ -21007,7 +21010,7 @@ Your keybinds will need to be reconfigured manually."""
                 # processes the Location event or when user scans a ring
                 
         except Exception:
-            pass
+            log.exception("Reading last known system from journal failed")
     
     def record_system_visit(self, system_name: str, event_timestamp: str, coordinates: Optional[tuple] = None, system_address: Optional[int] = None) -> bool:
         """Single source of truth for recording system visits.
@@ -21043,8 +21046,11 @@ Your keybinds will need to be reconfigured manually."""
                     coordinates=coordinates
                 )
                 return True
-        except Exception:
-            pass
+        except Exception as e:
+            # Called once per jump during journal imports; log each distinct error once.
+            if getattr(self, '_visit_last_error', None) != repr(e):
+                self._visit_last_error = repr(e)
+                log.warning("Recording system visit failed: %s", e)
         return False
     
     def _fetch_reserve_levels_for_system(self, system_name: str, on_complete=None) -> None:

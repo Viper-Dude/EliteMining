@@ -102,6 +102,17 @@ class VisitDataChecks(unittest.TestCase):
                 parser.process_carrier_event.assert_any_call(events[2])
                 parser.process_carrier_event.assert_any_call(events[1])
 
+    def test_failed_visit_save_returns_false_and_logs_each_error_once(self):
+        app = App()
+        db = Mock()
+        db.add_visited_system.side_effect = sqlite3.OperationalError('database is locked')
+        app.cargo_monitor = SimpleNamespace(user_db=db)
+        with self.assertLogs('visit-test', 'WARNING') as logs:
+            self.assertFalse(app.record_system_visit('Sol', '2026-11-01T12:00:00Z'))
+            self.assertFalse(app.record_system_visit('Sol', '2026-11-01T13:00:00Z'))
+        self.assertEqual(len(logs.output), 1)
+        self.assertIn('database is locked', logs.output[0])
+
     def test_system_distances_do_not_look_up_ls(self):
         finder = SimpleNamespace(systems_data={'sol': dict(x=0, y=0, z=0), 'aboard': dict(x=3, y=4, z=0)},
                                  _calculate_distance=lambda a, b: sum((a[k] - b[k]) ** 2 for k in a) ** 0.5)

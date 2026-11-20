@@ -5894,15 +5894,15 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                                     with open(mappings_file, 'w', encoding='utf-8') as f:
                                                         json.dump(mappings, f, indent=2)
                                             except Exception as map_error:
-                                                pass
+                                                log.exception("Updating graph mappings after report delete failed")
                                                 
                                             if deleted_graphs:
                                                 pass  # Graphs deleted successfully
                                             
                                     except Exception as graph_error:
-                                        pass  # Silent error handling
+                                        log.exception("Deleting report graphs failed")
                             except Exception as graph_error:
-                                pass  # Silent error handling
+                                log.exception("Deleting report graphs failed")
                             
                             # Delete corresponding mining card (v4.4.3+)
                             try:
@@ -5958,7 +5958,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                                     with open(mappings_file, 'w', encoding='utf-8') as f:
                                                         json.dump(mappings, f, indent=2)
                                             except Exception as e:
-                                                pass
+                                                log.exception("Updating detailed report mappings after delete failed")
                                     
                                     # Delete screenshots - try multiple report_id formats for compatibility
                                     screenshots = self._get_report_screenshots(report_id)
@@ -5997,9 +5997,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                                 with open(screenshots_map_file, 'w', encoding='utf-8') as f:
                                                     json.dump(screenshot_mappings, f, indent=2)
                                         except Exception as e:
-                                            pass
+                                            log.exception("Updating screenshot mappings after report delete failed")
                             except Exception as e:
-                                pass
+                                log.exception("Deleting report files failed")
                         except Exception as e:
                             self._set_status(f"Error deleting {system}-{body}: {e}")
                     
@@ -6221,7 +6221,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
             if source_key:
                 update_config_value('reports_source_filter_key', source_key)
         except Exception:
-            pass
+            log.exception("Saving report filters failed")
         
         # Show/hide dynamic sub-filter for By System / By Ship
         source_display = self._source_filter_var.get() if hasattr(self, '_source_filter_var') else ''
@@ -12091,7 +12091,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                             try:
                                 os.remove(screenshot_path)
                             except Exception as e:
-                                pass
+                                log.exception("Deleting report screenshot failed")
                     
                     # Remove from screenshot mappings using the found report_id
                     if found_report_id:
@@ -12108,7 +12108,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                                 with open(screenshots_map_file, 'w') as f:
                                     json.dump(screenshot_mappings, f, indent=2)
                             except Exception as e:
-                                pass
+                                log.exception("Updating screenshot mappings after report delete failed")
                     
                     # Remove from enhanced report mappings
                     mappings = self._load_enhanced_report_mappings()
