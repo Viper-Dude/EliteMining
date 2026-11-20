@@ -1,17 +1,6 @@
-﻿What's new in EliteMining v5.6.6
+﻿What's new in EliteMining v5.6.7
 
 New Features & Improvements
-- Combined service indicators into one status, with details on hover or click.
-- Grouped Auto-Search, Auto Switch and Auto Prices under Auto Options; Auto Switch now waits until the app has been idle for 30 seconds.
-- Improved Announcements with single-click checkboxes, clearer Minimal % boxes and remembered column widths.
-- Changed values now appear in color in Announcements and VoiceAttack Controls.
-- Announcement presets now have a right-click Load / Save / Rename menu to prevent accidental overwrites.
-- Added a Ships tab to Mining Statistics with sessions, tons and T/hr for each ship.
-- Added a Patch Notes button to the About window.
+- Hover the Updated column wherever prices are shown to see where each price came from.
 
 Bug Fixes
-- Fixed Announcements column resizing and alignment, and accidental Minimal % changes while scrolling.
-- Simplified Distance Calculator messages and fixed unwanted popups when Home or Fleet Carrier is unset.
-- Fixed missing unsaved-change prompts for ship and announcement presets.
-- Star Systems no longer shows systems in a state, such as Boom, after that state has ended.
-- Star Systems now shows the newest available system information.
