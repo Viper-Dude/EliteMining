@@ -36,7 +36,7 @@ Line counts are physical lines, including blank lines.
 - `main.py` re-imports all of these, so no other code changed.
 - Verified: `py_compile` on all three files, standalone import of `overlays`, an undefined-name scan (none found), `check_sidebar.py` (6 tests OK), and the user's app test (overlays and log OK).
 - Small difference: `main.py`'s own `t()` swallows translation errors, while `overlays.py` uses `localization.t` directly. It's only used for the overlay window title and the T/hr line.
-- Seen during the test, not caused by the move: with no `overlay_mode` saved, the settings screen falls back to Enhanced (`main.py` `_load_text_overlay_preference`) but `prospector_panel.py` `_show_prospector_overlay_or_standard` falls back to Standard. A fix (make the prospector fallback "enhanced") was offered, not yet approved.
+- Seen during the test, not caused by the move: with no `overlay_mode` saved, the settings screen falls back to Enhanced (`main.py` `_load_text_overlay_preference`) but `prospector_panel.py` `_show_prospector_overlay_or_standard` falls back to Standard. Fixed 20 Nov 2026: the prospector fallback is now "enhanced" too.
 
 ## Step 2 — CargoMonitor (done, in-game test pending)
 

@@ -4422,7 +4422,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         """
         from config import _load_cfg
         cfg = _load_cfg()
-        overlay_mode = cfg.get("overlay_mode", "standard")
+        overlay_mode = cfg.get("overlay_mode", "enhanced")
         show_all = cfg.get("prospector_show_all", False)
         log.debug(f"[OVERLAY] prospector overlay request: mode={overlay_mode}, show_all={show_all}, "
                  f"overlay_enabled={getattr(self.text_overlay, 'overlay_enabled', None)}")
