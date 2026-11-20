@@ -18,7 +18,8 @@
 - The journal history import window no longer stays open if the import fails, and now shows an error instead.
 
 
-### Voiceattack Profile - no update (V5.6.6)
+### Voiceattack Profile -update to V5.6.7
+- Fixed a sound effect playing even when the prospector sequence was not launched due to unmet conditions.
 
 
 

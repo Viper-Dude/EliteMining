@@ -5066,12 +5066,22 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception as e:
             log.debug(f"refresh_overlays: {e}")
 
+    def _log_overlay_error_once(self, where):
+        """Log a failure in the 2 s overlay loop with its traceback, once per distinct error (the loop would otherwise flood the log)."""
+        exc = sys.exc_info()[1]
+        key = (where, type(exc).__name__, str(exc))
+        seen = self.__dict__.setdefault('_overlay_errors_seen', set())
+        if key in seen or len(seen) >= 50:
+            return
+        seen.add(key)
+        log.exception(f"[OVERLAY] periodic update failed ({where}); further identical errors are not logged")
+
     def _periodic_integrated_cargo_update(self):
         """Periodically update the integrated cargo display"""
         try:
             self._update_integrated_cargo_display()
-        except Exception as e:
-            pass  # Silently handle any update errors
+        except Exception:
+            self._log_overlay_error_once("cargo display update")
         
         # Journal replay misses supercruise if no entry event is in the current session, so seed it once from Status.json
         if not getattr(self, '_sc_seeded', False):
@@ -5136,8 +5146,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                             self.text_overlay._hide_window()
                             self.text_overlay._is_showing = False
         except Exception:
-            pass
-        
+            self._log_overlay_error_once("game focus check")
+
         # Hide overlays in supercruise if setting is enabled
         try:
             if self.hide_overlays_in_supercruise.get() and self._in_supercruise:
@@ -5162,8 +5172,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     if self.text_overlay._is_showing and not self.text_overlay._game_hidden:
                         self.text_overlay._show_on_top()
         except Exception:
-            pass
-        
+            self._log_overlay_error_once("supercruise hide/restore")
+
         # Hide overlays when no mining session is active (if setting enabled)
         try:
             _session_active = hasattr(self, 'prospector_panel') and self.prospector_panel and getattr(self.prospector_panel, 'session_active', False)
@@ -5192,8 +5202,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         if self.text_overlay.overlay_window:
                             self.text_overlay._show_on_top()
         except Exception:
-            pass
-        
+            self._log_overlay_error_once("session hide/restore")
+
         # Update cargo text overlay data (respects _game_hidden — won't deiconify if hidden)
         try:
             if hasattr(self, 'cargo_text_overlay') and self.cargo_text_overlay.overlay_enabled and self.text_overlay_enabled.get():
@@ -5202,7 +5212,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     tph = getattr(self.prospector_panel, 'live_tph', 0.0)
                 self.cargo_text_overlay.update_cargo(self.cargo_monitor, tph)
         except Exception:
-            pass
+            self._log_overlay_error_once("cargo overlay update")
 
         # Schedule next update
         self.after(2000, self._periodic_integrated_cargo_update)  # Every 2 seconds

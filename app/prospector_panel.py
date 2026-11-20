@@ -8496,7 +8496,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                     overlay._game_hidden = False
                     overlay.update_cargo(self.main_app.cargo_monitor)
             except Exception:
-                pass
+                log.exception("[OVERLAY] cargo overlay start-of-session refresh failed")
 
         # Also reset the prospector/announcement overlay's session-hidden gate —
         # it can get stuck True if session ended while no message was showing
@@ -8506,7 +8506,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
                 self.main_app.text_overlay._session_hidden = False
                 self.main_app.text_overlay._game_hidden = False
             except Exception:
-                pass
+                log.exception("[OVERLAY] resetting text overlay hide flags failed")
         self.live_tph_var.set("")
         self.session_screenshots = []  # Initialize screenshots list for this session
         self.session_yield_data = {}  # Track yield data during session {material: [percentages]}

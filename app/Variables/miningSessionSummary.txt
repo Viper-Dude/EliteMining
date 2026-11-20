@@ -1,2 +1,2 @@
-Session: Wregoe MD-K d8-19 — 2 A Ring — 00:00:05 — Total 6t (Single Session)
-Ship: Mega Bumper - Type-11 Prospector | Osmium 4t (2734.81 t/hr); Platinum 2t (1367.40 t/hr)
+Session: Wregoe MD-K d8-19 — 2 A Ring — 00:00:01 — Total 0t (Single Session)
+Ship: Mega Bumper - Type-11 Prospector | No refined materials.
