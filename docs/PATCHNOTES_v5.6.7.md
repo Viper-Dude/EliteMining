@@ -13,6 +13,7 @@
 
 - General stability and code optimization: settings such as the journal folder now apply immediately, journal handling and jumps-left tracking are more reliable, and mining events are no longer missed right after startup.
 - Typed timer values in VoiceAttack Controls are now saved right away.
+- Auto Switch now changes to the Mining Session tab reliably when you fire a prospector, and only waits 10 seconds after you last used the app.
 
 
 ### Voiceattack Profile -update to V5.6.7

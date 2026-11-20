@@ -8685,22 +8685,36 @@ class App(tk.Tk, ColumnVisibilityMixin):
         print(f"Loaded auto-search preference: False (default)")
     
     def _record_ui_activity(self, event=None) -> None:
+        # Overlays sit over the game as app windows; cursor movement there while
+        # the game has focus is not app use and must not block auto switching.
+        try:
+            if self.focus_get() is None:
+                return
+        except (KeyError, tk.TclError):
+            pass
         self._last_ui_activity = time.monotonic()
 
     def _can_auto_switch_tabs(self) -> bool:
         if not self.auto_switch_tabs.get():
             return False
-        if time.monotonic() - self._last_ui_activity < 30:
+        idle = time.monotonic() - self._last_ui_activity
+        if idle < 10:
+            log.info(f"[AUTO-TAB] Skipped: app used {idle:.0f}s ago (needs 10s idle)")
             return False
         if self.grab_current() is not None:
+            log.info("[AUTO-TAB] Skipped: a dialog is open")
             return False
         controls = [getattr(self, name, None) for name in (
             '_marketplace_search_control', '_trade_search_control',
             '_systems_search_control', '_traders_search_control')]
         controls.append(getattr(getattr(self, 'multi_mineral_tab', None), '_search_control', None))
         if any(control is not None and control.running for control in controls):
+            log.info("[AUTO-TAB] Skipped: a search is running")
             return False
-        return not getattr(getattr(self, 'ring_finder', None), '_search_in_progress', False)
+        if getattr(getattr(self, 'ring_finder', None), '_search_in_progress', False):
+            log.info("[AUTO-TAB] Skipped: a Hotspots Finder search is running")
+            return False
+        return True
 
     def _load_auto_switch_tabs_preference(self) -> None:
         """Load auto-switch tabs preference from config"""
@@ -8773,7 +8787,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
             if tab_name in tab_indices:
                 self.notebook.select(tab_indices[tab_name])
-                print(f"[AUTO-TAB] Switched to tab: {tab_name}")
+                log.info(f"[AUTO-TAB] Switched to tab: {tab_name}")
         except Exception as e:
             log.error(f"[AUTO-TAB] Error switching to tab {tab_name}: {e}")
     

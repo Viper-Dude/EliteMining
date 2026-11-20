@@ -593,7 +593,7 @@ Tick these under the Start / End buttons:
 - **Auto-end** – Ends and saves the session when you enter supercruise or jump. The refinery and comment questions are skipped, and anything still in your refinery is not counted. Sessions with nothing mined are discarded. Not available with Multi-Session.
 - **Prompt when full** – Asks if you want to end the session when your cargo hold has been 100% full and idle for 1 minute. Turn this off if you want Auto-end to run with no pop-ups. Not available with Multi-Session.
 - **Multi-Session** – Keeps one session running across several cargo loads (mine, sell, return) and reports them as one. The session only ends when you press End.
-- **Auto Switch** – Switches to the Mining Session tab when you fire a prospector and back to Hotspots Finder after the session ends, only after 30 seconds without app activity and while no search or modal dialog is open; skipped switches wait for the next trigger.
+- **Auto Switch** – Switches to the Mining Session tab when you fire a prospector and back to Hotspots Finder after the session ends, only after 10 seconds without app activity and while no search or modal dialog is open; skipped switches wait for the next trigger.
 
 For a fully hands-free setup, tick **Auto-start** and **Auto-end** and turn off **Prompt when full**. Sessions then start and save by themselves.
 
