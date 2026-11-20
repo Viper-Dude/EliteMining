@@ -5025,7 +5025,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.ToolTip(reports_info, t('reports.right_click_options'))
         self._cv_add_columns_button(hint_frame, 'reports_tab')
         self._reports_showing_label = ttk.Label(hint_frame, text="", foreground="#888888")
-        self._reports_load_more_btn = ttk.Button(hint_frame, text=t('reports.load_more'), width=14, command=self._load_more_reports)
+        self._reports_load_more_btn = ttk.Button(hint_frame, text=t('reports.load_more'), width=0, command=self._load_more_reports)
 
         # Spacing between filter and table
         ttk.Frame(main_frame, height=6).grid(row=2, column=0, columnspan=2)
