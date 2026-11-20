@@ -9,12 +9,23 @@ import os
 import sys
 import logging
 import threading
+from logging.handlers import RotatingFileHandler
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 
 LOG_FORMAT = '%(asctime)s [%(levelname)s] %(name)s [%(threadName)s]: %(message)s'
+
+
+class SafeRotatingFileHandler(RotatingFileHandler):
+    """RotatingFileHandler that silently handles rotation errors (file locked by another process)"""
+    def doRollover(self):
+        try:
+            super().doRollover()
+        except (PermissionError, OSError):
+            # File is locked by another process, just continue writing to current file
+            pass
 
 
 def setup_logging(force_enable: bool = False) -> Optional[str]:
