@@ -2,13 +2,14 @@
 
 Updated: 20 November 2026. Version in progress: 5.6.7 (not released).
 
-Origin: an honest review of the GUI, features, performance, the file watcher (watchdog) and the journal parser. All planned batches are implemented and pushed. The in-game test is still pending.
+Origin: an honest review of the GUI, features, performance, the file watcher (watchdog) and the journal parser. All planned batches, plus the silent-failure logging pass, are implemented and pushed. The in-game test is still pending.
 
 ## Commits (on origin/main)
 
 - `f3ab5ae` Read the journal once, move the watch with the folder, and translate session UI text
 - `6f95295` Log journal, overlay and voice failures instead of hiding them
 - `7c7dca6` Move the new patch notes into the unreleased 5.6.7 notes
+- `894b740` Log failed saves instead of hiding them, and write Auto Search state atomically (see "Silent-failure logging" below)
 
 ## What changed
 
@@ -33,8 +34,15 @@ Origin: an honest review of the GUI, features, performance, the file watcher (wa
 - Silent `except: pass` now logs in: Status.json check, journal capacity scan, journal event processing, capacity recovery, forced Loadout scan and cargo refresh, prospector `_tick` (once per distinct error), live summary, overlay destroy and timer cancel (TclError ignored), Ring Finder auto-refresh, saved voice, voice list, preset file listing.
 - Removed unused code: `CargoMonitor.reset_cargo_hold`, `App.reset_cargo_hold`, `App._validate_cargo_monitor`.
 
+**Silent-failure logging (`894b740`)**
+- Of 339 `except: pass` blocks in `main.py`, `prospector_panel.py` and `ring_finder.py`, 23 that guard writes now log: active announcement preset save/clear/retry, marketplace filters on close, system visit recording (`record_system_visit` logs each distinct error once), last-known-system read, forced cargo refresh, first-install scan (one summary warning for failed hotspot events), report delete (graph/screenshot files and mapping JSON), report filter save, Ring Finder filter save/load, hotspot coordinate commit, Auto Search and prefetch prices state saves.
+- `ring_finder.py` now has a module `log`.
+- `_save_auto_search_state` and `_save_prefetch_prices_state` write `Variables/autoSearch.txt` and `prefetchPrices.txt` through `_atomic_write_text()`. A failed write logs "Atomic write failed for ..." from `config.py`.
+- Deliberately left silent: read-only per-row DB lookups during search and display refresh (would flood the log), Tk/UI blocks, parsing fallbacks, crash-log writers, legacy file cleanup, `_atomic_write_text` fallback cleanup, `_sync_fc_location` (x2), the resume-offset seek in `_process_journals_for_catchup`.
+- New failure-path checks: `check_visited_systems` (failed visit save logs once), `check_ring_finder_search` (`RingFinderSaveFailureTests`: filter save logs; Auto Search file written atomically and a failed write is logged).
+
 **Checks** (`app\.venv\Scripts\python.exe scripts\check_<area>.py`)
-- `check_journal_reading` (42; includes `SharedReaderChecks`, `BackgroundMonitorChecks`, folder-relist throttle), `check_session_location` (6), `check_cargo_tracking` (8), `check_fleet_carrier` (17), `check_network_responsiveness` (25), `check_session_statistics` (17), `check_mining_tab` (12), `check_sidebar` (6), `check_settings` (14). All passed at last run.
+- `check_journal_reading` (42; includes `SharedReaderChecks`, `BackgroundMonitorChecks`, folder-relist throttle), `check_session_location` (6), `check_cargo_tracking` (8), `check_fleet_carrier` (17), `check_network_responsiveness` (25), `check_session_statistics` (17), `check_mining_tab` (12), `check_sidebar` (6), `check_settings` (14). All passed at last run. After `894b740` these also passed: `check_visited_systems` (6), `check_ring_finder_search` (11), `check_config_saving` (14), `check_voiceattack_controls` (13).
 - Not run: PyInstaller build, anything in the real game. The dev app was started and looked fine.
 
 ## Open items
@@ -48,17 +56,18 @@ Origin: an honest review of the GUI, features, performance, the file watcher (wa
    - Session summary in English and German.
    - Settings -> import journal history with a real folder.
    - Check the log for new "failed" lines from the logging changes.
+   - Also smoke-test the `894b740` changes: delete a report in Reports, change Ring Finder filters, pick an announcement preset, toggle Auto Search and prefetch prices (`Variables/autoSearch.txt` and `prefetchPrices.txt` should flip between 1 and 0).
 2. **`docs/INSTALLER_RELEASE_NOTES.txt`** (user-owned): add the five new 5.6.7 lines (see `PATCHNOTES_v5.6.7.md`).
 
 ## Deliberately skipped (and why)
 
 - **Sorting journal files by name in `JournalParser.find_journal_files`:** old journal file names use a different date format, so name order can be wrong. Keep mtime.
 - **`transient()` in 13 live dialogs, plus hardcoded dark backgrounds** (~58 spots in `main.py`, `prospector_panel.py`, `ring_finder.py`): each dialog has its own show sequence, some use `transient` on purpose, and the result can't be verified without seeing it. Fix a dialog when it is next changed. The four Ring Finder right-click dialogs also lack `withdraw()` and can flash on the wrong monitor.
-- **About 100 other silent `except: pass` blocks in `main.py`**, and any in `prospector_panel.py` / `ring_finder.py`.
+- **About 316 remaining silent `except: pass` blocks across `main.py`, `prospector_panel.py` and `ring_finder.py`.** Next step after the in-game test: use the new log lines to find which silent blocks hide real failures, and convert those. Tier-B reasons are listed under "Silent-failure logging".
 - **306 `hasattr(self, ...)` guards and 356 `print(` calls in `main.py`:** pointed out in the review, no fix requested.
 
 ## Local state at handover
 
 - Uncommitted and not mine: `app/Variables/miningSessionSummary.txt` (dev-run output), `docs/INSTALLER_RELEASE_NOTES.txt` (user-owned).
-- Untracked: two `app/config.json.backup_*` files (safe to delete).
+- The two `app/config.json.backup_*` files were deleted.
 - `app/main.py`, `prospector_panel.py`, `ring_finder.py`, `file_watcher.py` are CRLF; `config.py`, `journal_parser.py`, the localization JSON and `scripts/check_*.py` are LF.
