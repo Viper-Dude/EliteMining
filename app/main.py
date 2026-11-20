@@ -18,8 +18,13 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 from ui.striped_treeview import StripedTreeview
+from ui.themed_checkbox import ThemedCheckbutton
 from ui.theme import modern_color
 from ui.search_control import SearchControl
+from ui.color_swatches import ColorSwatchPicker
+from ui.segmented_selector import SegmentedSelector
+from ui.stepper import Stepper
+from ui.themed_slider import ThemedSlider, slider_colors
 
 import os
 import sys
@@ -6159,7 +6164,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
             rowf.grid(row=r, column=0, sticky="w", pady=2)
 
-            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name],
+            checkbox = ThemedCheckbutton(rowf, text=name, variable=self.toggle_vars[name],
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg,
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg,
                                     highlightthickness=0, bd=0, font=self._scaled_font(9),
@@ -6194,11 +6199,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
             rowf.grid(row=r, column=0, sticky="w", pady=2)
             tk.Label(rowf, text=t(label_key), bg=_toggle_bg, fg=_toggle_fg,
                      font=self._scaled_font(9), width=14, anchor="w").pack(side="left", padx=(4, 0))
-            scale = tk.Scale(rowf, from_=lo, to=hi, orient="horizontal", variable=getattr(self, var_name),
-                             bg=_toggle_bg, fg=_toggle_fg, activebackground=_sl_active, highlightthickness=0,
-                             troughcolor=_sl_trough, font=self._scaled_font(9), length=200,
-                             sliderrelief="flat", sliderlength=20,
-                             command=lambda v: self._write_sound_levels())
+            scale = ThemedSlider(rowf, lo, hi, getattr(self, var_name), command=lambda v: self._write_sound_levels(),
+                                 length=self._scaled_px(200), bg=_toggle_bg, fg=_toggle_fg,
+                                 font=self._scaled_font(9), fill_from_center=(var_name == 'sound_balance'),
+                                 scale=self._scaled_px(100) / 100, **slider_colors(self.current_theme))
             scale.pack(side="left", padx=(8, 0))
             self._vf_controls.append((scale, "normal"))
             if var_name == 'sound_balance':
@@ -6251,7 +6255,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     for label in _set_labels:
                         sv = tk.BooleanVar(value=(label == self._voice_set_active.get(_category)))
                         self._voice_set_vars[(_category, label)] = sv
-                        _set_cb = tk.Checkbutton(setf, text=label, variable=sv,
+                        _set_cb = ThemedCheckbutton(setf, text=label, variable=sv,
                                        command=lambda c=_category, l=label: self._on_voice_set_toggle(c, l),
                                        bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg,
                                        activebackground=_toggle_bg, activeforeground=_toggle_fg,
@@ -6400,10 +6404,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Slider with its value to the right ("100%") instead of floating above it
         vol_row = tk.Frame(box, bg=_bg)
         vol_row.grid(row=0, column=1, sticky="ew", padx=(8, 0), pady=(0, 6))
-        tk.Scale(vol_row, from_=0, to=100, orient="horizontal", variable=self.voice_volume, bg=_bg, fg=_slider_fg,
-                 activebackground=_slider_active, highlightthickness=0, troughcolor=_slider_trough,
-                 font=self._scaled_font(9), command=_on_volume_change, length=self._scaled_px(160),
-                 showvalue=0, sliderrelief="flat", sliderlength=20).pack(side="left", fill="x", expand=True)
+        ThemedSlider(vol_row, 0, 100, self.voice_volume, command=_on_volume_change, length=self._scaled_px(160),
+                     bg=_bg, fg=_slider_fg, font=self._scaled_font(9), show_value=False,
+                     scale=self._scaled_px(100) / 100, **slider_colors(self.current_theme)).pack(side="left")
         vol_text = tk.StringVar()
         def _sync_vol_text(*_a):
             try:
@@ -6507,7 +6510,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         if name in self.announcement_vars:
                             # Get localized display name and help text
                             display_name, localized_help = toggle_display.get(name, (name, helptext))
-                            checkbox = tk.Checkbutton(toggles_frame, text=display_name, 
+                            checkbox = ThemedCheckbutton(toggles_frame, text=display_name, 
                                                     variable=self.announcement_vars[name], 
                                                     bg=_ann_cb_bg, fg="#ffffff", selectcolor=_ann_cb_select, 
                                                     activebackground=_ann_cb_bg, activeforeground="#ffffff", 
@@ -6531,34 +6534,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     self.prospector_panel.threshold.set(value)
                     self.prospector_panel._save_threshold_value()
                     self._ann_check_modified()
-                sp = tk.Spinbox(thr, from_=0.0, to=100.0, increment=0.5, width=6,
-                                 textvariable=self.prospector_panel.threshold, 
-                                 command=_ann_threshold_changed,
-                                 bg="#1e1e1e", fg=_ann_spinbox_fg, buttonbackground="#2d2d2d",
-                                 insertbackground=_ann_spinbox_fg, selectbackground="#4a6a8a",
-                                 relief="solid", bd=0, highlightthickness=1,
-                                 highlightbackground="#ffffff", highlightcolor="#ffffff",
-                                 font=self._scaled_font(9))
+                sp = Stepper(thr, 0.0, 100.0, self.prospector_panel.threshold, increment=0.5, width=5,
+                             command=_ann_threshold_changed, bg=ttk.Style().lookup("TFrame", "background") or "#1e1e1e",
+                             fg=_ann_spinbox_fg, font=self._scaled_font(9), scale=self._scaled_px(100) / 100,
+                             accent=slider_colors(self.current_theme)["accent"])
                 sp.pack(side="left", padx=(6, 4))
                 self._ann_threshold_spin = sp
                 ttk.Label(thr, text="%").pack(side="left")  # unit sits next to its value
-                sp.bind("<Return>", _ann_threshold_changed)
-                sp.bind("<FocusOut>", _ann_threshold_changed)
-                # Add mouse wheel support
-                def on_ann_threshold_scroll(event, var=self.prospector_panel.threshold):
-                    try:
-                        current = float(var.get())
-                        if event.delta > 0:
-                            new_val = min(current + 0.5, 100.0)
-                        else:
-                            new_val = max(current - 0.5, 0.0)
-                        var.set(round(new_val, 1))
-                    except:
-                        pass
-                    _ann_threshold_changed()
-                    return "break"
-                sp.bind("<MouseWheel>", on_ann_threshold_scroll)
-                ToolTip(sp, t('tooltips.announcement_threshold'))
+                ToolTip(sp.entry, t('tooltips.announcement_threshold'))
                 
                 announcement_button = create_action_button if getattr(self, 'current_theme', '') in ('modern', 'modern_slate', 'modern_orange') else tk.Button
                 set_all_btn = announcement_button(thr, text=t('settings.set_all'), command=self._ann_set_all_threshold,
@@ -6691,14 +6674,11 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self._ann_minpct_spin = {}
                 self._ann_minpct_vars = {}
 
-                # Spinbox look: darker field with a soft border (bright only when focused),
-                # following the active theme instead of fixed white/grey.
+                # Stepper field colours follow the active theme instead of fixed white/grey.
                 if self.current_theme in ('modern', 'modern_slate', 'modern_orange'):
                     _ann_field_bg, _ann_field_btn = modern_color("#14171B"), modern_color("#262C34")
-                    _ann_field_border, _ann_field_focus = modern_color("#343B44"), modern_color("#FF9A32")
                 else:
-                    _ann_field_bg, _ann_field_btn, _ann_field_border = "#151515", "#2d2d2d", "#444444"
-                    _ann_field_focus = "#ff8c00" if self.current_theme == "elite_orange" else "#7fb2e5"
+                    _ann_field_bg, _ann_field_btn = "#151515", "#2d2d2d"
                 _ann_diff_fg = self._preset_diff_fg()
 
                 # Values changed since the active preset was last saved or loaded get an
@@ -6801,58 +6781,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         v = self.prospector_panel.min_pct_map.get(mat, 0.0)
                         self._ann_minpct_vars[mat] = tk.DoubleVar(value=v)
                         
-                        self._ann_minpct_spin[mat] = tk.Spinbox(
-                            self.ann_mat_tree,
-                            from_=0.0,
-                            to=100.0,
-                            increment=0.5,
-                            width=5,
-                            textvariable=self._ann_minpct_vars[mat],
-                            command=_on_ann_minpct_change_factory(mat),
-                            bg=_ann_field_bg, fg=_ann_spinbox_fg, buttonbackground=_ann_field_btn,
-                            insertbackground=_ann_spinbox_fg, selectbackground="#4a6a8a",
-                            relief="solid", bd=0, highlightthickness=1,
-                            highlightbackground=_ann_field_border, highlightcolor=_ann_field_focus,
-                            font=self._scaled_font(9)
-                        )
+                        self._ann_minpct_spin[mat] = Stepper(
+                            self.ann_mat_tree, 0.0, 100.0, self._ann_minpct_vars[mat], increment=0.5, width=5,
+                            command=_on_ann_minpct_change_factory(mat), bg=_ann_field_bg, field_bg=_ann_field_bg,
+                            button_bg=_ann_field_btn, fg=_ann_spinbox_fg, font=self._scaled_font(9),
+                            scale=self._scaled_px(100) / 100, accent=slider_colors(self.current_theme)["accent"])
                         self._ann_minpct_vars[mat].trace_add("write", _ann_queue_tint)
-                        # Mouse wheel: only edits the value once the box has been clicked
-                        # into; otherwise it scrolls the list so values change by accident less.
-                        def on_ann_minpct_scroll(event, v=self._ann_minpct_vars[mat], m=mat, sp=self._ann_minpct_spin[mat]):
-                            if self.focus_get() is not sp:
-                                self.ann_mat_tree.yview_scroll(-1 if event.delta > 0 else 1, "units")
-                                return "break"
-                            try:
-                                current = float(v.get())
-                                if event.delta > 0:
-                                    new_val = min(current + 0.5, 100.0)
-                                else:
-                                    new_val = max(current - 0.5, 0.0)
-                                new_val = round(new_val, 1)
-                                v.set(new_val)
-                                # Save after wheel scroll
-                                self.prospector_panel.min_pct_map[m] = new_val
-                                self.prospector_panel._save_min_pct_map()
-                                self._ann_check_modified()
-                            except:
-                                pass
-                            return "break"
-                        self._ann_minpct_spin[mat].bind("<MouseWheel>", on_ann_minpct_scroll)
-                        
-                        # Add bindings to save on manual entry (Return, FocusOut)
-                        def on_ann_minpct_manual(event, m=mat, v=self._ann_minpct_vars[mat]):
-                            try:
-                                val = float(v.get())
-                                val = round(max(0.0, min(100.0, val)), 1)
-                                v.set(val)  # Update UI with validated value
-                                self.prospector_panel.min_pct_map[m] = val
-                                self.prospector_panel._save_min_pct_map()
-                                self._ann_check_modified()
-                            except ValueError:
-                                # Reset to current saved value on invalid input
-                                v.set(self.prospector_panel.min_pct_map.get(m, 0.0))
-                        self._ann_minpct_spin[mat].bind("<Return>", on_ann_minpct_manual)
-                        self._ann_minpct_spin[mat].bind("<FocusOut>", on_ann_minpct_manual)
                     row_idx += 1
 
                 _ann_queue_tint()
@@ -6861,7 +6795,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 def _clear_spinbox_focus(event):
                     # Check if click is not on a spinbox
                     widget = event.widget.winfo_containing(event.x_root, event.y_root)
-                    if not isinstance(widget, tk.Spinbox):
+                    if not isinstance(getattr(widget, 'master', None), Stepper):
                         frame.focus_set()
                 self.ann_mat_tree.bind("<Button-1>", _clear_spinbox_focus, add='+')
 
@@ -6906,7 +6840,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                 # Scale-aware width that grows a little with the column; inset
                                 # top/bottom so neighbouring boxes read as separate fields.
                                 spinbox_width = min(max(width - self._scaled_px(8), 1),
-                                                    max(self._scaled_px(72), int(width * 0.5)))
+                                                    max(self._scaled_px(96), int(width * 0.5)))
                                 pad_y = self._scaled_px(3)
                                 x_offset = (width - spinbox_width) // 2
                                 spinbox.place(in_=self.ann_mat_tree, x=x + x_offset, y=y + pad_y,
@@ -7490,7 +7424,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         r += 1
         
         # Tooltips option
-        tk.Checkbutton(scrollable_frame, text=t('settings.enable_tooltips'), variable=self.tooltips_enabled, 
+        ThemedCheckbutton(scrollable_frame, text=t('settings.enable_tooltips'), variable=self.tooltips_enabled, 
                       bg=_gs_bg, fg="#ffffff", selectcolor=_gs_bg, activebackground=_gs_bg, 
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9), 
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground=_gs_bg, 
@@ -7501,7 +7435,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         r += 1
         
         # Stay on top option
-        tk.Checkbutton(scrollable_frame, text=t('settings.stay_on_top'), variable=self.stay_on_top, 
+        ThemedCheckbutton(scrollable_frame, text=t('settings.stay_on_top'), variable=self.stay_on_top, 
                       bg=_gs_bg, fg="#ffffff", selectcolor=_gs_bg, activebackground=_gs_bg, 
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9), 
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground=_gs_bg, 
@@ -7694,7 +7628,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         r += 1
         
         # EDDN send enable/disable
-        tk.Checkbutton(scrollable_frame, text="✓ " + t('settings.send_eddn'), variable=self.eddn_send_enabled, 
+        ThemedCheckbutton(scrollable_frame, text="✓ " + t('settings.send_eddn'), variable=self.eddn_send_enabled, 
                       command=self._on_eddn_send_toggle,
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9), 
@@ -7738,10 +7672,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         def _slider_row(row, label_text, variable, from_, to, unit, indent=0):
             frame = _labelled_row(row, label_text, indent)
-            scale = tk.Scale(frame, from_=from_, to=to, orient="horizontal", variable=variable, bg=_gs_bg,
-                             fg=_slider_fg, activebackground=_slider_active, highlightthickness=0, length=140,
-                             troughcolor=_slider_trough, font=self._scaled_font(9),
-                             sliderrelief="flat", sliderlength=20)
+            scale = ThemedSlider(frame, from_, to, variable, length=self._scaled_px(140), bg=_gs_bg, fg=_slider_fg,
+                                 font=self._scaled_font(9), scale=self._scaled_px(100) / 100,
+                                 **slider_colors(_gs_theme))
             scale.pack(side="left")
             tk.Label(frame, text=unit, bg=_gs_bg, fg="#ffffff", font=self._scaled_font(9)).pack(side="left")
             return scale
@@ -7756,12 +7689,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Text overlay enable/disable + Hide in Supercruise + mining session + game focus on one row
         text_overlay_row = tk.Frame(scrollable_frame, bg=_gs_bg)
         text_overlay_row.grid(row=r, column=0, sticky="w")
-        tk.Checkbutton(text_overlay_row, text=t('settings.enable_text_overlay'), variable=self.text_overlay_enabled,
+        ThemedCheckbutton(text_overlay_row, text=t('settings.enable_text_overlay'), variable=self.text_overlay_enabled,
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9),
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e",
                       highlightcolor="#1e1e1e", takefocus=False).pack(side="left")
-        self._sc_checkbox = tk.Checkbutton(text_overlay_row, text=t('settings.hide_overlays_in_supercruise'), variable=self.hide_overlays_in_supercruise,
+        self._sc_checkbox = ThemedCheckbutton(text_overlay_row, text=t('settings.hide_overlays_in_supercruise'), variable=self.hide_overlays_in_supercruise,
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9),
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e",
@@ -7777,14 +7710,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     self._sc_checkbox.config(state="normal", fg="#ffffff")
             self._save_cargo_preferences()
 
-        self._mining_session_cb = tk.Checkbutton(text_overlay_row, text=t('settings.overlay_only_mining_session'), variable=self.overlay_only_mining_session,
+        self._mining_session_cb = ThemedCheckbutton(text_overlay_row, text=t('settings.overlay_only_mining_session'), variable=self.overlay_only_mining_session,
                       command=_on_mining_session_toggle,
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e",
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9),
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e",
                       highlightcolor="#1e1e1e", takefocus=False)
         self._mining_session_cb.pack(side="left", padx=(8, 0))
-        _focused_cb = tk.Checkbutton(text_overlay_row, text=t('settings.overlay_only_game_focused'), variable=self.overlay_only_game_focused,
+        _focused_cb = ThemedCheckbutton(text_overlay_row, text=t('settings.overlay_only_game_focused'), variable=self.overlay_only_game_focused,
                       command=self._save_cargo_preferences, **_cb_kw)
         _focused_cb.pack(side="left", padx=(8, 0))
         # Apply initial state — grey out supercruise checkbox if mining session is already enabled
@@ -7816,78 +7749,23 @@ class App(tk.Tk, ColumnVisibilityMixin):
         }
         self._color_display_to_internal = {v: k for k, v in color_display_names.items()}
 
-        # Create display variable with localized name
-        current_color_display = color_display_names.get(self.text_overlay_color.get(), t('settings.color_white'))
-        self._color_display_var = tk.StringVar(value=current_color_display)
-
-        # Create custom OptionMenu with colored options
-        self.color_menu = tk.OptionMenu(color_frame, self._color_display_var, *color_display_names.values())
-        self.color_menu.configure(
-            bg=_gs_bg,
-            fg="#ffffff",
-            activebackground="#444444",
-            activeforeground="#ffffff",
-            highlightthickness=0,
-            relief="raised",
-            bd=1,
-            font=self._scaled_font(8)
-        )
+        self.color_menu = ColorSwatchPicker(
+            color_frame, self.color_options, self.text_overlay_color, names=color_display_names,
+            bg=_gs_bg, ring=slider_colors(_gs_theme)["accent"], font=self._scaled_font(9),
+            scale=self._scaled_px(100) / 100)
         self.color_menu.pack(side="left")
-
-        # Style the dropdown menu items with their actual colors
-        menu = self.color_menu['menu']
-        menu.configure(bg=MENU_COLORS["bg"], fg=MENU_COLORS["fg"],
-                      activebackground=MENU_COLORS["activebackground"])
-
-        # Clear existing items and add colored ones with localized labels
-        menu.delete(0, 'end')
-        for internal_name, color_hex in self.color_options.items():
-            display_name = color_display_names.get(internal_name, internal_name)
-            # For very light colors, use black text for readability
-            text_color = "#000000"
-
-            def set_color(disp=display_name, internal=internal_name):
-                self._color_display_var.set(disp)
-                self.text_overlay_color.set(internal)
-
-            menu.add_command(
-                label=display_name,
-                command=set_color,
-                background=color_hex,
-                foreground=text_color,
-                activebackground=color_hex,
-                activeforeground=text_color,
-                font=self._scaled_font(9, "bold")
-            )
         r += 1
 
         # Text size selection with localized options
         size_frame = _labelled_row(r, t('settings.text_size'))
 
-        # Localized size options
-        size_display_names = [t('settings.text_size_small'), t('settings.text_size_normal'), t('settings.text_size_large')]
-        self._size_display_to_internal = {
-            t('settings.text_size_small'): "Small",
-            t('settings.text_size_normal'): "Normal",
-            t('settings.text_size_large'): "Large"
-        }
-        self._size_internal_to_display = {v: k for k, v in self._size_display_to_internal.items()}
-
-        # Convert current value to display name
-        current_size_display = self._size_internal_to_display.get(self.text_overlay_size.get(), t('settings.text_size_normal'))
-        self._size_display_var = tk.StringVar(value=current_size_display)
-
-        self.size_combo = ttk.Combobox(size_frame, textvariable=self._size_display_var,
-                                      values=size_display_names,
-                                      state="readonly", width=12, font=self._scaled_font(9))
+        self.size_combo = SegmentedSelector(
+            size_frame,
+            [("Small", t('settings.text_size_small')), ("Normal", t('settings.text_size_normal')),
+             ("Large", t('settings.text_size_large'))],
+            self.text_overlay_size, bg=_gs_bg, accent=slider_colors(_gs_theme)["accent"],
+            font=self._scaled_font(9), scale=self._scaled_px(100) / 100)
         self.size_combo.pack(side="left")
-
-        # Sync display var to internal var
-        def _on_size_change(event=None):
-            display_val = self._size_display_var.get()
-            internal_val = self._size_display_to_internal.get(display_val, "Normal")
-            self.text_overlay_size.set(internal_val)
-        self.size_combo.bind('<<ComboboxSelected>>', _on_size_change)
         r += 1
         _desc(r, t('settings.overlay_appearance_desc'))
         r += 1
@@ -7919,13 +7797,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 if not self._overlay_standard_var.get():
                     self._overlay_enhanced_var.set(1)
 
-        _std_cb = tk.Checkbutton(mode_frame, text=t('settings.overlay_standard'), variable=self._overlay_standard_var,
+        _std_cb = ThemedCheckbutton(mode_frame, text=t('settings.overlay_standard'), variable=self._overlay_standard_var,
                       command=_on_standard_cb, **_cb_kw)
         _std_cb.pack(side="left", padx=(8, 0))
-        _enh_cb = tk.Checkbutton(mode_frame, text=t('settings.overlay_enhanced'), variable=self._overlay_enhanced_var,
+        _enh_cb = ThemedCheckbutton(mode_frame, text=t('settings.overlay_enhanced'), variable=self._overlay_enhanced_var,
                       command=_on_enhanced_cb, **_cb_kw)
         _enh_cb.pack(side="left", padx=(8, 0))
-        _cargo_cb = tk.Checkbutton(mode_frame, text=t('settings.cargo_overlay'), variable=self.cargo_show_in_overlay,
+        _cargo_cb = ThemedCheckbutton(mode_frame, text=t('settings.cargo_overlay'), variable=self.cargo_show_in_overlay,
                       **_cb_kw)
         _cargo_cb.pack(side="left", padx=(8, 0))
         self._overlay_mode_cbs = [_std_cb, _enh_cb, _cargo_cb, _focused_cb]
@@ -7941,14 +7819,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # ----- Auto Prices overlay (Ring Finder) -----
         _sub_heading(r, t('settings.overlay_group_auto_prices'))
         r += 1
-        self._auto_prices_overlay_cb = tk.Checkbutton(scrollable_frame, text=t('settings.overlay_show_auto_prices'),
+        self._auto_prices_overlay_cb = ThemedCheckbutton(scrollable_frame, text=t('settings.overlay_show_auto_prices'),
                                                       variable=self.auto_prices_overlay, **_cb_kw)
         self._auto_prices_overlay_cb.grid(row=r, column=0, sticky="w")
         r += 1
         # Same saved setting as "In-system prices only" in Rank Minerals / Find Best Mining System
         from config import load_pp_mode, save_pp_mode
         self.auto_prices_in_system = tk.BooleanVar(value=load_pp_mode())
-        _in_system_cb = tk.Checkbutton(scrollable_frame, text=t('settings.overlay_auto_prices_in_system'), variable=self.auto_prices_in_system,
+        _in_system_cb = ThemedCheckbutton(scrollable_frame, text=t('settings.overlay_auto_prices_in_system'), variable=self.auto_prices_in_system,
                       command=lambda: save_pp_mode(self.auto_prices_in_system.get()), **_cb_kw)
         _in_system_cb.grid(row=r, column=0, sticky="w")
         self._auto_prices_in_system_cb = _in_system_cb
@@ -8013,7 +7891,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Import prompt preference checkbox
         self.ask_import_on_path_change = tk.IntVar()
-        import_prompt_check = tk.Checkbutton(
+        import_prompt_check = ThemedCheckbutton(
             scrollable_frame,
             text=t('settings.ask_import_prompt'),
             variable=self.ask_import_on_path_change,
@@ -8033,7 +7911,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         r += 1
         
         # Auto-scan journals on startup checkbox
-        tk.Checkbutton(scrollable_frame, text=t('settings.auto_scan_journals'), variable=self.auto_scan_journals, 
+        ThemedCheckbutton(scrollable_frame, text=t('settings.auto_scan_journals'), variable=self.auto_scan_journals, 
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9), 
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
@@ -8061,7 +7939,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 self.ring_finder._on_auto_search_toggle()
             self._set_status(f"Auto-search hotspots {'enabled' if enabled else 'disabled'}")
         
-        tk.Checkbutton(scrollable_frame, text=t('settings.auto_search_hotspots'), variable=self.auto_search_enabled, 
+        ThemedCheckbutton(scrollable_frame, text=t('settings.auto_search_hotspots'), variable=self.auto_search_enabled, 
                       command=_on_auto_search_toggle,
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9), 
@@ -8073,7 +7951,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         r += 1
         
         # Auto-switch tabs checkbox
-        tk.Checkbutton(scrollable_frame, text=t('settings.auto_switch_tabs'), variable=self.auto_switch_tabs, 
+        ThemedCheckbutton(scrollable_frame, text=t('settings.auto_switch_tabs'), variable=self.auto_switch_tabs, 
                       bg=_gs_bg, fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", 
                       activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9), 
                       padx=4, pady=2, anchor="w", relief="flat", highlightbackground="#1e1e1e", 
@@ -8820,8 +8698,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Bind mousewheel to canvas and all child widgets (except spinboxes)
         def _bind_mousewheel_recursive(widget):
-            # Skip spinboxes - they have their own scroll handlers
-            if isinstance(widget, tk.Spinbox):
+            # Skip spinboxes and steppers - they have their own scroll handlers
+            if isinstance(widget, (tk.Spinbox, Stepper)):
                 return
             widget.bind("<MouseWheel>", _on_mousewheel_mc)
             for child in widget.winfo_children():
@@ -8924,7 +8802,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             def make_toggle_trace(toggle_name):
                 return lambda *args: self._save_toggle(toggle_name)
 
-            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name],
+            checkbox = ThemedCheckbutton(rowf, text=name, variable=self.toggle_vars[name],
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg,
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg,
                                     highlightthickness=0, bd=0, font=self._scaled_font(9),
@@ -8961,7 +8839,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             def make_fsd_toggle_trace(toggle_name):
                 return lambda *args: self._save_toggle(toggle_name)
 
-            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name],
+            checkbox = ThemedCheckbutton(rowf, text=name, variable=self.toggle_vars[name],
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg,
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg,
                                     highlightthickness=0, bd=0, font=self._scaled_font(9),
@@ -8982,7 +8860,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 osm_name = "Open System Map"
                 _osm_fname, osm_helptext = TOGGLES[osm_name]
                 osm_display_help = t(toggle_help_translations.get(osm_name, osm_name)) if osm_name in toggle_help_translations else osm_helptext
-                osm_checkbox = tk.Checkbutton(rowf, text=osm_name, variable=self.toggle_vars[osm_name],
+                osm_checkbox = ThemedCheckbutton(rowf, text=osm_name, variable=self.toggle_vars[osm_name],
                                              bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg,
                                              activebackground=_toggle_bg, activeforeground=_toggle_fg,
                                              highlightthickness=0, bd=0, font=self._scaled_font(9),
@@ -9011,35 +8889,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
                     _fsdjump_fname, fsdjump_lo, fsdjump_hi, fsdjump_helptext = TIMERS[fsdjump_timer_name]
 
-                    def make_save_fsdjump(tn, fn, l, h):
-                        return lambda: self._save_timer(tn, fn, l, h)
                     def make_trace_fsdjump(tn, fn, l, h):
                         return lambda *args: self._save_timer(tn, fn, l, h)
 
-                    fsdjump_spinbox = tk.Spinbox(fsdjump_frame, from_=fsdjump_lo, to=fsdjump_hi, width=5,
-                                                  textvariable=self.timer_vars[fsdjump_timer_name],
-                                                  command=make_save_fsdjump(fsdjump_timer_name, _fsdjump_fname, fsdjump_lo, fsdjump_hi),
-                                                  bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
-                                                  insertbackground=_toggle_fg, selectbackground="#4a6a8a",
-                                                  disabledbackground="#1e1e1e", disabledforeground="#666666",
-                                                  relief="solid", bd=0, highlightthickness=1,
-                                                  highlightbackground="#ffffff", highlightcolor="#ffffff",
-                                                  font=self._scaled_font(9))
+                    fsdjump_spinbox = self._make_stepper(fsdjump_frame, fsdjump_lo, fsdjump_hi,
+                                                         self.timer_vars[fsdjump_timer_name], _toggle_bg, _toggle_fg)
                     fsdjump_spinbox.pack(side="left", padx=(4, 6))
                     self.fsdjump_timer_spinboxes[fsdjump_timer_name] = fsdjump_spinbox
-
-                    def on_fsdjump_scroll(event, var=self.timer_vars[fsdjump_timer_name], lo_val=fsdjump_lo, hi_val=fsdjump_hi):
-                        try:
-                            current = int(var.get())
-                            if event.delta > 0:
-                                new_val = min(current + 1, hi_val)
-                            else:
-                                new_val = max(current - 1, lo_val)
-                            var.set(new_val)
-                        except:
-                            pass
-                        return "break"
-                    fsdjump_spinbox.bind("<MouseWheel>", on_fsdjump_scroll)
 
                     self.timer_vars[fsdjump_timer_name].trace_add("write",
                         make_trace_fsdjump(fsdjump_timer_name, _fsdjump_fname, fsdjump_lo, fsdjump_hi))
@@ -9063,7 +8919,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     honk_rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
                     honk_rowf.grid(row=r, column=0, sticky="w", pady=2)
 
-                    honk_checkbox = tk.Checkbutton(honk_rowf, text=honk_name, variable=self.toggle_vars[honk_name],
+                    honk_checkbox = ThemedCheckbutton(honk_rowf, text=honk_name, variable=self.toggle_vars[honk_name],
                                             bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg,
                                             activebackground=_toggle_bg, activeforeground=_toggle_fg,
                                             highlightthickness=0, bd=0, font=self._scaled_font(9),
@@ -9103,33 +8959,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
             rowf.grid(row=r, column=0, sticky="w", pady=2)
             
             # Create closure with captured values for auto-save
-            def make_save_laser(tn, fn, l, h):
-                return lambda: self._save_timer(tn, fn, l, h)
             def make_trace_laser(tn, fn, l, h):
                 return lambda *args: self._save_timer(tn, fn, l, h)
             
-            # Use tk.Spinbox instead of ttk.Spinbox to test selection behavior
-            sp = tk.Spinbox(rowf, from_=lo, to=hi, width=5, textvariable=self.timer_vars[name],
-                            command=make_save_laser(name, _fname, lo, hi),
-                            bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
-                            insertbackground=_toggle_fg, selectbackground="#4a6a8a",
-                            relief="solid", bd=0, highlightthickness=1,
-                            highlightbackground="#ffffff", highlightcolor="#ffffff",
-                            font=self._scaled_font(9))
-            sp.pack(side="left")
-            # Add mouse wheel support for tk.Spinbox
-            def on_spinbox_scroll(event, spinbox=sp, var=self.timer_vars[name], lo_val=lo, hi_val=hi):
-                try:
-                    current = int(var.get())
-                    if event.delta > 0:
-                        new_val = min(current + 1, hi_val)
-                    else:
-                        new_val = max(current - 1, lo_val)
-                    var.set(new_val)
-                except:
-                    pass
-                return "break"
-            sp.bind("<MouseWheel>", on_spinbox_scroll)
+            self._make_stepper(rowf, lo, hi, self.timer_vars[name], _toggle_bg, _toggle_fg).pack(side="left")
             
             self.timer_vars[name].trace_add("write", make_trace_laser(name, _fname, lo, hi))
             
@@ -9149,7 +8982,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
             rowf.grid(row=r, column=0, sticky="w", pady=2)
             
-            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
+            checkbox = ThemedCheckbutton(rowf, text=name, variable=self.toggle_vars[name], 
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg, 
                                     highlightthickness=0, bd=0, font=self._scaled_font(9), 
@@ -9172,35 +9005,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
             # Use existing variable (initialized in __init__)
             # NOTE: Don't set up trace until AFTER import runs, to avoid overwriting saved values
-            repeat_spinbox = tk.Spinbox(repeat_frame, from_=1, to=10, width=5, 
-                                         textvariable=self.laser_extra_repeat_var,
-                                         bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
-                                         insertbackground=_toggle_fg, selectbackground="#4a6a8a",
-                                         relief="solid", bd=0, highlightthickness=1,
-                                         highlightbackground="#ffffff", highlightcolor="#ffffff",
-                                         font=self._scaled_font(9))
+            repeat_spinbox = self._make_stepper(repeat_frame, 1, 10, self.laser_extra_repeat_var, _toggle_bg, _toggle_fg,
+                                                command=self._save_laser_extra_repeat)
             repeat_spinbox.pack(side="left", padx=(4, 6))
-            
-            # Store spinbox for later trace setup
             self._laser_extra_spinbox = repeat_spinbox
-            
-            # Add mouse wheel support
-            def on_repeat_scroll(event, var=self.laser_extra_repeat_var):
-                try:
-                    current = int(var.get())
-                    if event.delta > 0:
-                        new_val = min(current + 1, 10)
-                    else:
-                        new_val = max(current - 1, 1)
-                    var.set(new_val)
-                    self._save_laser_extra_repeat()  # Save on scroll
-                except:
-                    pass
-                return "break"
-            repeat_spinbox.bind("<MouseWheel>", on_repeat_scroll)
-            
-            # Spinbox command for button clicks
-            repeat_spinbox.config(command=self._save_laser_extra_repeat)
             
             repeat_label = tk.Label(repeat_frame, text=f"{t('voiceattack.laser_extra_repeat_label')} [1..10]",
                                    bg=_toggle_bg, fg=_toggle_fg, font=self._scaled_font(9))
@@ -9221,7 +9029,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
             rowf.grid(row=r, column=0, sticky="w", pady=2)
             
-            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
+            checkbox = ThemedCheckbutton(rowf, text=name, variable=self.toggle_vars[name], 
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg, 
                                     highlightthickness=0, bd=0, font=self._scaled_font(9), 
@@ -9241,7 +9049,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 cp_name = "Continuous Pulsewave"
                 _cp_fname, cp_helptext = TOGGLES[cp_name]
                 cp_display_help = t(toggle_help_translations.get(cp_name, cp_name)) if cp_name in toggle_help_translations else cp_helptext
-                cp_checkbox = tk.Checkbutton(rowf, text=cp_name, variable=self.toggle_vars[cp_name],
+                cp_checkbox = ThemedCheckbutton(rowf, text=cp_name, variable=self.toggle_vars[cp_name],
                                              bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg,
                                              activebackground=_toggle_bg, activeforeground=_toggle_fg,
                                              highlightthickness=0, bd=0, font=self._scaled_font(9),
@@ -9263,7 +9071,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
             rowf.grid(row=r, column=0, sticky="w", pady=2)
             
-            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
+            checkbox = ThemedCheckbutton(rowf, text=name, variable=self.toggle_vars[name], 
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg, 
                                     highlightthickness=0, bd=0, font=self._scaled_font(9), 
@@ -9290,34 +9098,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 _fname, lo, hi, _helptext = cargoscoop_spec
                 
                 # Create closure with captured values
-                def make_save_cargoscoop(tn, fn, l, h):
-                    return lambda: self._save_timer(tn, fn, l, h)
-                
                 def make_trace_cargoscoop(tn, fn, l, h):
                     return lambda *args: self._save_timer(tn, fn, l, h)
                 
-                cargoscoop_spinbox = tk.Spinbox(cargoscoop_frame, from_=lo, to=hi, width=5, 
-                                                 textvariable=self.timer_vars[cargoscoop_timer_name],
-                                                 command=make_save_cargoscoop(cargoscoop_timer_name, _fname, lo, hi),
-                                                 bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
-                                                 insertbackground=_toggle_fg, selectbackground="#4a6a8a",
-                                                 relief="solid", bd=0, highlightthickness=1,
-                                                 highlightbackground="#ffffff", highlightcolor="#ffffff",
-                                                 font=self._scaled_font(9))
+                cargoscoop_spinbox = self._make_stepper(cargoscoop_frame, lo, hi, self.timer_vars[cargoscoop_timer_name],
+                                                        _toggle_bg, _toggle_fg)
                 cargoscoop_spinbox.pack(side="left", padx=(4, 6))
-                # Add mouse wheel support
-                def on_cargoscoop_scroll(event, var=self.timer_vars[cargoscoop_timer_name], lo_val=lo, hi_val=hi):
-                    try:
-                        current = int(var.get())
-                        if event.delta > 0:
-                            new_val = min(current + 1, hi_val)
-                        else:
-                            new_val = max(current - 1, lo_val)
-                        var.set(new_val)
-                    except:
-                        pass
-                    return "break"
-                cargoscoop_spinbox.bind("<MouseWheel>", on_cargoscoop_scroll)
                 
                 self.timer_vars[cargoscoop_timer_name].trace_add("write", 
                     make_trace_cargoscoop(cargoscoop_timer_name, _fname, lo, hi))
@@ -9339,7 +9125,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
             rowf.grid(row=r, column=0, sticky="w", pady=2)
             
-            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
+            checkbox = ThemedCheckbutton(rowf, text=name, variable=self.toggle_vars[name], 
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg, 
                                     highlightthickness=0, bd=0, font=self._scaled_font(9), 
@@ -9369,7 +9155,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
             rowf.grid(row=r, column=0, sticky="w", pady=2)
             
-            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
+            checkbox = ThemedCheckbutton(rowf, text=name, variable=self.toggle_vars[name], 
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg, 
                                     highlightthickness=0, bd=0, font=self._scaled_font(9), 
@@ -9388,7 +9174,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 cps_name = "Continuous Prospector Sequence"
                 _cps_fname, cps_helptext = TOGGLES[cps_name]
                 cps_display_help = t(toggle_help_translations.get(cps_name, cps_name)) if cps_name in toggle_help_translations else cps_helptext
-                cps_checkbox = tk.Checkbutton(rowf, text="Continuous Seq.", variable=self.toggle_vars[cps_name],
+                cps_checkbox = ThemedCheckbutton(rowf, text="Continuous Seq.", variable=self.toggle_vars[cps_name],
                                              bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg,
                                              activebackground=_toggle_bg, activeforeground=_toggle_fg,
                                              highlightthickness=0, bd=0, font=self._scaled_font(9),
@@ -9412,35 +9198,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
                 _cpst_fname, cpst_lo, cpst_hi, cpst_helptext = TIMERS[cpst_timer_name]
 
-                def make_save_cpst(tn, fn, l, h):
-                    return lambda: self._save_timer(tn, fn, l, h)
                 def make_trace_cpst(tn, fn, l, h):
                     return lambda *args: self._save_timer(tn, fn, l, h)
 
-                cpst_spinbox = tk.Spinbox(cpst_frame, from_=cpst_lo, to=cpst_hi, increment=0.1, width=5,
-                                           format="%.1f",
-                                           disabledbackground="#1e1e1e", disabledforeground="#666666",
-                                           textvariable=self.timer_vars[cpst_timer_name],
-                                           command=make_save_cpst(cpst_timer_name, _cpst_fname, cpst_lo, cpst_hi),
-                                           bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
-                                           insertbackground=_toggle_fg, selectbackground="#4a6a8a",
-                                           relief="solid", bd=0, highlightthickness=1,
-                                           highlightbackground="#ffffff", highlightcolor="#ffffff",
-                                           font=self._scaled_font(9))
+                cpst_spinbox = self._make_stepper(cpst_frame, cpst_lo, cpst_hi, self.timer_vars[cpst_timer_name],
+                                                  _toggle_bg, _toggle_fg, increment=0.1)
                 cpst_spinbox.pack(side="left", padx=(4, 6))
-
-                def on_cpst_scroll(event, var=self.timer_vars[cpst_timer_name], lo_val=cpst_lo, hi_val=cpst_hi):
-                    try:
-                        current = float(var.get())
-                        if event.delta > 0:
-                            new_val = min(current + 0.1, hi_val)
-                        else:
-                            new_val = max(current - 0.1, lo_val)
-                        var.set(round(new_val, 1))
-                    except:
-                        pass
-                    return "break"
-                cpst_spinbox.bind("<MouseWheel>", on_cpst_scroll)
                 self.cpst_spinbox = cpst_spinbox
 
                 self.timer_vars[cpst_timer_name].trace_add("write",
@@ -9466,30 +9229,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
             # Use existing variable (initialized in __init__)
             # NOTE: Don't set up trace during build - import will load values first
-            prospector_spinbox = tk.Spinbox(prospector_frame, from_=0.0, to=6.0, increment=0.1, width=5,
-                                             textvariable=self.prospector_delay_var, format="%.1f",
-                                             disabledbackground="#1e1e1e", disabledforeground="#666666",
-                                             command=self._save_prospector_delay,
-                                             bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
-                                             insertbackground=_toggle_fg, selectbackground="#4a6a8a",
-                                             relief="solid", bd=0, highlightthickness=1,
-                                             highlightbackground="#ffffff", highlightcolor="#ffffff",
-                                             font=self._scaled_font(9))
+            prospector_spinbox = self._make_stepper(prospector_frame, 0.0, 6.0, self.prospector_delay_var, _toggle_bg,
+                                                    _toggle_fg, increment=0.1, command=self._save_prospector_delay)
             prospector_spinbox.pack(side="left", padx=(4, 6))
-            # Add mouse wheel support - explicitly save on scroll
-            def on_prospector_scroll(event, var=self.prospector_delay_var):
-                try:
-                    current = float(var.get())
-                    if event.delta > 0:
-                        new_val = min(current + 0.1, 6.0)
-                    else:
-                        new_val = max(current - 0.1, 0.0)
-                    var.set(round(new_val, 1))
-                    self._save_prospector_delay()  # Save on scroll
-                except:
-                    pass
-                return "break"
-            prospector_spinbox.bind("<MouseWheel>", on_prospector_scroll)
             
             prospector_label = tk.Label(prospector_frame, text=f"{t('voiceattack.prospector_delay_label')} [0.0..6.0] seconds (default: 2.6s)",
                                        bg=_toggle_bg, fg=_toggle_fg, font=self._scaled_font(9))
@@ -9522,7 +9264,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             def make_dependent_trace(toggle_name):
                 return lambda *args: self._save_toggle(toggle_name)
             
-            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
+            checkbox = ThemedCheckbutton(rowf, text=name, variable=self.toggle_vars[name], 
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg, 
                                     highlightthickness=0, bd=0, font=self._scaled_font(9), 
@@ -9546,29 +9288,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 tk.Label(thrust_upduration_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
                 tk.Label(thrust_upduration_frame, text="", bg=_toggle_bg, width=2).pack(side="left")
 
-                thrust_upduration_spinbox = tk.Spinbox(thrust_upduration_frame, from_=0.5, to=3.5, increment=0.1, width=6,
-                                                       textvariable=self.thrust_upduration_var, format="%.1f",
-                                                       command=self._save_thrust_upduration,
-                                                       bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
-                                                       insertbackground=_toggle_fg, selectbackground="#4a6a8a",
-                                                       relief="solid", bd=0, highlightthickness=1,
-                                                       highlightbackground="#ffffff", highlightcolor="#ffffff",
-                                                       font=self._scaled_font(9))
+                thrust_upduration_spinbox = self._make_stepper(thrust_upduration_frame, 0.5, 3.5, self.thrust_upduration_var, _toggle_bg, _toggle_fg,
+                                                   increment=0.1, command=self._save_thrust_upduration)
                 thrust_upduration_spinbox.pack(side="left", padx=(4, 6))
-
-                def on_thrust_upduration_scroll(event, var=self.thrust_upduration_var):
-                    try:
-                        current = float(var.get())
-                        if event.delta > 0:
-                            new_val = min(current + 0.1, 3.5)
-                        else:
-                            new_val = max(current - 0.1, 0.5)
-                        var.set(round(new_val, 1))
-                        self._save_thrust_upduration()
-                    except:
-                        pass
-                    return "break"
-                thrust_upduration_spinbox.bind("<MouseWheel>", on_thrust_upduration_scroll)
 
                 tk.Label(thrust_upduration_frame, text=f"{t('voiceattack.thrust_upduration_label')} [0.5..3.5] seconds",
                          bg=_toggle_bg, fg=_toggle_fg, font=self._scaled_font(9)).pack(side="left")
@@ -9585,29 +9307,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 
                 # Use existing variable (initialized in __init__)
                 # NOTE: Don't set up trace during build - import will load values first
-                thrust_closed_spinbox = tk.Spinbox(thrust_closed_frame, from_=0.0, to=5.0, increment=0.1, width=6, 
-                                                    textvariable=self.thrust_closed_var, format="%.1f",
-                                                    command=self._save_thrust_closed,
-                                                    bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
-                                                    insertbackground=_toggle_fg, selectbackground="#4a6a8a",
-                                                    relief="solid", bd=0, highlightthickness=1,
-                                                    highlightbackground="#ffffff", highlightcolor="#ffffff",
-                                                    font=self._scaled_font(9))
+                thrust_closed_spinbox = self._make_stepper(thrust_closed_frame, 0.0, 5.0, self.thrust_closed_var, _toggle_bg, _toggle_fg,
+                                                   increment=0.1, command=self._save_thrust_closed)
                 thrust_closed_spinbox.pack(side="left", padx=(4, 6))
-                # Add mouse wheel support - explicitly save on scroll
-                def on_thrust_closed_scroll(event, var=self.thrust_closed_var):
-                    try:
-                        current = float(var.get())
-                        if event.delta > 0:
-                            new_val = min(current + 0.1, 5.0)
-                        else:
-                            new_val = max(current - 0.1, 0.0)
-                        var.set(round(new_val, 1))
-                        self._save_thrust_closed()  # Save on scroll
-                    except:
-                        pass
-                    return "break"
-                thrust_closed_spinbox.bind("<MouseWheel>", on_thrust_closed_scroll)
                 
                 thrust_closed_label = tk.Label(thrust_closed_frame, text=f"{t('voiceattack.thrust_closed_label')} [0.0..5.0] seconds",
                                               bg=_toggle_bg, fg=_toggle_fg, font=self._scaled_font(9))
@@ -9627,29 +9329,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 
                 # Use existing variable (initialized in __init__)
                 # NOTE: Don't set up trace during build - import will load values first
-                thrust_open_spinbox = tk.Spinbox(thrust_open_frame, from_=1.0, to=5.0, increment=0.1, width=6, 
-                                                  textvariable=self.thrust_open_var, format="%.1f",
-                                                  command=self._save_thrust_open,
-                                                  bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
-                                                  insertbackground=_toggle_fg, selectbackground="#4a6a8a",
-                                                  relief="solid", bd=0, highlightthickness=1,
-                                                  highlightbackground="#ffffff", highlightcolor="#ffffff",
-                                                  font=self._scaled_font(9))
+                thrust_open_spinbox = self._make_stepper(thrust_open_frame, 1.0, 5.0, self.thrust_open_var, _toggle_bg, _toggle_fg,
+                                                   increment=0.1, command=self._save_thrust_open)
                 thrust_open_spinbox.pack(side="left", padx=(4, 6))
-                # Add mouse wheel support - explicitly save on scroll
-                def on_thrust_open_scroll(event, var=self.thrust_open_var):
-                    try:
-                        current = float(var.get())
-                        if event.delta > 0:
-                            new_val = min(current + 0.1, 5.0)
-                        else:
-                            new_val = max(current - 0.1, 1.0)
-                        var.set(round(new_val, 1))
-                        self._save_thrust_open()  # Save on scroll
-                    except:
-                        pass
-                    return "break"
-                thrust_open_spinbox.bind("<MouseWheel>", on_thrust_open_scroll)
                 
                 thrust_open_label = tk.Label(thrust_open_frame, text=f"{t('voiceattack.thrust_open_label')} [1.0..5.0] seconds",
                                             bg=_toggle_bg, fg=_toggle_fg, font=self._scaled_font(9))
@@ -9669,7 +9351,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
             rowf.grid(row=r, column=0, sticky="w", pady=2)
             
-            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
+            checkbox = ThemedCheckbutton(rowf, text=name, variable=self.toggle_vars[name], 
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg, 
                                     highlightthickness=0, bd=0, font=self._scaled_font(9), 
@@ -9695,33 +9377,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 _tfname, lo, hi, thelptext = TIMERS[target_timer_name]
                 
                 # Create closure with captured values for auto-save
-                def make_save_target(tn, fn, l, h):
-                    return lambda: self._save_timer(tn, fn, l, h)
                 def make_trace_target(tn, fn, l, h):
                     return lambda *args: self._save_timer(tn, fn, l, h)
                 
-                target_spinbox = tk.Spinbox(target_frame, from_=lo, to=hi, width=5, 
-                                             textvariable=self.timer_vars[target_timer_name],
-                                             command=make_save_target(target_timer_name, _tfname, lo, hi),
-                                             bg="#1e1e1e", fg=_toggle_fg, buttonbackground="#2d2d2d",
-                                             insertbackground=_toggle_fg, selectbackground="#4a6a8a",
-                                             relief="solid", bd=0, highlightthickness=1,
-                                             highlightbackground="#ffffff", highlightcolor="#ffffff",
-                                             font=self._scaled_font(9))
+                target_spinbox = self._make_stepper(target_frame, lo, hi, self.timer_vars[target_timer_name],
+                                                    _toggle_bg, _toggle_fg)
                 target_spinbox.pack(side="left", padx=(4, 6))
-                # Add mouse wheel support
-                def on_target_scroll(event, var=self.timer_vars[target_timer_name], lo_val=lo, hi_val=hi):
-                    try:
-                        current = int(var.get())
-                        if event.delta > 0:
-                            new_val = min(current + 1, hi_val)
-                        else:
-                            new_val = max(current - 1, lo_val)
-                        var.set(new_val)
-                    except:
-                        pass
-                    return "break"
-                target_spinbox.bind("<MouseWheel>", on_target_scroll)
                 
                 self.timer_vars[target_timer_name].trace_add("write", make_trace_target(target_timer_name, _tfname, lo, hi))
                 
@@ -9742,7 +9403,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
             rowf.grid(row=r, column=0, sticky="w", pady=2)
             
-            checkbox = tk.Checkbutton(rowf, text=name, variable=self.toggle_vars[name], 
+            checkbox = ThemedCheckbutton(rowf, text=name, variable=self.toggle_vars[name], 
                                     bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
                                     activebackground=_toggle_bg, activeforeground=_toggle_fg, 
                                     highlightthickness=0, bd=0, font=self._scaled_font(9), 
@@ -10216,6 +9877,12 @@ class App(tk.Tk, ColumnVisibilityMixin):
         except Exception as e:
             print(f"[FIRE BUTTON] Error auto-saving {tool}: {e}")
     
+    def _make_stepper(self, parent, lo, hi, variable, bg, fg, increment=1, command=None):
+        """Themed number stepper used for the VoiceAttack Controls timers"""
+        return Stepper(parent, lo, hi, variable, increment=increment, command=command, bg=bg, fg=fg,
+                       font=self._scaled_font(9), scale=self._scaled_px(100) / 100,
+                       accent=slider_colors(self.current_theme)["accent"])
+
     def _save_timer(self, timer_name: str, filename: str, lo: int, hi: int) -> None:
         """Save any timer to file immediately on change"""
         # Skip save during import to prevent feedback loop
@@ -12120,7 +11787,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
 
         def walk(widget):
             for child in widget.winfo_children():
-                option = {"Checkbutton": "variable", "Spinbox": "textvariable"}.get(child.winfo_class())
+                option = {"Checkbutton": "variable", "Spinbox": "textvariable", "Entry": "textvariable"}.get(child.winfo_class())
                 path = paths.get(str(child.cget(option))) if option else None
                 if path:
                     self._ship_diff_widgets.append((child, "fg", child.cget("fg"), (path,)))
@@ -13053,7 +12720,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         # Checkbox for "don't ask again"
         dont_ask_var = tk.IntVar(value=0)
-        checkbox = tk.Checkbutton(
+        checkbox = ThemedCheckbutton(
             dialog,
             text="Don't ask me again when changing paths",
             variable=dont_ask_var,
@@ -13292,7 +12959,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         if hasattr(self, 'color_menu'):
             self.color_menu.config(state=state)
         if hasattr(self, 'size_combo'):
-            self.size_combo.config(state="readonly" if enabled else "disabled")
+            self.size_combo.config(state="normal" if enabled else "disabled")
         if hasattr(self, '_apply_auto_prices_duration_state'):
             self._apply_auto_prices_duration_state()
 
@@ -13379,24 +13046,9 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.text_overlay.show_message(f"Prospector Filter: {filter_mode}")
 
     def _update_color_menu_display(self):
-        """Update the color menu button to show the selected color"""
+        """Redraw the colour swatches so the selected colour is ringed"""
         try:
-            color_name = self.text_overlay_color.get()
-            color_hex = self.color_options.get(color_name, "#FFFFFF")
-            
-            # For very light colors, use black text for readability on the button
-            if color_name in ["White", "Yellow", "Light Gray", "Light Green", "Light Blue", "Cyan"]:
-                text_color = "#000000"
-            else:
-                text_color = "#000000"
-            
-            # Update the option menu button appearance
-            self.color_menu.configure(
-                bg=color_hex,
-                fg=text_color,
-                activebackground=color_hex,
-                activeforeground=text_color
-            )
+            self.color_menu.refresh()
         except Exception as e:
             print(f"Error updating color menu display: {e}")
 
@@ -15416,7 +15068,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 backup_config.set(new_value)
             
             # All checkbox
-            all_cb = tk.Checkbutton(options_frame, text="📂 " + t('dialogs.backup_everything'),
+            all_cb = ThemedCheckbutton(options_frame, text="📂 " + t('dialogs.backup_everything'),
                                   variable=backup_all,
                                   command=on_all_change,
                                   bg="#1e1e1e", fg="#ffffff",
@@ -15431,7 +15083,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             sep.pack(fill="x", pady=10)
             
             # Individual checkboxes
-            presets_cb = tk.Checkbutton(options_frame, text="⚙️ " + t('dialogs.ship_presets'),
+            presets_cb = ThemedCheckbutton(options_frame, text="⚙️ " + t('dialogs.ship_presets'),
                                       variable=backup_presets,
                                       bg="#1e1e1e", fg="#ffffff",
                                       selectcolor="#2a2a2a",
@@ -15440,7 +15092,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                       font=self._scaled_font(10))
             presets_cb.pack(anchor="w", pady=2)
             
-            reports_cb = tk.Checkbutton(options_frame, text="📊 " + t('dialogs.mining_reports'),
+            reports_cb = ThemedCheckbutton(options_frame, text="📊 " + t('dialogs.mining_reports'),
                                       variable=backup_reports,
                                       bg="#1e1e1e", fg="#ffffff",
                                       selectcolor="#2a2a2a",
@@ -15449,7 +15101,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                       font=self._scaled_font(10))
             reports_cb.pack(anchor="w", pady=2)
             
-            bookmarks_cb = tk.Checkbutton(options_frame, text="🔖 " + t('dialogs.mining_bookmarks'),
+            bookmarks_cb = ThemedCheckbutton(options_frame, text="🔖 " + t('dialogs.mining_bookmarks'),
                                         variable=backup_bookmarks,
                                         bg="#1e1e1e", fg="#ffffff",
                                         selectcolor="#2a2a2a",
@@ -15458,7 +15110,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                         font=self._scaled_font(10))
             bookmarks_cb.pack(anchor="w", pady=2)
             
-            va_profile_cb = tk.Checkbutton(options_frame, text="🎤 " + t('dialogs.voiceattack_profile'),
+            va_profile_cb = ThemedCheckbutton(options_frame, text="🎤 " + t('dialogs.voiceattack_profile'),
                                          variable=backup_va_profile,
                                          bg="#1e1e1e", fg="#ffffff",
                                          selectcolor="#2a2a2a",
@@ -15467,7 +15119,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                          font=self._scaled_font(10))
             va_profile_cb.pack(anchor="w", pady=2)
             
-            userdb_cb = tk.Checkbutton(options_frame, text="💾 " + t('dialogs.user_database'),
+            userdb_cb = ThemedCheckbutton(options_frame, text="💾 " + t('dialogs.user_database'),
                                        variable=backup_userdb,
                                        bg="#1e1e1e", fg="#ffffff",
                                        selectcolor="#2a2a2a",
@@ -15476,7 +15128,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                        font=self._scaled_font(10))
             userdb_cb.pack(anchor="w", pady=2)
             
-            journals_cb = tk.Checkbutton(options_frame, text="📝 " + t('dialogs.journal_files'),
+            journals_cb = ThemedCheckbutton(options_frame, text="📝 " + t('dialogs.journal_files'),
                                         variable=backup_journals,
                                         bg="#1e1e1e", fg="#ffffff",
                                         selectcolor="#2a2a2a",
@@ -15485,7 +15137,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                         font=self._scaled_font(10))
             journals_cb.pack(anchor="w", pady=2)
             
-            config_cb = tk.Checkbutton(options_frame, text="🔧 " + t('dialogs.configuration'),
+            config_cb = ThemedCheckbutton(options_frame, text="🔧 " + t('dialogs.configuration'),
                                       variable=backup_config,
                                       bg="#1e1e1e", fg="#ffffff",
                                       selectcolor="#2a2a2a",
@@ -15916,7 +15568,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     restore_config.set(new_value)
             
             # Restore Everything checkbox
-            all_cb = tk.Checkbutton(options_frame, text=t('dialogs.restore_everything'),
+            all_cb = ThemedCheckbutton(options_frame, text=t('dialogs.restore_everything'),
                                   variable=restore_all,
                                   command=on_restore_all_change,
                                   bg="#1e1e1e", fg="#ffffff",
@@ -15932,7 +15584,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             
             # Checkboxes for available items
             if has_presets:
-                presets_cb = tk.Checkbutton(options_frame, text=t('dialogs.ship_presets'),
+                presets_cb = ThemedCheckbutton(options_frame, text=t('dialogs.ship_presets'),
                                           variable=restore_presets,
                                           bg="#1e1e1e", fg="#ffffff",
                                           selectcolor="#2a2a2a",
@@ -15942,7 +15594,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 presets_cb.pack(anchor="w", pady=2)
             
             if has_reports:
-                reports_cb = tk.Checkbutton(options_frame, text=t('dialogs.mining_reports'),
+                reports_cb = ThemedCheckbutton(options_frame, text=t('dialogs.mining_reports'),
                                           variable=restore_reports,
                                           bg="#1e1e1e", fg="#ffffff",
                                           selectcolor="#2a2a2a",
@@ -15952,7 +15604,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 reports_cb.pack(anchor="w", pady=2)
             
             if has_bookmarks:
-                bookmarks_cb = tk.Checkbutton(options_frame, text=t('dialogs.mining_bookmarks'),
+                bookmarks_cb = ThemedCheckbutton(options_frame, text=t('dialogs.mining_bookmarks'),
                                             variable=restore_bookmarks,
                                             bg="#1e1e1e", fg="#ffffff",
                                             selectcolor="#2a2a2a",
@@ -15962,7 +15614,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 bookmarks_cb.pack(anchor="w", pady=2)
             
             if has_va_profile:
-                va_profile_cb = tk.Checkbutton(options_frame, text=t('dialogs.voiceattack_profile'),
+                va_profile_cb = ThemedCheckbutton(options_frame, text=t('dialogs.voiceattack_profile'),
                                              variable=restore_va_profile,
                                              bg="#1e1e1e", fg="#ffffff",
                                              selectcolor="#2a2a2a",
@@ -15972,7 +15624,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 va_profile_cb.pack(anchor="w", pady=2)
             
             if has_userdb:
-                userdb_cb = tk.Checkbutton(options_frame, text=t('dialogs.user_database'),
+                userdb_cb = ThemedCheckbutton(options_frame, text=t('dialogs.user_database'),
                                           variable=restore_userdb,
                                           bg="#1e1e1e", fg="#ffffff",
                                           selectcolor="#2a2a2a",
@@ -15982,7 +15634,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 userdb_cb.pack(anchor="w", pady=2)
             
             if has_journals:
-                journals_cb = tk.Checkbutton(options_frame, text=t('dialogs.journal_files'),
+                journals_cb = ThemedCheckbutton(options_frame, text=t('dialogs.journal_files'),
                                            variable=restore_journals,
                                            bg="#1e1e1e", fg="#ffffff",
                                            selectcolor="#2a2a2a",
@@ -15992,7 +15644,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 journals_cb.pack(anchor="w", pady=2)
             
             if has_config:
-                config_cb = tk.Checkbutton(options_frame, text=t('dialogs.configuration'),
+                config_cb = ThemedCheckbutton(options_frame, text=t('dialogs.configuration'),
                                           variable=restore_config,
                                           bg="#1e1e1e", fg="#ffffff",
                                           selectcolor="#2a2a2a",
@@ -16363,14 +16015,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         ttk.Separator(row0_frame, orient="vertical").pack(side="left", fill="y", padx=(0, 15))
         
-        sell_cb = tk.Checkbutton(row0_frame, text=t('marketplace.sell'), variable=self.marketplace_sell_mode,
+        sell_cb = ThemedCheckbutton(row0_frame, text=t('marketplace.sell'), variable=self.marketplace_sell_mode,
                       command=self._on_sell_mode_toggle, bg=_mkt_cb_bg, fg="#e0e0e0", selectcolor=_mkt_cb_select,
                       activebackground=_mkt_cb_bg, activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=self._scaled_font(9))
         sell_cb.pack(side="left", padx=(0, 10))
         ToolTip(sell_cb, t('tooltips.sell_mode'))
         
-        buy_cb = tk.Checkbutton(row0_frame, text=t('marketplace.buy'), variable=self.marketplace_buy_mode,
+        buy_cb = ThemedCheckbutton(row0_frame, text=t('marketplace.buy'), variable=self.marketplace_buy_mode,
                       command=self._on_buy_mode_toggle, bg=_mkt_cb_bg, fg="#e0e0e0", selectcolor=_mkt_cb_select,
                       activebackground=_mkt_cb_bg, activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=self._scaled_font(9))
@@ -16486,7 +16138,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         row2_checks_frame.grid(row=1, column=2, sticky="w", padx=(15, 25), pady=(0, 8))
 
         self.marketplace_exclude_carriers = tk.BooleanVar(value=cfg.get('marketplace_exclude_carriers', True))
-        self.marketplace_exclude_cb = tk.Checkbutton(row2_checks_frame, text=t('marketplace.exclude_carriers'), variable=self.marketplace_exclude_carriers,
+        self.marketplace_exclude_cb = ThemedCheckbutton(row2_checks_frame, text=t('marketplace.exclude_carriers'), variable=self.marketplace_exclude_carriers,
                       command=self._save_marketplace_preferences,
                       bg=_mkt_cb_bg, fg="#e0e0e0", selectcolor=_mkt_cb_select,
                       activebackground=_mkt_cb_bg, activeforeground="#ffffff",
@@ -16499,7 +16151,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.marketplace_exclude_cb.config(state="disabled")
 
         self.marketplace_large_pad_only = tk.BooleanVar(value=cfg.get('marketplace_large_pad_only', False))
-        large_pad_cb = tk.Checkbutton(row2_checks_frame, text=t('marketplace.large_pads'), variable=self.marketplace_large_pad_only,
+        large_pad_cb = ThemedCheckbutton(row2_checks_frame, text=t('marketplace.large_pads'), variable=self.marketplace_large_pad_only,
                       command=self._save_marketplace_preferences,
                       bg=_mkt_cb_bg, fg="#e0e0e0", selectcolor=_mkt_cb_select,
                       activebackground=_mkt_cb_bg, activeforeground="#ffffff",
@@ -16665,14 +16317,14 @@ class App(tk.Tk, ColumnVisibilityMixin):
         
         ttk.Separator(row0_frame, orient="vertical").pack(side="left", fill="y", padx=(0, 15))
         
-        sell_cb = tk.Checkbutton(row0_frame, text=t('marketplace.sell'), variable=self.trade_sell_mode,
+        sell_cb = ThemedCheckbutton(row0_frame, text=t('marketplace.sell'), variable=self.trade_sell_mode,
                       command=self._on_trade_sell_mode_toggle, bg=_trade_cb_bg, fg="#e0e0e0", selectcolor=_trade_cb_select,
                       activebackground=_trade_cb_bg, activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=self._scaled_font(9))
         sell_cb.pack(side="left", padx=(0, 10))
         ToolTip(sell_cb, t('tooltips.sell_mode'))
         
-        buy_cb = tk.Checkbutton(row0_frame, text=t('marketplace.buy'), variable=self.trade_buy_mode,
+        buy_cb = ThemedCheckbutton(row0_frame, text=t('marketplace.buy'), variable=self.trade_buy_mode,
                       command=self._on_trade_buy_mode_toggle, bg=_trade_cb_bg, fg="#e0e0e0", selectcolor=_trade_cb_select,
                       activebackground=_trade_cb_bg, activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=self._scaled_font(9))
@@ -16779,7 +16431,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         row2_checks_frame.grid(row=1, column=2, sticky="w", padx=(15, 25), pady=(0, 8))
 
         self.trade_exclude_carriers = tk.BooleanVar(value=cfg.get('trade_exclude_carriers', True))
-        exclude_cb = tk.Checkbutton(row2_checks_frame, text=t('marketplace.exclude_carriers'), variable=self.trade_exclude_carriers,
+        exclude_cb = ThemedCheckbutton(row2_checks_frame, text=t('marketplace.exclude_carriers'), variable=self.trade_exclude_carriers,
                       command=self._save_trade_preferences,
                       bg=_trade_cb_bg, fg="#e0e0e0", selectcolor=_trade_cb_select,
                       activebackground=_trade_cb_bg, activeforeground="#ffffff",
@@ -16788,7 +16440,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         ToolTip(exclude_cb, t('tooltips.exclude_carriers'))
 
         self.trade_large_pad_only = tk.BooleanVar(value=cfg.get('trade_large_pad_only', False))
-        large_pad_cb = tk.Checkbutton(row2_checks_frame, text=t('marketplace.large_pads'), variable=self.trade_large_pad_only,
+        large_pad_cb = ThemedCheckbutton(row2_checks_frame, text=t('marketplace.large_pads'), variable=self.trade_large_pad_only,
                       command=self._save_trade_preferences,
                       bg=_trade_cb_bg, fg="#e0e0e0", selectcolor=_trade_cb_select,
                       activebackground=_trade_cb_bg, activeforeground="#ffffff",

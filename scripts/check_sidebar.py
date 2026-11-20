@@ -57,6 +57,7 @@ class SidebarChecks(unittest.TestCase):
                          [('Auto Deselect Prospector', 0), ('Other', 1), ('Voice Feedback', 1)]}
         a._save_all_to_txt = lambda: None
         a._set_status = lambda *args: None
+        a._ship_preset_done = lambda key: None
 
     def test_legacy_toggle_aliases_and_current_key_precedence(self):
         self.mapping_setup()

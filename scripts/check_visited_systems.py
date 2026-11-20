@@ -1,3 +1,4 @@
+from contextlib import closing
 import json
 import logging
 import os
@@ -123,7 +124,12 @@ class VisitTableChecks(unittest.TestCase):
             with tempfile.TemporaryDirectory() as folder, \
                     patch('session_statistics_panel._load_cfg', return_value={}), \
                     patch('session_statistics_panel.update_config_value'):
-                db = SimpleNamespace(get_recent_visited_systems=Mock(return_value=[dict(system='Sol', last_visit_date='2026-11-15T12:00:00Z', visits=3)]))
+                db_path = os.path.join(folder, 'user_data.db')
+                with closing(sqlite3.connect(db_path)) as connection:
+                    connection.execute('CREATE TABLE hotspot_data (system_name, body_name, material_name, '
+                                       'hotspot_count, overlap_tag, res_tag)')
+                db = SimpleNamespace(db_path=db_path, get_recent_visited_systems=Mock(
+                    return_value=[dict(system='Sol', last_visit_date='2026-11-15T12:00:00Z', visits=3)]))
                 finder = SimpleNamespace(systems_data={'sol': dict(x=0, y=0, z=0)})
                 obj = owner()
                 obj.reports_dir = folder
@@ -175,7 +181,7 @@ class VisitTableChecks(unittest.TestCase):
                         panel.book.select(tree.master.master)
                         root.update()
                         self.assertEqual(len(tree.get_children()), 10)
-                        self.assertEqual(str(panel.ship_combo.cget('state')), 'disabled')
+                        self.assertEqual(panel.filter_controls.winfo_manager(), '')
                         self.assertEqual(tree.heading('visits', 'text'), strings['statistics_expanded']['col_visits'])
                         for col in ('system', 'date', 'distance', 'visits'):
                             self.assertEqual(str(tree.column(col, 'anchor')), 'w')

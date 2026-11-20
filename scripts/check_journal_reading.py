@@ -31,6 +31,7 @@ def load_methods(filename, class_name, names):
     )], type_ignores=[]))
     namespace = dict(os=os, glob=glob, json=json, time=time, Optional=Optional, MISSIONS_AVAILABLE=False,
                      logging=logging, log=logging.getLogger('journal-check'),
+                     t=lambda key: key,
                      journal_resume_offset=journal_resume_offset,
                      read_complete_journal_lines=read_complete_journal_lines)
     exec(compile(module, filename, 'exec'), namespace)
@@ -287,6 +288,8 @@ class ProspectorReaderChecks(ReaderCases, unittest.TestCase):
         self.reader.after = Mock()
         self.reader._session_start = Mock()
         self.reader._auto_switch_to_mining_tab = Mock()
+        self.reader._read_initial_location_from_journal = Mock()
+        self.reader.last_system = self.reader.last_body = None
         self.start = self.reader._watch_once
         self.poll = self.reader._watch_once
         namespace = self.poll.__func__.__globals__

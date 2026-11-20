@@ -17,6 +17,7 @@ import requests
 from column_visibility_helper import ColumnVisibilityMixin
 from system_finder_api import SystemFinderAPI as API
 from ui.search_control import SearchControl
+from ui.striped_treeview import StripedTreeview
 from check_ring_finder_search import load_methods
 
 
@@ -32,7 +33,8 @@ Methods = load_methods('app/main.py', 'App', {
     '_search_systems', '_search_material_traders',
     '_use_current_system_sysfinder',
 })
-Methods._create_sysfinder_results_table.__globals__.update(ttk=ttk, threading=threading, logging=logging, SearchControl=SearchControl)
+Methods._create_sysfinder_results_table.__globals__.update(ttk=ttk, threading=threading, logging=logging, SearchControl=SearchControl,
+                                                          StripedTreeview=StripedTreeview)
 
 
 class App(Methods, ColumnVisibilityMixin):
@@ -296,7 +298,7 @@ class TableChecks(unittest.TestCase):
         source = ast.parse((ROOT / 'app/main.py').read_text(encoding='utf-8-sig'))
         cls = next(node for node in source.body if isinstance(node, ast.ClassDef) and node.name == 'App')
         build = next(node for node in cls.body if isinstance(node, ast.FunctionDef) and node.name == '_build_system_finder_tab')
-        namespace = dict(tk=tk, ttk=ttk, ToolTip=Mock(), modern_color=lambda color: color,
+        namespace = dict(tk=tk, ttk=ttk, ToolTip=Mock(), modern_color=lambda color: color, StripedTreeview=StripedTreeview,
                          t=translate(language),
                          create_action_button=lambda parent, primary=False, **kwargs: tk.Button(parent, **kwargs))
         exec(compile(ast.Module(body=[build], type_ignores=[]), 'app/main.py', 'exec'), namespace)

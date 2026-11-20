@@ -142,6 +142,13 @@ class ServiceStatusChecks(unittest.TestCase):
         tree = ast.parse(source)
         names = ('_update_market_api_status', '_update_footer_indicator')
         methods = [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name in names]
+        from ui.theme import get_theme_colors
+
+        class Tip:
+            def __init__(self, widget, text, **kwargs):
+                self.text = text
+                self.tooltip_window = None
+
         root = tk.Tk()
         root.withdraw()
         try:
@@ -153,23 +160,31 @@ class ServiceStatusChecks(unittest.TestCase):
                 for theme in ('modern', 'modern_slate', 'modern_orange', 'dark_gray', 'elite_orange'):
                     with self.subTest(language=language, theme=theme):
                         actions = tk.Frame(root)
-                        app = SimpleNamespace(_scaled_font=lambda size: ('Segoe UI', size))
-                        scope = dict(self=app, actions=actions, _info_bg='#14171B',
-                                     _info_theme=theme, tk=tk, t=translate, ToolTip=Mock())
-                        exec(block, scope)
+                        app = SimpleNamespace(_scaled_font=lambda size: ('Segoe UI', size), current_theme=theme,
+                                              _show_service_status=Mock())
+                        scope = dict(self=app, actions=actions, _info_bg='#14171B', tk=tk, t=translate,
+                                     ToolTip=Tip, get_theme_colors=get_theme_colors)
                         exec(compile(ast.Module(body=methods, type_ignores=[]), 'app/main.py', 'exec'), scope)
                         app._update_footer_indicator = lambda *args: scope['_update_footer_indicator'](app, *args)
-                        footer = app._footer_market_label.master
+                        exec(block, scope)
+                        label = app._footer_services_label
+                        footer = label.master
                         self.assertIs(footer.master, actions)
                         self.assertEqual(int(footer.grid_info()['column']), 1)
-                        self.assertEqual(footer.pack_slaves()[-1], app._footer_market_label)
-                        if theme.startswith('modern'):
-                            self.assertEqual(footer.pack_slaves()[:2], [app._footer_eddn_label, app._footer_spansh_label])
-                        for status, color in (('online', '#4FB87A'), ('offline', '#C06060')):
-                            scope['_update_market_api_status'](app, status)
-                            label = app._footer_market_label
-                            self.assertEqual(label.cget('text'), translate('system_finder.service_' + status).format(service=translate('status_bar.market_api')))
+                        self.assertEqual(footer.pack_slaves()[-1], label)
+                        self.assertEqual(label.cget('text'), translate('status_bar.services_checking'))
+                        market = translate('status_bar.market_api')
+                        for statuses, overall, color in (
+                                (('online', 'online', 'online'), 'online', '#4FB87A'),
+                                (('online', 'online', 'offline'), 'partial', '#D9A441'),
+                                (('offline', 'offline', 'offline'), 'offline', '#C06060')):
+                            app._update_footer_indicator('eddn', statuses[0])
+                            app._update_footer_indicator('spansh', statuses[1])
+                            scope['_update_market_api_status'](app, statuses[2])
+                            self.assertEqual(label.cget('text'), translate('status_bar.services_' + overall))
                             self.assertEqual(label.cget('fg'), color)
+                            self.assertEqual(app._footer_services_tip.text.splitlines()[-1],
+                                             translate('system_finder.service_' + statuses[2]).format(service=market))
                         actions.destroy()
         finally:
             root.destroy()
@@ -185,7 +200,7 @@ class ServiceStatusChecks(unittest.TestCase):
                 tree.__getitem__.return_value = ('mineral', 'rings')
                 tree.get_children.return_value = ()
                 panel = SimpleNamespace(rows=[], database_records=[], owner=SimpleNamespace(main_app=app),
-                                        database_summary=Mock(), database_tree=tree)
+                                        database_summary=Mock(), database_heading=Mock(), database_tree=tree)
                 with patch('session_statistics_panel.t', side_effect=lambda key: '{visited}' if key.endswith('database_totals') else 'Total'), \
                         patch('session_statistics_panel.scaled_font', return_value=('Segoe UI', 9)):
                     SessionStatisticsPanel._show_database(panel)

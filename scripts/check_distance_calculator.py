@@ -17,15 +17,18 @@ sys.path.insert(0, str(ROOT / 'app'))
 import requests
 from edsm_distance import EDSMDistanceCalculator
 from version import __version__
+from ui.theme import get_theme_colors
 
 
 source = ast.parse((ROOT / 'app/main.py').read_text(encoding='utf-8-sig'))
 original = next(node for node in source.body if isinstance(node, ast.ClassDef) and node.name == 'App')
-methods = [node for node in original.body if isinstance(node, ast.FunctionDef)
-           and node.lineno >= next(n.lineno for n in original.body if isinstance(n, ast.FunctionDef) and n.name == '_build_distance_calculator_tab')
-           and node.lineno < next(n.lineno for n in original.body if isinstance(n, ast.FunctionDef) and n.name == '_check_market_api_status')]
+_first = next(n.lineno for n in original.body if isinstance(n, ast.FunctionDef) and n.name == '_build_distance_calculator_tab')
+_last = next(n.lineno for n in original.body if isinstance(n, ast.FunctionDef) and n.name == '_check_market_api_status')
+# Methods plus class constants (such as _DISTANCE_RESULT_FIELDS) defined in the Distance Calculator section
+methods = [node for node in original.body if isinstance(node, (ast.FunctionDef, ast.Assign))
+           and _first <= node.lineno < _last]
 node = ast.ClassDef(name='App', bases=[], keywords=[], body=methods, decorator_list=[])
-namespace = dict(tk=tk, ttk=ttk, logging=logging, threading=threading,
+namespace = dict(tk=tk, ttk=ttk, logging=logging, threading=threading, get_theme_colors=get_theme_colors,
                  ToolTip=Mock(), compact_classic_button=Mock(),
                  create_action_button=lambda parent, primary=False, **kwargs: tk.Button(parent, **kwargs))
 exec(compile(ast.fix_missing_locations(ast.Module(body=[node], type_ignores=[])), 'app/main.py', 'exec'), namespace)
@@ -106,7 +109,8 @@ def app():
                 'a_sol_label', 'b_sol_label', 'a_coords_label', 'b_coords_label',
                 'a_visits_label', 'b_visits_label', 'to_home_label', 'to_fc_label'):
         setattr(obj, 'distance_' + key, Widget())
-    for key in ('current_sol_label', 'home_sol_label', 'fc_sol_label', 'home_visits_label', 'fc_visits_label'):
+    for key in ('current_sol_label', 'home_sol_label', 'fc_sol_label', 'home_visits_label', 'fc_visits_label',
+                'distance_visits_label'):
         setattr(obj, key, Widget())
     for key, value in dict(system_a='A', system_b='B', current_system='Current', home_system='Home', fc_system='Carrier').items():
         setattr(obj, 'distance_' + key, Variable(value))
@@ -122,6 +126,7 @@ def app():
     obj.distance_refresh_btn = Widget()
     obj._distance_values = {}
     obj._set_status = Mock()
+    obj._show_notice = lambda label, msg, clear_after=6000, fg=None: label.config(text=msg)
     obj._save_distance_systems = Mock()
     obj.queue = Queue()
     obj.after = obj.queue.after
@@ -271,7 +276,7 @@ class RefreshChecks(unittest.TestCase):
         with patch('threading.Thread', InlineThread):
             obj._distance_refresh_locations()
             obj.queue.flush()
-        self.assertIn('scan error', obj._set_status.call_args.args[0])
+        self.assertIn('scan error', obj.distance_status_label.cget('text'))
 
     def test_home_can_be_cleared_without_enter(self):
         obj = app()

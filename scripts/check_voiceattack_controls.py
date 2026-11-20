@@ -139,7 +139,7 @@ class VoiceAttackChecks(unittest.TestCase):
         self.assertEqual(calls, ['bookmarks', {'system': 'Sol', 'body': 'Sol A 1 A Ring'}])
 
     def test_app_profile_commands_write_matching_actions(self):
-        profile = ET.parse(ROOT / 'Voiceattack Profile/EliteMining v5.6.5-Profile.vap')
+        profile = ET.parse(ROOT / 'Voiceattack Profile/EliteMining v5.6.6-Profile.vap')
         phrases = {
             'SIDEBAR:HIDE': 'Hide sidebar', 'SIDEBAR:SHOW': 'Show sidebar',
             'SIDEBAR:SWAP': 'Swap sidebar panels', 'TAB:REPORTS': 'Show mining reports',
@@ -230,20 +230,31 @@ class VoiceAttackChecks(unittest.TestCase):
         app._save_thrust_closed = lambda: None
         app._save_all_to_txt = lambda: None
         app._set_status = lambda *args: None
+        app._ship_preset_done = lambda key: None
         for saved, expected in ((0.0, 0.0), (0.4, 0.4), (1.6, 1.6), (-1, 0.0), (6, 5.0)):
             with self.subTest(saved=saved), contextlib.redirect_stdout(io.StringIO()):
                 app._apply_mapping({'ThrustClosed': saved})
                 self.assertEqual(app.thrust_closed_var.get(), expected)
 
     def test_open_thrust_wheel_stops_at_one_second(self):
-        node = next(n for n in ast.walk(METHODS['_build_timers_tab'])
-                    if isinstance(n, ast.FunctionDef) and n.name == 'on_thrust_open_scroll')
-        self.app.thrust_open_var = tk.DoubleVar(master=self.tcl, value=1.0)
+        call = next(n for n in ast.walk(METHODS['_build_timers_tab'])
+                    if isinstance(n, ast.Call) and getattr(n.func, 'attr', '') == '_make_stepper'
+                    and ast.unparse(n.args[3]) == 'self.thrust_open_var')
+        self.assertEqual(ast.literal_eval(call.args[1]), 1.0)
+        keywords = {k.arg: ast.unparse(k.value) for k in call.keywords}
+        self.assertEqual(keywords.get('command'), 'self._save_thrust_open')
+
+        stepper_ns = {}
+        exec((ROOT / 'app/ui/stepper.py').read_text(encoding='utf-8'), stepper_ns)
+        Stepper = stepper_ns['Stepper']
+        root = tk.Tk()
+        root.withdraw()
+        self.addCleanup(root.destroy)
+        var = tk.DoubleVar(master=root, value=1.0)
         saves = []
-        self.app._save_thrust_open = lambda: saves.append(self.app.thrust_open_var.get())
-        ns = dict(self.ns, self=self.app)
-        exec(compile(ast.Module(body=[node], type_ignores=[]), 'wheel_check', 'exec'), ns)
-        ns['on_thrust_open_scroll'](types.SimpleNamespace(delta=-120))
+        stepper = Stepper(root, ast.literal_eval(call.args[1]), ast.literal_eval(call.args[2]), var,
+                          increment=0.1, command=lambda: saves.append(var.get()))
+        stepper._on_wheel(types.SimpleNamespace(delta=-120))
         self.assertEqual(saves, [1.0])
 
 

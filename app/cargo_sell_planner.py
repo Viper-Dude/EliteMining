@@ -1,5 +1,6 @@
 """Whole-hold sale plans using reported market prices and demand."""
 from ui.striped_treeview import StripedTreeview
+from ui.themed_checkbox import ThemedCheckbutton
 from ui.theme import modern_color
 import math
 import threading
@@ -165,8 +166,8 @@ class CargoSellPlanner(ColumnVisibilityMixin):
         self.radius_combo = ttk.Combobox(filters, textvariable=self.radius, values=('50', '100', '150', '250', '500'),
                                         state='readonly', width=6)
         self.radius_combo.pack(side='left', padx=6)
-        ttk.Checkbutton(filters, text=t('marketplace.large_pads'), variable=self.large).pack(side='left', padx=8)
-        ttk.Checkbutton(filters, text=t('marketplace.exclude_carriers'), variable=self.carriers).pack(side='left', padx=8)
+        ThemedCheckbutton(filters, text=t('marketplace.large_pads'), variable=self.large).pack(side='left', padx=8)
+        ThemedCheckbutton(filters, text=t('marketplace.exclude_carriers'), variable=self.carriers).pack(side='left', padx=8)
         ttk.Label(filters, text=t('marketplace.max_age')).pack(side='left')
         self.age_combo = ttk.Combobox(filters, textvariable=self.age, values=[app._age_map[k] for k in app._age_order],
                                      state='readonly', width=12)

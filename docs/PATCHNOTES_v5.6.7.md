@@ -5,10 +5,12 @@
 
 - Hover the Updated column wherever prices are shown to see where each price came from.
 - Sell My Hold now shows the landing pad size of each station.
+- New modern look for sliders, number boxes, checkboxes and the text color and size options.
 
 
 ## Bug Fixes
 
+- Typed timer values in VoiceAttack Controls are now saved right away.
 
 
 ### Voiceattack Profile - no update (V5.6.6)

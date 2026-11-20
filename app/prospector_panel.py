@@ -1,4 +1,5 @@
 from ui.striped_treeview import StripedTreeview
+from ui.themed_checkbox import ThemedCheckbutton
 from ui.theme import modern_color
 from ui.tooltip import build_tooltip_label
 # ================================================================
@@ -2203,7 +2204,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         auto_start_ui_value = 1 if self.auto_start_on_prospector else 0
         print(f"[DEBUG] UI Init - auto_start boolean: {self.auto_start_on_prospector}, UI value: {auto_start_ui_value}")
         self.auto_start_var = tk.IntVar()  # Initialize without value first
-        auto_start_cb = tk.Checkbutton(
+        auto_start_cb = ThemedCheckbutton(
             options_frame, 
             text=t('mining_session.auto_start'), 
             variable=self.auto_start_var,
@@ -2228,7 +2229,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         self.ToolTip(auto_start_cb, t('tooltips.auto_start'))
 
         self.auto_end_var = tk.IntVar(value=1 if self.auto_end_session else 0)
-        auto_end_cb = tk.Checkbutton(
+        auto_end_cb = ThemedCheckbutton(
             options_frame,
             text=t('mining_session.auto_end'),
             variable=self.auto_end_var,
@@ -2257,7 +2258,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         initial_prompt_value = 1 if self.prompt_on_cargo_full else 0
         print(f"[DEBUG] UI Init - prompt_on_cargo_full boolean: {self.prompt_on_cargo_full}, UI value: {initial_prompt_value}")
         self.prompt_on_full_var = tk.IntVar()  # Initialize without value first
-        self.prompt_on_full_cb = tk.Checkbutton(
+        self.prompt_on_full_cb = ThemedCheckbutton(
             options_frame, 
             text=t('mining_session.prompt_when_full'), 
             variable=self.prompt_on_full_var,
@@ -2295,7 +2296,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin):
         multi_session_ui_value = 1 if self.multi_session_mode else 0
         print(f"[DEBUG] UI Init - multi_session_mode boolean: {self.multi_session_mode}, UI value: {multi_session_ui_value}")
         self.multi_session_var = tk.IntVar()  # Initialize without value first
-        multi_session_cb = tk.Checkbutton(
+        multi_session_cb = ThemedCheckbutton(
             options_frame, 
             text=t('mining_session.multi_session'), 
             variable=self.multi_session_var,

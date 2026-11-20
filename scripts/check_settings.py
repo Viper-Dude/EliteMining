@@ -209,6 +209,7 @@ class SettingsChecks(unittest.TestCase):
         self.app.geometry = lambda: '1000x700+0+0'
         self.app._save_sash_positions_now = lambda: None
         self.app.destroy = lambda: None
+        self.app._confirm_unsaved_presets = lambda: True
 
         def launch(*args, **kwargs):
             disk = json.loads(Path(self.config.CONFIG_FILE).read_text())

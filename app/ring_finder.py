@@ -6,6 +6,9 @@ Provides mining hotspot location services with live API data integration
 from ui.striped_treeview import StripedTreeview
 from ui.theme import modern_color
 from ui.search_control import SearchControl
+from ui.stepper import Stepper
+from ui.themed_checkbox import ThemedCheckbutton
+from ui.themed_slider import slider_colors
 
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -658,7 +661,7 @@ class RingFinder(ColumnVisibilityMixin):
         
         # "Any Ring" checkbox - DISABLED (hidden) - searches Spansh for rings without requiring hotspot data
         self.any_ring_var = tk.BooleanVar(value=False)
-        self.any_ring_cb = tk.Checkbutton(search_frame, text=t('ring_finder.any_ring'),
+        self.any_ring_cb = ThemedCheckbutton(search_frame, text=t('ring_finder.any_ring'),
                                           variable=self.any_ring_var,
                                           command=self._on_any_ring_changed,
                                           bg=_cb_bg, fg="#e0e0e0",
@@ -753,7 +756,7 @@ class RingFinder(ColumnVisibilityMixin):
         _flag_parent = self._rf_flags if _modern_form else misc_inner_row
         ttk.Label(_flag_parent, text=t('ring_finder.unvisited_only') + ":", foreground=unvisited_fg).pack(side="left")
         self.unvisited_only_var = tk.BooleanVar(value=False)
-        self.unvisited_only_cb = tk.Checkbutton(_flag_parent,
+        self.unvisited_only_cb = ThemedCheckbutton(_flag_parent,
                                                 variable=self.unvisited_only_var,
                                                 command=self._save_filter_settings,
                                                 bg=_cb_bg,
@@ -764,7 +767,7 @@ class RingFinder(ColumnVisibilityMixin):
 
         ttk.Label(_flag_parent, text=t('ring_finder.favourites_only') + ":", foreground=unvisited_fg).pack(side="left")
         self.favourites_only_var = tk.BooleanVar(value=False)
-        self.favourites_only_cb = tk.Checkbutton(_flag_parent,
+        self.favourites_only_cb = ThemedCheckbutton(_flag_parent,
                                                 variable=self.favourites_only_var,
                                                 command=self._on_favourites_only_changed,
                                                 bg=_cb_bg,
@@ -805,7 +808,7 @@ class RingFinder(ColumnVisibilityMixin):
         _overlaps_align_spacer.pack_propagate(False)
 
         self.overlaps_only_var = tk.BooleanVar(value=False)
-        self.overlaps_only_cb = tk.Checkbutton(right_filters_frame_row1, text=t('ring_finder.overlaps_only'),
+        self.overlaps_only_cb = ThemedCheckbutton(right_filters_frame_row1, text=t('ring_finder.overlaps_only'),
                                                variable=self.overlaps_only_var,
                                                command=self._on_overlaps_only_changed,
                                                bg=_cb_bg, fg="#e0e0e0",
@@ -817,7 +820,7 @@ class RingFinder(ColumnVisibilityMixin):
 
         # RES Only checkbox - filters to show only RES site entries
         self.res_only_var = tk.BooleanVar(value=False)
-        self.res_only_cb = tk.Checkbutton(right_filters_frame_row1, text=t('ring_finder.res_only'),
+        self.res_only_cb = ThemedCheckbutton(right_filters_frame_row1, text=t('ring_finder.res_only'),
                                           variable=self.res_only_var,
                                           command=self._on_res_only_changed,
                                           bg=_cb_bg, fg="#e0e0e0",
@@ -829,7 +832,7 @@ class RingFinder(ColumnVisibilityMixin):
 
         # Ring Type Only checkbox - searches for ring types regardless of hotspot data (Spansh only)
         self.ring_type_only_var = tk.BooleanVar(value=False)
-        self.ring_type_only_cb = tk.Checkbutton(right_filters_frame_row1, text=t('ring_finder.ring_search_spansh'),
+        self.ring_type_only_cb = ThemedCheckbutton(right_filters_frame_row1, text=t('ring_finder.ring_search_spansh'),
                                                  variable=self.ring_type_only_var,
                                                  command=self._on_ring_type_only_changed,
                                                  bg=_cb_bg, fg="#e0e0e0",
@@ -877,37 +880,12 @@ class RingFinder(ColumnVisibilityMixin):
         self.min_hotspots_var = tk.IntVar(value=1)  # Changed to IntVar for spinbox
         # Determine spinbox text color based on theme
         _spinbox_fg = "#ff8c00" if _cb_theme == "elite_orange" else "#ffffff"
-        self.min_hotspots_spinbox = tk.Spinbox(right_filters_frame_row2, 
-                                                 textvariable=self.min_hotspots_var, 
-                                                 from_=1, 
-                                                 to=20, 
-                                                 width=6,
-                                                 state="disabled",  # Start disabled (greyed out)
-                                                 wrap=False,
-                                                 command=lambda: None,
-                                                 bg="#1e1e1e", fg=_spinbox_fg, buttonbackground="#2d2d2d",
-                                                 insertbackground=_spinbox_fg, selectbackground="#4a6a8a",
-                                                 disabledbackground="#1e1e1e", disabledforeground="#666666",
-                                                 relief="solid", bd=0, highlightthickness=1,
-                                                 highlightbackground="#ffffff", highlightcolor="#ffffff",
-                                                 font=scaled_font(9))
+        self.min_hotspots_spinbox = Stepper(right_filters_frame_row2, 1, 20, self.min_hotspots_var, bg=_cb_bg,
+                                            fg=_spinbox_fg, font=scaled_font(9), scale=scaled_px(100) / 100,
+                                            accent=slider_colors(_cb_theme)["accent"])
         self.min_hotspots_spinbox.pack(side="left")
-        # Add mouse wheel support
-        def on_min_hotspots_scroll(event):
-            if str(self.min_hotspots_spinbox.cget('state')) == 'disabled':
-                return
-            try:
-                current = int(self.min_hotspots_var.get())
-                if event.delta > 0:
-                    new_val = min(current + 1, 20)
-                else:
-                    new_val = max(current - 1, 1)
-                self.min_hotspots_var.set(new_val)
-            except:
-                pass
-            return "break"
-        self.min_hotspots_spinbox.bind("<MouseWheel>", on_min_hotspots_scroll)
-        ToolTip(self.min_hotspots_spinbox, t('tooltips.min_hotspots'))
+        self.min_hotspots_spinbox.configure(state="disabled")  # enabled when a specific mineral is chosen
+        ToolTip(self.min_hotspots_spinbox.entry, t('tooltips.min_hotspots'))
         
         # NOW bind material selection to enable/disable min hotspots filter (after spinbox exists!)
         self.specific_material_combo.bind('<<ComboboxSelected>>', self._on_material_changed)
@@ -947,7 +925,7 @@ class RingFinder(ColumnVisibilityMixin):
         self.data_source_spansh_rb.pack(side="left", padx=(0, 15))
         
         self.auto_save_var = tk.BooleanVar(value=False)
-        self.auto_save_cb = tk.Checkbutton(source_frame, text=t('ring_finder.auto_save'), variable=self.auto_save_var,
+        self.auto_save_cb = ThemedCheckbutton(source_frame, text=t('ring_finder.auto_save'), variable=self.auto_save_var,
                       command=self._save_filter_settings, **rb_style)
         self.auto_save_cb.pack(side="left", padx=(0, 15))
         self.auto_save_cb.configure(state="disabled")  # enabled by _on_data_source_changed for Spansh/Both
@@ -959,7 +937,7 @@ class RingFinder(ColumnVisibilityMixin):
 
         self.spansh_pp_var = tk.BooleanVar(value=False)
         self._spansh_pp_stashed = False
-        self.spansh_pp_cb = tk.Checkbutton(source_frame, text=t('ring_finder.spansh_pp_lookup'), variable=self.spansh_pp_var,
+        self.spansh_pp_cb = ThemedCheckbutton(source_frame, text=t('ring_finder.spansh_pp_lookup'), variable=self.spansh_pp_var,
                       command=self._save_filter_settings, **rb_style)
         self.spansh_pp_cb.pack(side="left")
         ToolTip(self.spansh_pp_cb, t('ring_finder.spansh_pp_lookup_tooltip'))
@@ -975,7 +953,7 @@ class RingFinder(ColumnVisibilityMixin):
         # Confirmed hotspots only checkbox - DISABLED FOR TESTING
         # try:
         #     self.confirmed_only_var = tk.BooleanVar(value=False)
-        #     self.confirmed_checkbox = tk.Checkbutton(search_frame, 
+        #     self.confirmed_checkbox = ThemedCheckbutton(search_frame, 
         #                                       text="Confirmed hotspots only",
         #                                       variable=self.confirmed_only_var,
         #                                       fg="#cccccc", bg="#1e1e1e", 
@@ -6782,7 +6760,7 @@ class RingFinder(ColumnVisibilityMixin):
         for m in minerals:
             var = tk.BooleanVar(value=True)
             vars_[m] = var
-            tk.Checkbutton(frame, text=get_material(m), variable=var, bg=bg, fg=fg, selectcolor=bg,
+            ThemedCheckbutton(frame, text=get_material(m), variable=var, bg=bg, fg=fg, selectcolor=bg,
                            activebackground=bg, activeforeground=fg, highlightthickness=0, bd=0,
                            anchor="w").pack(fill="x")
 
@@ -7361,7 +7339,7 @@ class RingFinder(ColumnVisibilityMixin):
         options_row = tk.Frame(frame, bg=bg)
         options_row.pack(fill="x", pady=(0, 8))
 
-        pp_check = tk.Checkbutton(options_row, text=t('ring_finder.pp_mode_checkbox'),
+        pp_check = ThemedCheckbutton(options_row, text=t('ring_finder.pp_mode_checkbox'),
                                   variable=pp_mode_var, bg=bg, fg=fg,
                                   activebackground=bg, activeforeground=fg,
                                   selectcolor=bg, font=scaled_font(9))
@@ -7475,7 +7453,7 @@ class RingFinder(ColumnVisibilityMixin):
                 list_canvas.create_window((0, 0), window=checklist_frame, anchor="nw")
 
                 for mat in extra_candidates:
-                    tk.Checkbutton(checklist_frame, text=self._format_material_for_display(mat),
+                    ThemedCheckbutton(checklist_frame, text=self._format_material_for_display(mat),
                                    variable=extra_checked_vars[mat],
                                    command=lambda m=mat: on_extra_mineral_toggle(m),
                                    bg=bg, fg=fg, activebackground=bg, activeforeground=fg,
@@ -8091,7 +8069,7 @@ class RingFinder(ColumnVisibilityMixin):
                                                 cached['rows_by_material'], cached['candidate_coords'],
                                                 cached['max_distance'], pp_mode_var.get(), dialog, status_label, search_btn)
 
-        pp_check = tk.Checkbutton(second_row, text=t('ring_finder.pp_mode_checkbox_target'),
+        pp_check = ThemedCheckbutton(second_row, text=t('ring_finder.pp_mode_checkbox_target'),
                                   variable=pp_mode_var, command=on_pp_mode_toggle, bg=bg, fg=fg,
                                   activebackground=bg, activeforeground=fg,
                                   selectcolor=bg, font=scaled_font(9))
@@ -10829,7 +10807,7 @@ class RingFinder(ColumnVisibilityMixin):
                     for j, (text, tag) in enumerate(res_options):
                         on = tag.lower() in current_res or (tag == "Hazardous" and "haz" in current_res)
                         flags[tag] = tk.BooleanVar(value=on)
-                        tk.Checkbutton(grid, text=text, variable=flags[tag], **cb_style).grid(row=i, column=2 + j, sticky="w")
+                        ThemedCheckbutton(grid, text=text, variable=flags[tag], **cb_style).grid(row=i, column=2 + j, sticky="w")
                     res_vars[mat] = (flags, {tag for tag, v in flags.items() if v.get()})
 
             # Ring type, visits, density
@@ -11701,10 +11679,10 @@ class RingFinder(ColumnVisibilityMixin):
             cb_style = {"bg": "#1e1e1e", "fg": "#e0e0e0", "activebackground": "#2b2b2b", 
                         "activeforeground": "#ffffff", "selectcolor": "#333333", "relief": "flat"}
             
-            tk.Checkbutton(res_frame, text="Haz", variable=haz_var, **cb_style).pack(side="left", padx=(0, 12))
-            tk.Checkbutton(res_frame, text="High", variable=high_var, **cb_style).pack(side="left", padx=(0, 12))
-            tk.Checkbutton(res_frame, text="Normal", variable=normal_var, **cb_style).pack(side="left", padx=(0, 12))
-            tk.Checkbutton(res_frame, text="Low", variable=low_var, **cb_style).pack(side="left")
+            ThemedCheckbutton(res_frame, text="Haz", variable=haz_var, **cb_style).pack(side="left", padx=(0, 12))
+            ThemedCheckbutton(res_frame, text="High", variable=high_var, **cb_style).pack(side="left", padx=(0, 12))
+            ThemedCheckbutton(res_frame, text="Normal", variable=normal_var, **cb_style).pack(side="left", padx=(0, 12))
+            ThemedCheckbutton(res_frame, text="Low", variable=low_var, **cb_style).pack(side="left")
             
             # Helper label
             ttk.Label(frame, text=t('context_menu.res_multi_hint'), font=scaled_font(8, "italic"),

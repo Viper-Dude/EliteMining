@@ -141,14 +141,14 @@ Gold:
         self.assertEqual(ranked[0]['count'], 2)
         self.assertAlmostEqual(ranked[0]['hours'], 1.01)
 
-    def test_recent_has_ten_distinct_locations_not_ten_sessions(self):
+    def test_recent_has_twenty_distinct_locations_not_twenty_sessions(self):
         rows = sessions()
         for i, row in enumerate(rows):
             row['body'] = str(i)
         best, recent = location_summary(rows)
-        self.assertEqual(len(best), 10)
+        self.assertEqual(len(best), 20)
         self.assertEqual(best[0]['best']['_tph'], 123)
-        self.assertEqual(len(recent), 10)
+        self.assertEqual(len(recent), 20)
         self.assertEqual(recent[0]['latest']['body'], '23')
 
     def test_nonmining_visits_excluded(self):

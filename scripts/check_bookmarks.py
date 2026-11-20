@@ -25,6 +25,7 @@ from mining_statistics import session_date
 from column_visibility_helper import ColumnVisibilityMixin, displayed_column
 from user_database import UserDatabase
 from journal_parser import JournalParser
+from ui.striped_treeview import StripedTreeview
 
 Panel = load_methods('app/prospector_panel.py', 'ProspectorPanel', {
     '_save_bookmarks', '_bookmark_location_key', '_find_bookmark', '_bookmark_ring_type',
@@ -40,7 +41,7 @@ G = Panel._save_bookmarks.__globals__
 G.update(os=os, json=json, tempfile=tempfile, re=re, dt=dt, tk=tk, ttk=ttk,
          log=logging.getLogger('bookmarks-check'), centered_message=Mock(),
          centered_askyesno=Mock(return_value=True), session_date=session_date, JournalParser=JournalParser,
-         displayed_column=displayed_column, get_app_icon_path=lambda: None,
+         displayed_column=displayed_column, get_app_icon_path=lambda: None, StripedTreeview=StripedTreeview,
          t=localization.t, get_material=localization.get_material,
          get_abbr=localization.get_abbr, to_english=localization.to_english,
          scaled_font=lambda size, *style: ('Segoe UI', size, *style), scaled_px=lambda n: n)

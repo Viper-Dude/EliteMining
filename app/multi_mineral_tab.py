@@ -1,5 +1,6 @@
 """Multi-Mineral sub-tab of Commodity Market: find the best stations to sell several minerals at once."""
 from ui.striped_treeview import StripedTreeview
+from ui.themed_checkbox import ThemedCheckbutton
 from ui.theme import modern_color
 import threading
 import tkinter as tk
@@ -68,7 +69,7 @@ class MultiMineralTab:
         for name in MINING_COMMODITY_ORDER:
             var = tk.BooleanVar(value=False)
             self._mineral_vars[name] = var
-            cb = tk.Checkbutton(grid, text=app._commodity_map.get(name, name), variable=var,
+            cb = ThemedCheckbutton(grid, text=app._commodity_map.get(name, name), variable=var,
                                 command=lambda n=name: self._on_toggle(n),
                                 bg=bg, fg="#e0e0e0", selectcolor=bg, activebackground=bg,
                                 activeforeground="#ffffff", highlightthickness=0, bd=0, relief="flat",
@@ -88,7 +89,7 @@ class MultiMineralTab:
         self.station_var.trace_add('write', self._on_station_type_change)
         for text, var in ((t('marketplace.exclude_carriers'), self.exclude_carriers_var),
                           (t('marketplace.large_pads'), self.large_pad_var)):
-            cb = tk.Checkbutton(filt, text=text, variable=var, bg=bg, fg="#e0e0e0", selectcolor=bg,
+            cb = ThemedCheckbutton(filt, text=text, variable=var, bg=bg, fg="#e0e0e0", selectcolor=bg,
                            activebackground=bg, activeforeground="#ffffff", highlightthickness=0, bd=0,
                            relief="flat", font=app._scaled_font(9))
             if var is self.exclude_carriers_var:

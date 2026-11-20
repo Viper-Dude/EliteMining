@@ -374,9 +374,10 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
                     rows = []
                 user_db = getattr(getattr(app, 'cargo_monitor', None), 'user_db', None)
                 import sqlite3
+                from contextlib import closing
                 records = []
                 if user_db:
-                    with sqlite3.connect(user_db.db_path) as connection:
+                    with closing(sqlite3.connect(user_db.db_path)) as connection:
                         records = connection.execute('SELECT system_name, body_name, material_name, hotspot_count, overlap_tag, res_tag FROM hotspot_data').fetchall()
                 visited = user_db.get_recent_visited_systems(limit=20) if user_db else []
                 for row in visited:
