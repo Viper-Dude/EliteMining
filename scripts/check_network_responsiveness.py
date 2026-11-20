@@ -46,8 +46,12 @@ App = load_methods('App', {
 })
 Monitor = load_methods('CargoMonitor', {'_process_scan_event', '_process_journal_event_impl'},
                        'app/cargo_monitor.py')
-Panel = load_methods('ProspectorPanel', {'_share_to_discord', '_finish_discord_share'},
-                     'app/prospector_panel.py')
+from localization import t
+from mining_card_mixin import MiningCardMixin
+
+
+class Panel(MiningCardMixin, load_methods('ProspectorPanel', {'_finish_discord_share'}, 'app/prospector_panel.py')):
+    pass
 
 
 class UploadChecks(unittest.TestCase):
@@ -436,13 +440,15 @@ class DiscordChecks(unittest.TestCase):
         self.panel.reports_tree_tab = SimpleNamespace(selection=lambda: ['one'])
         self.session = dict(system='Sol', body='1 A Ring', tph=100)
         self.panel.reports_tab_session_lookup = {'one': self.session}
-        self.panel._get_discord_username = Mock(return_value=('CMDR', 'Comment'))
+        self.panel._get_cmdr_info_for_card = Mock(return_value={'cmdr': 'CMDR', 'comment': 'Comment'})
+        self.panel._generate_mining_card = Mock(return_value='card.png')
+        self.panel._update_card_button = Mock()
         self.dialog, self.send = Mock(), Mock(return_value=(True, 'Posted'))
         helpers = ModuleType('app_utils')
         helpers.centered_message = self.dialog
         discord = ModuleType('discord_integration')
         discord.is_discord_enabled = lambda: True
-        discord.send_discord_report = self.send
+        discord.send_mining_card = self.send
         modules = patch.dict(sys.modules, app_utils=helpers, discord_integration=discord)
         modules.start()
         self.addCleanup(modules.stop)
@@ -474,7 +480,7 @@ class DiscordChecks(unittest.TestCase):
         started, release = threading.Event(), threading.Event()
         self.addCleanup(release.set)
 
-        def send(data):
+        def send(card_path, content):
             started.set()
             release.wait(3)
             return True, 'Posted'
@@ -485,17 +491,20 @@ class DiscordChecks(unittest.TestCase):
             self.assertTrue(started.wait(1))
             self.assertTrue(self.workers[0].is_alive())
             self.panel._share_to_discord()
-            self.panel._get_discord_username.assert_called_once()
+            self.panel._get_cmdr_info_for_card.assert_called_once()
             self.assertEqual(self.send.call_count, 1)
             self.dialog.assert_not_called()
             self.session['system'] = 'Achenar'
         finally:
             release.set()
             self.flush()
-        data = self.send.call_args.args[0]
-        self.assertEqual((data['system'], data['discord_username'], data['discord_comment']),
-                         ('Sol', 'CMDR', 'Comment'))
-        self.dialog.assert_called_once_with(self.parent, 'Discord Share', 'Posted')
+        card, content = self.send.call_args.args
+        self.assertEqual(card, 'card.png')
+        self.assertIn('```Sol```', content)
+        self.assertIn('1 A Ring', content)
+        self.panel._generate_mining_card.assert_called_once_with(
+            self.session, {'cmdr': 'CMDR', 'comment': 'Comment'}, open_card=False)
+        self.dialog.assert_called_once_with(self.parent, 'Discord Share', t('mining_card.shared'))
         self.panel._set_status.assert_called_once_with('Report shared to Discord successfully!')
         self.assertFalse(self.panel._discord_share_in_progress)
 
@@ -508,10 +517,11 @@ class DiscordChecks(unittest.TestCase):
         self.assertFalse(self.panel._discord_share_in_progress)
 
     def test_cancel_does_not_send_and_close_suppresses_late_dialog(self):
-        self.panel._get_discord_username.return_value = None, None
+        self.panel._get_cmdr_info_for_card.return_value = None
         self.panel._share_to_discord()
         self.send.assert_not_called()
-        self.panel._get_discord_username.return_value = 'CMDR', None
+        self.panel._generate_mining_card.assert_not_called()
+        self.panel._get_cmdr_info_for_card.return_value = {'cmdr': 'CMDR', 'comment': None}
         self.panel._share_to_discord()
         self.join_workers()
         self.parent._network_closing = True

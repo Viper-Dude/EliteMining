@@ -2,6 +2,7 @@
 
 import logging
 import os
+import re
 
 from config import scaled_font
 
@@ -15,166 +16,117 @@ log = logging.getLogger("prospector_panel")
 
 
 class MiningCardMixin:
-    def _get_cmdr_info_for_card(self):
-        """Get CMDR name and comment for mining card (similar to Discord share)"""
+    def _get_cmdr_info_for_card(self, session=None, share=False):
+        """Get CMDR name and comment for the card; None means cancelled."""
         try:
             from config import _load_cfg
-            
-            # Check if CMDR name is already saved
-            cfg = _load_cfg()
-            saved_cmdr = cfg.get('cmdr_name', '').strip()
-            
-            # Show dialog
-            cmdr_result = self._show_cmdr_dialog(saved_cmdr)
-            return cmdr_result
-                
+            saved_cmdr = _load_cfg().get('cmdr_name', '').strip()
+            return self._show_cmdr_dialog(saved_cmdr, self._report_comment(session) if session else "", share)
         except Exception as e:
-            log.error(f"[DEBUG] Error getting CMDR info: {e}")
+            log.error(f"[CARD] Error getting CMDR info: {e}")
             return None
 
-    def _show_cmdr_dialog(self, current_cmdr=""):
-        """Show custom CMDR input dialog (adapted from Discord dialog)"""
+    @staticmethod
+    def _report_comment(session) -> str:
+        """Comment saved with the session, so the card dialog doesn't ask for it again."""
+        comment = (session.get('comment') or "").strip()
+        file_path = session.get('file_path', '')
+        if not comment and file_path and os.path.exists(file_path):
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    match = re.search(r'=== SESSION COMMENT ===\s*\n(.+?)(?:\n===|$)', f.read(), re.DOTALL)
+                comment = match.group(1).strip() if match else ""
+            except OSError:
+                comment = ""
+        return " ".join(comment.split())
+
+    @staticmethod
+    def _session_date_text(session) -> str:
+        """Session start from the report file name (Session_YYYY-MM-DD_HH-MM-SS_...)."""
+        match = re.match(r'Session_(\d{4}-\d{2}-\d{2})_(\d{2})-(\d{2})', os.path.basename(session.get('file_path', '')))
+        return f"{match.group(1)} {match.group(2)}:{match.group(3)}" if match else ""
+
+    def _show_cmdr_dialog(self, current_cmdr="", current_comment="", share=False):
+        """Ask for the CMDR name and comment shown on the card."""
         try:
             import tkinter as tk
-            
-            # Create toplevel window
-            dialog = tk.Toplevel(self.winfo_toplevel())
-            dialog.title("Mining Card Info")
-            dialog.configure(bg="#1e1e1e")
+            from config import load_theme
+            from ui.theme import get_theme_colors
+            from ui.dialogs import center_window
+            from app_utils import create_action_button, get_app_icon_path
+
+            c = get_theme_colors(load_theme())
+            bg, fg = c['bg'], c['fg']
+            field_bg = c.get('panel', c['bg_accent'])
+            heading_fg = c.get('accent', c['tip_fg'])
+            parent = self.winfo_toplevel()
+
+            dialog = tk.Toplevel(parent)
+            dialog.withdraw()
+            dialog.title(t('mining_card.dialog_title'))
+            dialog.configure(bg=bg)
             dialog.resizable(False, False)
-            
-            # Set app icon
             try:
-                from icon_utils import set_window_icon
-                set_window_icon(dialog)
-            except Exception as e:
-                print(f"[DEBUG] Could not set dialog icon: {e}")
-            
-            # Make it modal FIRST
-            dialog.transient(self.winfo_toplevel())
-            
-            # Set size
-            dialog_width = 450
-            dialog_height = 300
-            
-            # Force dialog to appear on same screen as main window
-            main_window = self.winfo_toplevel()
-            
-            # Wait for main window to be ready
-            main_window.update()
-            dialog.update()
-            
-            # Get main window center
-            main_x = main_window.winfo_x()
-            main_y = main_window.winfo_y()
-            main_width = main_window.winfo_width()
-            main_height = main_window.winfo_height()
-            
-            # Calculate center position
-            x = main_x + (main_width - dialog_width) // 2
-            y = main_y + (main_height - dialog_height) // 2
-            
-            # Set position explicitly
-            dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
-            
-            # Force it to appear
-            dialog.update()
-            dialog.deiconify()
-            dialog.grab_set()
-            dialog.focus_force()
-            
-            # Main frame
-            main_frame = tk.Frame(dialog, bg="#1e1e1e")
-            main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-            
-            # Title
-            title_label = tk.Label(main_frame, text="Add Your Info to Card",
-                                  font=scaled_font(14, "bold", family="Arial"),
-                                  fg="#FF8C00", bg="#1e1e1e")
-            title_label.pack(pady=(0, 15))
+                icon_path = get_app_icon_path()
+                if icon_path and icon_path.endswith('.ico'):
+                    dialog.iconbitmap(icon_path)
+            except Exception:
+                pass
 
-            # CMDR Name label
-            cmdr_label = tk.Label(main_frame, text="CMDR Name (optional):",
-                                 font=scaled_font(10, family="Arial"),
-                                 fg="#ffffff", bg="#1e1e1e")
-            cmdr_label.pack(anchor="w", pady=(0, 5))
+            frame = tk.Frame(dialog, bg=bg)
+            frame.pack(fill="both", expand=True, padx=20, pady=18)
+            tk.Label(frame, text=t('mining_card.dialog_heading'), font=scaled_font(13, "bold"),
+                     fg=heading_fg, bg=bg).pack(anchor="w", pady=(0, 14))
 
-            # CMDR Name input
-            cmdr_entry = tk.Entry(main_frame, font=scaled_font(11, family="Arial"), width=35,
-                                 bg="#333333", fg="#ffffff",
-                                 insertbackground="#ffffff",
-                                 relief="solid", bd=1)
-            cmdr_entry.pack(pady=(0, 15))
-            cmdr_entry.insert(0, current_cmdr)
-            cmdr_entry.focus()
-            cmdr_entry.select_range(0, tk.END)
+            def field(label_key, value):
+                tk.Label(frame, text=t(label_key), font=scaled_font(10), fg=fg, bg=bg).pack(anchor="w", pady=(0, 4))
+                entry = tk.Entry(frame, font=scaled_font(10), width=42, bg=field_bg, fg=fg, insertbackground=fg,
+                                 relief="solid", bd=1, highlightthickness=0)
+                entry.pack(fill="x", pady=(0, 12))
+                entry.insert(0, value)
+                return entry
 
-            # Comment label
-            comment_label = tk.Label(main_frame, text="Comment (optional):",
-                                   font=scaled_font(10, family="Arial"),
-                                   fg="#ffffff", bg="#1e1e1e")
-            comment_label.pack(anchor="w", pady=(0, 5))
+            cmdr_entry = field('mining_card.cmdr_label', current_cmdr)
+            comment_entry = field('mining_card.comment_label', current_comment)
 
-            # Comment input
-            comment_entry = tk.Entry(main_frame, font=scaled_font(10, family="Arial"), width=35,
-                                   bg="#333333", fg="#ffffff",
-                                   insertbackground="#ffffff",
-                                   relief="solid", bd=1)
-            comment_entry.pack(pady=(0, 20))
-            
-            # Result variable
             result = {"cmdr": None, "comment": None}
-            
+
             def on_ok():
                 cmdr = cmdr_entry.get().strip()
                 comment = comment_entry.get().strip()
-                
-                # Save CMDR name to config if provided
                 if cmdr:
                     from config import update_config_value
                     update_config_value("cmdr_name", cmdr)
-                
-                result["cmdr"] = cmdr if cmdr else None
-                result["comment"] = comment if comment else None
+                result["cmdr"] = cmdr or None
+                result["comment"] = comment or None
                 dialog.destroy()
-            
-            def on_skip():
-                # Skip without saving
-                dialog.destroy()
-            
-            # Buttons frame
-            button_frame = tk.Frame(main_frame, bg="#1e1e1e")
-            button_frame.pack(pady=(10, 0))
-            
-            ok_button = tk.Button(button_frame, text="OK", command=on_ok,
-                                 font=scaled_font(10, "bold", family="Arial"),
-                                 bg="#FF8C00", fg="#ffffff",
-                                 activebackground="#FFA500",
-                                 activeforeground="#ffffff",
-                                 width=10, relief="flat", cursor="hand2")
-            ok_button.pack(side="left", padx=5)
 
-            skip_button = tk.Button(button_frame, text="Skip", command=on_skip,
-                                   font=scaled_font(10, family="Arial"),
-                                   bg="#555555", fg="#ffffff",
-                                   activebackground="#666666",
-                                   activeforeground="#ffffff",
-                                   width=10, relief="flat", cursor="hand2")
-            skip_button.pack(side="left", padx=5)
-            
-            # Bind Enter key to OK
+            buttons = tk.Frame(frame, bg=bg)
+            buttons.pack(anchor="e", pady=(6, 0))
+            create_action_button(buttons, primary=True, text=t('common.ok'), command=on_ok).pack(side="left", padx=(0, 8))
+            def on_cancel():
+                # Sharing can be cancelled; for a card, Skip still makes it without the info
+                if share:
+                    result.clear()
+                dialog.destroy()
+
+            create_action_button(buttons, text=t('common.cancel' if share else 'mining_card.skip'),
+                                 command=on_cancel).pack(side="left")
+            dialog.protocol("WM_DELETE_WINDOW", on_cancel)
+
             dialog.bind('<Return>', lambda e: on_ok())
-            dialog.bind('<Escape>', lambda e: on_skip())
-            
-            # Wait for dialog to close
+            dialog.bind('<Escape>', lambda e: on_cancel())
+
+            center_window(dialog, parent)
+            dialog.deiconify()
+            dialog.grab_set()
+            cmdr_entry.focus_set()
+            cmdr_entry.select_range(0, tk.END)
             dialog.wait_window()
-            
-            return result
-            
+            return result or None
+
         except Exception as e:
-            log.error(f"[DEBUG] Error showing CMDR dialog: {e}")
-            import traceback
-            traceback.print_exc()
+            log.error(f"[CARD] Error showing CMDR dialog: {e}")
             return None
 
 
@@ -196,7 +148,7 @@ class MiningCardMixin:
             session = self.reports_tab_session_lookup[item_id]
             
             # Get CMDR name and comment
-            cmdr_info = self._get_cmdr_info_for_card()
+            cmdr_info = self._get_cmdr_info_for_card(session)
             if cmdr_info is None:
                 return  # User cancelled
             
@@ -251,7 +203,78 @@ class MiningCardMixin:
         if card_path and os.path.exists(card_path):
             os.startfile(card_path)
 
-    def _generate_mining_card(self, session, cmdr_info=None):
+    def _ring_details(self, system, body):
+        """Translated (ring type, reserve level) from saved ring data; "" when unknown."""
+        user_db = getattr(getattr(getattr(self, 'main_app', None), 'cargo_monitor', None), 'user_db', None)
+        if not (user_db and system and body):
+            return "", ""
+        from ring_finder import translate_ring_type, translate_reserve_level
+        ring_type = translate_ring_type(user_db.get_ring_type(system, body) or "")
+        # Old density values stored in the same column translate to "" and are skipped
+        reserve = translate_reserve_level(user_db.get_reserve_level(system, body))
+        return ring_type or "", reserve or ""
+
+    def _discord_card_text(self, system, body) -> str:
+        """Message above the card; the system name sits in a code block so it can be copied."""
+        lines = [f"**{t('mining_card.post_system')}**", f"```{system}```"] if system else []
+        if body:
+            lines.append(f"**{t('mining_card.post_ring')}** {body}")
+            ring_type, reserve = self._ring_details(system, body)
+            if ring_type:
+                lines.append(f"**{t('mining_card.post_ring_type')}** {ring_type}")
+            if reserve:
+                lines.append(f"**{t('mining_card.post_reserve')}** {reserve}")
+        return "\n".join(lines)
+
+    def _share_to_discord(self):
+        """Share the selected session to Discord as a Mining Card."""
+        if getattr(self, '_discord_share_in_progress', False):
+            return
+        from app_utils import centered_message
+        selected = self.reports_tree_tab.selection()
+        if not selected:
+            centered_message(self.winfo_toplevel(), "No Selection", "Please select a mining session to share to Discord.")
+            return
+        session = self.reports_tab_session_lookup.get(selected[0])
+        if not session:
+            centered_message(self.winfo_toplevel(), "Error", "Session data not found for selected item.")
+            return
+
+        from discord_integration import is_discord_enabled, send_mining_card
+        if not is_discord_enabled():
+            centered_message(self.winfo_toplevel(), "Discord Sharing",
+                             "Discord sharing is not available in this version.\n\n"
+                             "Contact the administrator if you believe this is an error.")
+            return
+
+        cmdr_info = self._get_cmdr_info_for_card(session, share=True)
+        if cmdr_info is None:
+            return
+        card_path = self._generate_mining_card(session, cmdr_info, open_card=False)
+        if not card_path:
+            return
+        self._update_card_button()
+
+        import threading
+        parent = self.winfo_toplevel()
+        system, body = session.get('system', ''), session.get('body', '')
+        self._discord_share_in_progress = True
+
+        def worker():
+            try:
+                success, message = send_mining_card(card_path, self._discord_card_text(system, body))
+            except Exception as e:
+                success, message = False, f"Failed to share to Discord: {e}"
+            if success:
+                message = t('mining_card.shared')
+            if not getattr(parent, '_network_closing', False):
+                try:
+                    parent.after(0, self._finish_discord_share, success, message)
+                except RuntimeError:
+                    pass
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _generate_mining_card(self, session, cmdr_info=None, open_card=True):
         """Generate mining card PNG from session data"""
         try:
             from mining_card_generator import create_card_from_session
@@ -276,6 +299,7 @@ class MiningCardMixin:
             prospectors_used = 0
             session_duration_hours = 0
             avg_yield = 0
+            core_asteroids = 0
             session_type = session_type_from_session
             
             if file_path and os.path.exists(file_path):
@@ -322,6 +346,11 @@ class MiningCardMixin:
                                     try:
                                         avg_yield = float(line.split(':')[1].split('%')[0].strip())
                                     except:
+                                        pass
+                                elif 'Core Asteroids Found:' in line:
+                                    try:
+                                        core_asteroids = int(line.split(':')[1].strip())
+                                    except ValueError:
                                         pass
                                 elif 'Asteroids Prospected:' in line:
                                     try:
@@ -519,6 +548,7 @@ class MiningCardMixin:
                 'session_type': session_type,
                 'avg_yield': avg_yield,
                 'asteroids_prospected': asteroids_prospected,
+                'core_asteroids': core_asteroids,
                 'hit_rate': hit_rate,
                 'prospecting_speed': prospecting_speed,
                 'mineral_performance': mineral_performance,
@@ -533,29 +563,29 @@ class MiningCardMixin:
                 'system': system,
                 'body': body,
                 'ship': ship,
-                'duration_text': duration
+                'duration_text': duration,
+                'session_date': self._session_date_text(session),
             }
+            session_info['ring_type'], session_info['reserve'] = self._ring_details(system, body)
             
-            print(f"[CARD DEBUG] session_info: {session_info}")
-            print(f"[CARD DEBUG] cargo_session_data session_type: {cargo_session_data.get('session_type')}")
             
             # Generate the card
             if create_card_from_session(cargo_session_data, session_info, card_path, cmdr_info):
                 print(f"[CARD] Mining card generated: {card_filename}")
-                
-                # Open the card image directly
-                if os.name == 'nt':  # Windows
-                    os.startfile(card_path)
-                else:  # macOS/Linux
-                    subprocess.Popen(['xdg-open', card_path])
-                    
-            else:
-                from tkinter import messagebox
-                messagebox.showerror("Error", "Failed to generate mining card.")
-                
+                if open_card:
+                    if os.name == 'nt':  # Windows
+                        os.startfile(card_path)
+                    else:  # macOS/Linux
+                        subprocess.Popen(['xdg-open', card_path])
+                return card_path
+            from tkinter import messagebox
+            messagebox.showerror("Error", "Failed to generate mining card.")
+            return None
+
         except Exception as e:
             log.error(f"[CARD] Error generating mining card: {e}")
             import traceback
             traceback.print_exc()
             from tkinter import messagebox
             messagebox.showerror("Error", f"Failed to generate mining card: {e}")
+            return None
