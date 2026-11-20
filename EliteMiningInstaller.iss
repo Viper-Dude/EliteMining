@@ -862,21 +862,6 @@ begin
   Result := CheckForMutexes('Global\EliteMining_SingleInstance_Mutex');
 end;
 
-function IsVoiceAttackRunning: Boolean;
-var
-  Locator, Service, Processes: Variant;
-begin
-  Result := False;
-  try
-    Locator := CreateOleObject('WbemScripting.SWbemLocator');
-    Service := Locator.ConnectServer('.', 'root\CIMV2');
-    Processes := Service.ExecQuery('SELECT ProcessId FROM Win32_Process WHERE Name = ''VoiceAttack.exe''');
-    Result := Processes.Count > 0;
-  except
-    Result := False;
-  end;
-end;
-
 { Belt-and-braces check alongside the mutex: some older/test builds may not
   create the single-instance mutex (e.g. it was briefly disabled for testing
   in a beta build), so a live process could go undetected by IsEliteMiningRunning.
@@ -916,19 +901,6 @@ begin
       Exit;
     end;
   end;
-
-  { After a profile update the app reads the player's current shortcuts from
-    VoiceAttack, which needs VoiceAttack closed. Cancel installs anyway; the app
-    asks again if VoiceAttack is still running when it starts. }
-  if WizardIsTaskSelected('installvaprofile') then
-    while IsVoiceAttackRunning do
-    begin
-      if MsgBox('VoiceAttack is currently running.' + #13#10 + #13#10 +
-         'Please close it so EliteMining can carry your shortcuts over to the new profile, then click OK.' + #13#10 + #13#10 +
-         'Click Cancel to continue without closing it.',
-         mbInformation, MB_OKCANCEL) = IDCANCEL then
-        Break;
-    end;
 
   { Remove old installation directory if it exists }
   if DirExists('C:\Program Files\Elite Mining') then
