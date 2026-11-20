@@ -1,6 +1,6 @@
 # Journal Review Handoff
 
-Updated: 20 November 2026. Version in progress: 5.6.7 (not released).
+Updated: 20 November 2026 (after `9783abf`). Version in progress: 5.6.7 (not released).
 
 Origin: an honest review of the GUI, features, performance, the file watcher (watchdog) and the journal parser. All planned batches, plus the silent-failure logging pass, are implemented and pushed. The first in-game test (installer build before `172c5b0`) is done; the fixes it led to still need a retest in the next test build.
 
@@ -12,6 +12,7 @@ Origin: an honest review of the GUI, features, performance, the file watcher (wa
 - `894b740` Log failed saves instead of hiding them, and write Auto Search state atomically (see "Silent-failure logging" below)
 - `682016c` Add the 5.6.7 installer release notes
 - `172c5b0` Fix missing ring type on carrier-side sessions and skip empty reports (see "In-game test findings" below)
+- `9783abf` Fix splash hang at startup and log error prints in the installed app (see "Startup hang and print-to-log" below)
 
 ## What changed
 
@@ -57,9 +58,17 @@ Origin: an honest review of the GUI, features, performance, the file watcher (wa
 - The constant ~8 s gap between journal timestamps and log times is the game clock ahead of the PC clock, not app lag.
 - Checks after `172c5b0`: `check_session_location` (8, two new), `check_mining_tab` (12), `check_session_statistics` (17), `check_journal_reading` (42), `check_cargo_tracking` (8). All passed.
 
+**Startup hang and print-to-log (`9783abf`)**
+- *Splash hang:* the `172c5b0` deferral (`after(0)` in `_on_cargo_capacity_detected` when `cargo_max_capacity` did not exist yet) re-queued itself forever, because the splash `update()` keeps running pending callbacks. The installer build hung on "Initializing systems...". The capacity is now stored in `_pending_detected_capacity` and applied right after `_load_cargo_preferences()` in `App.__init__`, wrapped in try/except with `log.exception`. Never use `after(0)` for startup-time retries while the splash is up.
+- *Charmap crash:* the "Auto-updated cargo capacity" print contained an emoji and raised a charmap error on a cp1252 console; it is now a `log.info` without the emoji. Other emoji prints can hit the same error (the VA variables init already logged one with a check mark).
+- *Print-to-log:* 272 single-argument `print(` calls whose message contained error/fail/warning/exception became `log.error` or `log.warning` (104 `main.py`, 100 `prospector_panel.py`, 68 `ring_finder.py`; "warn" in the text gives warning). Two stay prints because they run before logging exists (localization init warning, single-instance mutex warning). Prints reporting a failure without those words are not converted.
+- Checks passed: `check_cargo_tracking` (8), `check_journal_reading` (42), `check_session_location` (8), `check_ring_finder_search` (11); the dev app got past the splash with a cp1252 console. Installer build not yet retested.
+
 ## Open items
 
 1. **Retest in the next test build (user):**
+   - The app gets past the splash screen, and the startup log has no "Applying detected cargo capacity at startup failed" line.
+   - Error lines from the converted prints now appear in the installed log.
    - About 3 s after entering supercruise, the tab switches to Hotspots Finder (if the app was idle for 30 s).
    - A session started after undocking from the carrier in the ring shows "2 A Ring / Metallic" in Reports.
    - Starting and stopping a session without mining saves no report.
@@ -72,7 +81,7 @@ Origin: an honest review of the GUI, features, performance, the file watcher (wa
 - **`transient()` in 13 live dialogs, plus hardcoded dark backgrounds** (~58 spots in `main.py`, `prospector_panel.py`, `ring_finder.py`): each dialog has its own show sequence, some use `transient` on purpose, and the result can't be verified without seeing it. Fix a dialog when it is next changed. The four Ring Finder right-click dialogs also lack `withdraw()` and can flash on the wrong monitor.
 - **About 316 remaining silent `except: pass` blocks across `main.py`, `prospector_panel.py` and `ring_finder.py`.** The first in-game logs pointed only at the two failures fixed in `172c5b0`, so there is no lead for more. Revisit only if new log lines appear. Tier-B reasons are listed under "Silent-failure logging".
 - **Patch notes for `172c5b0`:** left out on user request.
-- **306 `hasattr(self, ...)` guards and 356 `print(` calls in `main.py`:** pointed out in the review, no fix requested.
+- **306 `hasattr(self, ...)` guards and the remaining non-error `print(` calls in `main.py`:** pointed out in the review, no fix requested.
 
 ## Local state at handover
 
