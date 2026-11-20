@@ -2,7 +2,7 @@
 
 Updated: 20 November 2026. Version in progress: 5.6.7 (not released).
 
-Origin: an honest review of the GUI, features, performance, the file watcher (watchdog) and the journal parser. All planned batches, plus the silent-failure logging pass, are implemented and pushed. The in-game test is still pending.
+Origin: an honest review of the GUI, features, performance, the file watcher (watchdog) and the journal parser. All planned batches, plus the silent-failure logging pass, are implemented and pushed. The first in-game test (installer build before `172c5b0`) is done; the fixes it led to still need a retest in the next test build.
 
 ## Commits (on origin/main)
 
@@ -10,6 +10,8 @@ Origin: an honest review of the GUI, features, performance, the file watcher (wa
 - `6f95295` Log journal, overlay and voice failures instead of hiding them
 - `7c7dca6` Move the new patch notes into the unreleased 5.6.7 notes
 - `894b740` Log failed saves instead of hiding them, and write Auto Search state atomically (see "Silent-failure logging" below)
+- `682016c` Add the 5.6.7 installer release notes
+- `172c5b0` Fix missing ring type on carrier-side sessions and skip empty reports (see "In-game test findings" below)
 
 ## What changed
 
@@ -45,29 +47,35 @@ Origin: an honest review of the GUI, features, performance, the file watcher (wa
 - `check_journal_reading` (42; includes `SharedReaderChecks`, `BackgroundMonitorChecks`, folder-relist throttle), `check_session_location` (6), `check_cargo_tracking` (8), `check_fleet_carrier` (17), `check_network_responsiveness` (25), `check_session_statistics` (17), `check_mining_tab` (12), `check_sidebar` (6), `check_settings` (14). All passed at last run. After `894b740` these also passed: `check_visited_systems` (6), `check_ring_finder_search` (11), `check_config_saving` (14), `check_voiceattack_controls` (13).
 - Not run: PyInstaller build, anything in the real game. The dev app was started and looked fine.
 
+**In-game test findings (20 Nov 2026, installer build; fixed in `172c5b0`)**
+- Jumps-left, prospecting and auto-end on supercruise worked. The log showed no failure lines except the two below.
+- *Missing ring type:* with a carrier parked in a ring, the game only names the planet or moon (e.g. `2 a`, `BodyType: Planet`) on SupercruiseExit and on Location after undocking, never the ring. The report saved "2 A" (moon shown title-cased, looks like the ring) and the ring type lookup found nothing. Status.json has no BodyName in a ring, so it can't help. New `ProspectorPanel._resolve_session_ring` runs in `_session_stop`: a non-ring body becomes the ring last mined around that planet (reports CSV via `get_last_mined_lookup`; a moon `2 a` matches planet 2's rings), else the planet's only ring in `hotspot_data`, else unchanged.
+- *0-ton reports:* `_session_stop` now saves nothing (report, CSV row, graphs) when cargo data says 0 t; with no cargo data it still saves.
+- *Auto-switch "too fast":* switch logic is unchanged since 5.6.6; events now arrive every 0.5 s instead of up to 1 s. On user request the Hotspots Finder switch now waits `RING_FINDER_SWITCH_DELAY_MS` (3000) after SupercruiseEntry/FSDJump/session end in supercruise, is cancelled on SupercruiseExit, and re-checks the guards when it fires.
+- *Crash:* `_handle_journal_events` used `self.app` on CarrierLocation (pre-existing, now visible through listener logging); it dropped the rest of that event batch for the Mining Session. Now `self.main_app`.
+- *Startup "Journal capacity/ship scan failed":* the CargoMonitor startup scan called `_on_cargo_capacity_detected` before `cargo_max_capacity` existed. It now defers with `after(0)`.
+- The constant ~8 s gap between journal timestamps and log times is the game clock ahead of the PC clock, not app lag.
+- Checks after `172c5b0`: `check_session_location` (8, two new), `check_mining_tab` (12), `check_session_statistics` (17), `check_journal_reading` (42), `check_cargo_tracking` (8). All passed.
+
 ## Open items
 
-1. **In-game test (user, pending):**
-   - Launch a prospector; the session should auto-start, and prospecting results and cargo should update.
-   - Plot a route; jumps-left counts down and drops to 0 on docking.
-   - Auto Search / Auto Prices triggers once per jump.
-   - Change the journal folder, then dock at a market; an EDDN upload is logged.
-   - Restart the game while the app runs; the new journal is picked up within ~5 s.
-   - Session summary in English and German.
-   - Settings -> import journal history with a real folder.
-   - Check the log for new "failed" lines from the logging changes.
-   - Also smoke-test the `894b740` changes: delete a report in Reports, change Ring Finder filters, pick an announcement preset, toggle Auto Search and prefetch prices (`Variables/autoSearch.txt` and `prefetchPrices.txt` should flip between 1 and 0).
-2. **`docs/INSTALLER_RELEASE_NOTES.txt`** (user-owned): add the five new 5.6.7 lines (see `PATCHNOTES_v5.6.7.md`).
+1. **Retest in the next test build (user):**
+   - About 3 s after entering supercruise, the tab switches to Hotspots Finder (if the app was idle for 30 s).
+   - A session started after undocking from the carrier in the ring shows "2 A Ring / Metallic" in Reports.
+   - Starting and stopping a session without mining saves no report.
+   - No "Journal capacity/ship scan failed" or "Journal listener ... failed" lines in the startup log.
+2. Not yet covered by the first test: changing the journal folder, restarting the game while the app runs, German session summary, importing journal history, and the `894b740` smoke test (delete a report, Ring Finder filters, announcement preset, Auto Search and prefetch prices toggles). Unless the user reports otherwise, treat these as untested.
 
 ## Deliberately skipped (and why)
 
 - **Sorting journal files by name in `JournalParser.find_journal_files`:** old journal file names use a different date format, so name order can be wrong. Keep mtime.
 - **`transient()` in 13 live dialogs, plus hardcoded dark backgrounds** (~58 spots in `main.py`, `prospector_panel.py`, `ring_finder.py`): each dialog has its own show sequence, some use `transient` on purpose, and the result can't be verified without seeing it. Fix a dialog when it is next changed. The four Ring Finder right-click dialogs also lack `withdraw()` and can flash on the wrong monitor.
-- **About 316 remaining silent `except: pass` blocks across `main.py`, `prospector_panel.py` and `ring_finder.py`.** Next step after the in-game test: use the new log lines to find which silent blocks hide real failures, and convert those. Tier-B reasons are listed under "Silent-failure logging".
+- **About 316 remaining silent `except: pass` blocks across `main.py`, `prospector_panel.py` and `ring_finder.py`.** The first in-game logs pointed only at the two failures fixed in `172c5b0`, so there is no lead for more. Revisit only if new log lines appear. Tier-B reasons are listed under "Silent-failure logging".
+- **Patch notes for `172c5b0`:** left out on user request.
 - **306 `hasattr(self, ...)` guards and 356 `print(` calls in `main.py`:** pointed out in the review, no fix requested.
 
 ## Local state at handover
 
-- Uncommitted and not mine: `app/Variables/miningSessionSummary.txt` (dev-run output), `docs/INSTALLER_RELEASE_NOTES.txt` (user-owned).
+- Uncommitted and not mine: `app/Variables/miningSessionSummary.txt` (dev-run output). `docs/INSTALLER_RELEASE_NOTES.txt` was committed in `682016c` at the user's request.
 - The two `app/config.json.backup_*` files were deleted.
 - `app/main.py`, `prospector_panel.py`, `ring_finder.py`, `file_watcher.py` are CRLF; `config.py`, `journal_parser.py`, the localization JSON and `scripts/check_*.py` are LF.
