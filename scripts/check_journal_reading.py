@@ -39,7 +39,7 @@ def load_methods(filename, class_name, names):
     return namespace[class_name]
 
 
-Monitor = load_methods('app/main.py', 'CargoMonitor', {
+Monitor = load_methods('app/cargo_monitor.py', 'CargoMonitor', {
     'start_journal_monitoring', 'find_latest_journal', '_poll_journal',
     'read_new_journal_entries', '_read_new_journal_entries',
     'add_journal_listener', '_dispatch_journal_events', '_deliver_journal_events',

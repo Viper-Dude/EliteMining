@@ -13,7 +13,8 @@ Background moved out of [AGENTS.md](../AGENTS.md). Read when working on data fet
 
 ## Main Modules
 
-- `app/main.py` — multi-tabbed Tkinter app, CargoMonitor, dark theme, ToolTip system
+- `app/main.py` — multi-tabbed Tkinter app, dark theme, ToolTip system
+- `app/cargo_monitor.py` — CargoMonitor (cargo, Status.json and the shared journal reader)
 - `app/ring_finder.py` — Ring Finder tab: Spansh/local search, results treeview, context menu, PP column
 - `app/system_finder_api.py` — Spansh API wrapper + Inara powerplay HTML fetch
 - `app/marketplace_api.py` — commodity market lookups (Ardent and other sources)

@@ -22,7 +22,7 @@ App = load_methods('app/main.py', 'App', {
     '_process_journals_for_catchup', '_process_journals_for_catchup_with_progress',
 })
 App._process_journals_for_catchup.__globals__.update(os=os, log=logging.getLogger('fc-test'))
-Monitor = load_methods('app/main.py', 'CargoMonitor', {'_process_journal_event_impl'})
+Monitor = load_methods('app/cargo_monitor.py', 'CargoMonitor', {'_process_journal_event_impl'})
 Monitor._process_journal_event_impl.__globals__.update(json=json)
 
 

@@ -18,7 +18,8 @@ from unittest.mock import Mock, patch
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = (ROOT / 'app/main.py').read_text(encoding='utf-8-sig')
 TREE = ast.parse(SOURCE)
-CARGO = next(n for n in TREE.body if isinstance(n, ast.ClassDef) and n.name == 'CargoMonitor')
+CARGO_TREE = ast.parse((ROOT / 'app/cargo_monitor.py').read_text(encoding='utf-8-sig'))
+CARGO = next(n for n in CARGO_TREE.body if isinstance(n, ast.ClassDef) and n.name == 'CargoMonitor')
 APP = next(n for n in TREE.body if isinstance(n, ast.ClassDef) and n.name == 'App')
 NAMES = {
     'read_cargo_json', '_finish_read_cargo_json', '_process_journal_event_impl',
@@ -39,7 +40,7 @@ class CargoTrackingChecks(unittest.TestCase):
         module = ast.Module(body=[ast.ClassDef(name='Monitor', bases=[], keywords=[], decorator_list=[],
             body=[n for n in CARGO.body if isinstance(n, ast.FunctionDef) and n.name in NAMES])], type_ignores=[])
         ast.fix_missing_locations(module)
-        exec(compile(module, str(ROOT / 'app/main.py'), 'exec'), ns)
+        exec(compile(module, str(ROOT / 'app/cargo_monitor.py'), 'exec'), ns)
         self.monitor = m = ns['Monitor']()
         m.cargo_json_path = str(Path(self.folder.name) / 'Cargo.json')
         m.status_json_path = str(Path(self.folder.name) / 'Status.json')

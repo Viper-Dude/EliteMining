@@ -44,7 +44,8 @@ App = load_methods('App', {
     '_test_api_connection', '_finish_api_connection_test',
     '_fetch_reserve_levels_for_system', '_trigger_ring_auto_search',
 })
-Monitor = load_methods('CargoMonitor', {'_process_scan_event', '_process_journal_event_impl'})
+Monitor = load_methods('CargoMonitor', {'_process_scan_event', '_process_journal_event_impl'},
+                       'app/cargo_monitor.py')
 Panel = load_methods('ProspectorPanel', {'_share_to_discord', '_finish_discord_share'},
                      'app/prospector_panel.py')
 

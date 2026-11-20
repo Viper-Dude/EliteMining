@@ -11,7 +11,7 @@ Make `app/main.py` (and later `prospector_panel.py` and `ring_finder.py`) smalle
 - Only move code, one step per commit. Never move and change behaviour in the same commit.
 - Re-import moved names in `main.py` so existing references keep working.
 - Patch with a script outside the repo: normalize to `\n`, assert one match each, restore CRLF, then `py_compile`.
-- Check every moved block for names it used from `main.py` (`t`, `log`, helpers, constants) and import them in the new module.
+- Check every moved block for names it used from `main.py` (`t`, `log`, helpers, constants) and import them in the new module. Use a scope-aware scan (Python's `symtable`: report each function's implicit globals the module doesn't define). A flat AST scan misses names that one method imports locally while another relies on `main.py`'s import; that caused the `JournalParser` startup crash in step 2. The check scripts can't catch it either, because they run methods in their own namespaces.
 - After each step: `py_compile`, an undefined-name scan of the new module, then the matching check scripts. The user restarts the app and tests it.
 - Plain top-level imports are picked up by PyInstaller, so the specs need no change.
 - Move tabs only when a task already touches that tab. Don't do a dedicated "refactor everything" push.
@@ -22,9 +22,9 @@ Make `app/main.py` (and later `prospector_panel.py` and `ring_finder.py`) smalle
 | Step | What | Status | main.py lines after |
 |---|---|---|---|
 | 0 | Starting point | — | 21,293 |
-| 1 | Pilot: overlays and log handler | Done 20 Nov 2026, not committed, waiting for the user's app test | 20,515 (−778) |
-| 2 | `CargoMonitor` into `cargo_monitor.py` | Next | about −2,690 |
-| 3 | Tabs and dialogs, when they're touched | Open | — |
+| 1 | Pilot: overlays and log handler | Done, user-tested, committed `1b7eee1` | 20,515 (−778) |
+| 2 | `CargoMonitor` into `cargo_monitor.py` | Done and committed 20 Nov 2026; app start and cargo list OK, in-game test pending | 17,833 (−2,682) |
+| 3 | Tabs and dialogs, when they're touched | Next (only alongside other work) | — |
 | 4 | `prospector_panel.py`, `ring_finder.py` | Later | — |
 
 Line counts are physical lines, including blank lines.
@@ -34,17 +34,20 @@ Line counts are physical lines, including blank lines.
 - New `app/overlays.py` (781 lines): `TextOverlay`, `CargoTextOverlay`, and the game-window helpers `_foreground_window_title`, `is_game_focused`, `_find_game_window_rect` and `get_game_monitor_offset`. It imports `t` from `localization` directly and uses the same `EliteMining` logger.
 - `SafeRotatingFileHandler` moved into `app/logging_setup.py`.
 - `main.py` re-imports all of these, so no other code changed.
-- Verified: `py_compile` on all three files, standalone import of `overlays`, an undefined-name scan (none found), `check_sidebar.py` (6 tests OK).
-- Not verified: the running app. The user's test is to restart the app, check that an announcement overlay and the cargo overlay show on the game monitor, and that `~\EliteMining.log` is written.
+- Verified: `py_compile` on all three files, standalone import of `overlays`, an undefined-name scan (none found), `check_sidebar.py` (6 tests OK), and the user's app test (overlays and log OK).
 - Small difference: `main.py`'s own `t()` swallows translation errors, while `overlays.py` uses `localization.t` directly. It's only used for the overlay window title and the T/hr line.
+- Seen during the test, not caused by the move: with no `overlay_mode` saved, the settings screen falls back to Enhanced (`main.py` `_load_text_overlay_preference`) but `prospector_panel.py` `_show_prospector_overlay_or_standard` falls back to Standard. A fix (make the prospector fallback "enhanced") was offered, not yet approved.
 
-## Step 2 — CargoMonitor (next)
+## Step 2 — CargoMonitor (done, in-game test pending)
 
-- `class CargoMonitor` starts at about line 282 of `main.py` and runs to `class App` (about line 2968).
-- Higher risk: it involves threading, the shared journal reader (`add_journal_listener`, see `docs/JOURNAL_REVIEW_HANDOFF.md`), and `_process_journal_event_impl` (about 540 lines).
-- Before moving, list everything it uses from `main.py` (`_atomic_write_text`, constants from `core.constants`, `t`, `log`, config helpers) and anything that patches `main.CargoMonitor` in `scripts/check_*.py`.
-- Checks to run afterwards: `check_cargo_tracking.py`, `check_journal_reading.py`, `check_session_location.py`, `check_fleet_carrier.py`, `check_sidebar.py`.
-- Use the strongest model with high effort, and Plan mode.
+- New `app/cargo_monitor.py` (about 2,700 lines) holds `class CargoMonitor` unchanged. It imports `glob, json, logging, os, re, threading, time, tkinter as tk`, `_load_cfg`, `JournalParser`, `journal_resume_offset`, `read_complete_journal_lines`, `t` (from `localization`), `centered_yesno_dialog`, `RefineryDialog` and `UserDatabase`, and uses the `EliteMining` logger.
+- Everything it uses from the app goes through `self.main_app_ref`, so it has no links to `main.py` globals.
+- `main.py` imports it back with `from cargo_monitor import CargoMonitor`. The now-unused imports `journal_resume_offset`, `read_complete_journal_lines`, `UserDatabase` and `RefineryDialog` were removed from `main.py`.
+- Check scripts that read `CargoMonitor` source now point to `app/cargo_monitor.py`: `check_cargo_tracking.py`, `check_fleet_carrier.py`, `check_journal_reading.py`, `check_network_responsiveness.py`.
+- Verified: `py_compile`, standalone import, undefined-name scan (none), and 106 tests OK across `check_cargo_tracking` (8), `check_journal_reading` (42), `check_fleet_carrier` (17), `check_network_responsiveness` (25), `check_session_location` (8) and `check_sidebar` (6).
+- First run crashed with `name 'JournalParser' is not defined`. Fixed by adding the missing imports (`JournalParser`, `re`, `time`, `tk`) found by the scope-aware scan. A later "hang at start" could not be reproduced; the next start was fine.
+- User-tested: the app starts and the cargo list is correct. Still to test in game (the user will do it at the end of the task): a jump or docking updates the current system; mining a fragment updates the cargo count and the cargo overlay; the log shows no new errors.
+- Commit by staging the specific paths. Running the app changes tracked `Variables/*.txt` files, so don't use the broad `git add -A` for this work.
 
 ## Step 3 — Candidates in App (move when touched)
 
