@@ -461,8 +461,10 @@ class TextOverlay:
         if self.overlay_window:
             try:
                 self.overlay_window.destroy()
+            except tk.TclError:
+                pass  # window already gone
             except Exception:
-                pass
+                logging.exception("[OVERLAY] overlay window destroy failed")
         self.overlay_window = None
         self.fade_timer = None
         self._outline_items = []
@@ -823,8 +825,10 @@ class CargoTextOverlay:
             # Destroy rather than alpha-hide: a hidden leftover window can reappear or render oversized
             try:
                 self.overlay_window.destroy()
+            except tk.TclError:
+                pass  # window already gone
             except Exception:
-                pass
+                logging.exception("[OVERLAY] overlay window destroy failed")
             self.overlay_window = None
             self._outline_items = []
 
@@ -835,8 +839,10 @@ class CargoTextOverlay:
         if self.overlay_window:
             try:
                 self.overlay_window.destroy()
+            except tk.TclError:
+                pass  # window already gone
             except Exception:
-                pass
+                logging.exception("[OVERLAY] overlay window destroy failed")
         self.overlay_window = None
         self._outline_items = []
         self._game_hidden = False
@@ -926,8 +932,10 @@ class CargoTextOverlay:
         if self._update_timer:
             try:
                 self.overlay_window.after_cancel(self._update_timer)
+            except tk.TclError:
+                pass  # window already gone
             except Exception:
-                pass
+                logging.exception("[OVERLAY] cargo overlay timer cancel failed")
         if self.overlay_window:
             self.overlay_window.destroy()
             self.overlay_window = None
@@ -1482,15 +1490,15 @@ class CargoMonitor:
                     ring_finder.parent.after(3000, lambda: ring_finder.status_var.set(""))
                     self._auto_refresh_timer = None  # Clear timer reference
                     self._pending_highlight_bodies = []  # Clear after successful refresh
-                except Exception as e:
-                    pass  # Silent fail in delayed refresh
+                except Exception:
+                    log.exception("Delayed Ring Finder auto-refresh failed")
             
             # Schedule refresh with delay - already on main thread via after()
             self._auto_refresh_timer = main_app.after(delay, do_delayed_refresh)
             
-        except Exception as e:
-            # Silent fail - don't break journal processing
-            pass
+        except Exception:
+            # Never break journal processing, but leave a trace
+            log.exception("Ring Finder auto-refresh scheduling failed")
 
     def get_ship_info_string(self) -> str:
         """
@@ -8570,13 +8578,13 @@ class App(tk.Tk, ColumnVisibilityMixin):
                     # Apply the saved voice to announcer
                     try:
                         announcer.set_voice(saved_voice)
-                    except Exception as e:
-                        pass
+                    except Exception:
+                        log.exception("Could not apply saved voice")
                 elif voice_values and not self.voice_choice.get():
                     self.voice_choice.set(voice_values[0])
                     
-        except Exception as e:
-            pass
+        except Exception:
+            log.exception("Voice list refresh failed")
 
     # ---------- Timers/Toggles tab ----------
     def _build_timers_tab(self, frame: ttk.Frame) -> None:
@@ -10562,8 +10570,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
             for fn in os.listdir(self.settings_dir):
                 if fn.lower().endswith(".json"):
                     names.append(os.path.splitext(fn)[0])
-        except Exception:
-            pass
+        except OSError:
+            log.exception("Could not list ship preset files")
         
         # Group by ship type
         groups = {}
