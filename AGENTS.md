@@ -260,7 +260,7 @@ Report applicable checks that could not be run; do not claim visual verification
 
 ## Git
 
-- Commit messages are concise and focus on the "why". No `Co-Authored-By` trailers and no Claude/Anthropic or Codex attribution in commits, PR descriptions, or committed content.
+- Commit messages are concise and focus on the "why". Attribution trailers (`Co-Authored-By`) are fine; follow the attribution guidance the tool provides.
 - When asked to commit and push, use `git add -A` to include all workspace changes, including pre-existing modified and untracked files, unless the user explicitly limits the scope.
 - **Exception:** the user cleans and commits the shipped `Voiceattack Profile/*.vap` files (including test copies such as `backup_clean.vap`) and `docs/INSTALLER_RELEASE_NOTES.txt` themselves. Leave them out of your commits with `git add -A -- . ":(exclude)Voiceattack Profile/*.vap" ":(exclude)docs/INSTALLER_RELEASE_NOTES.txt"`, and don't offer to clean or commit them. Before a release, at most mention once if the shipped profile still has shortcuts.
 - The established remote for this checkout is `https://github.com/Viper-Dude/EliteMining.git`. Confirm the current configuration still matches; do not change the destination automatically.
