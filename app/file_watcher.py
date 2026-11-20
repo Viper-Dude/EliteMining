@@ -31,34 +31,50 @@ def _is_elite_file(file_path: str) -> bool:
 
 class EliteFileHandler(FileSystemEventHandler):
     """Handles file system events for Elite Dangerous files"""
-    
+
     def __init__(self, callback: Callable[[str], None]):
         super().__init__()
         self.callback = callback
         self.last_event_time = {}
         self.debounce_delay = 0.1  # 100ms debounce for rapid file changes
-    
+        self._pending = {}
+        self._lock = threading.Lock()
+
     def on_modified(self, event):
         if event.is_directory:
             return
-            
+
         file_path = event.src_path
+        if not _is_elite_file(file_path):
+            return
+
         current_time = time.time()
-        
-        # Debounce rapid file changes (Elite can write files multiple times quickly)
-        if file_path in self.last_event_time:
-            if current_time - self.last_event_time[file_path] < self.debounce_delay:
+        with self._lock:
+            last = self.last_event_time.get(file_path)
+            if last is not None and current_time - last < self.debounce_delay:
+                # Elite can write a file several times in a burst. Defer instead of dropping, so the
+                # final change is always handled (the callback reads the file when it fires).
+                if file_path not in self._pending:
+                    timer = threading.Timer(self.debounce_delay, self._fire_pending, args=(file_path,))
+                    timer.daemon = True
+                    self._pending[file_path] = timer
+                    timer.start()
                 return
-        
-        self.last_event_time[file_path] = current_time
-        
-        # Only process Elite Dangerous files
-        if _is_elite_file(file_path):
-            try:
-                self.callback(file_path)
-            except Exception as e:
-                print(f"[FileWatcher] Error in callback for {file_path}: {e}")
-    
+            self.last_event_time[file_path] = current_time
+
+        self._run_callback(file_path)
+
+    def _fire_pending(self, file_path: str):
+        with self._lock:
+            self._pending.pop(file_path, None)
+            self.last_event_time[file_path] = time.time()
+        self._run_callback(file_path)
+
+    def _run_callback(self, file_path: str):
+        try:
+            self.callback(file_path)
+        except Exception as e:
+            print(f"[FileWatcher] Error in callback for {file_path}: {e}")
 
 
 class EliteFileWatcher:

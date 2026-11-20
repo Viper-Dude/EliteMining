@@ -24,6 +24,7 @@ Origin: an honest review of the GUI, features, performance, the file watcher (wa
 - The callback handles only Market.json and NavRoute.json. The old "last 2 KB / last 10 lines" journal branch is deleted.
 - Jumps-left is owned by the 2 s `_poll_route_status` in `main.py`. It can lag up to 2 s.
 - `App._rewatch_journal_dir(old, new)` moves the watch when the journal folder changes (both change sites).
+- The 100 ms debounce in `EliteFileHandler` now defers instead of dropping: the first change in a burst fires immediately, later ones schedule one trailing call (`_pending`, one timer per file). Covered only by a throwaway test, not a repo check.
 - `remove_watch` unschedules the watchdog handler (`self.watches`). One module-level `_is_elite_file` (includes navroute.json).
 
 **UI and logging**
@@ -48,7 +49,6 @@ Origin: an honest review of the GUI, features, performance, the file watcher (wa
    - Settings -> import journal history with a real folder.
    - Check the log for new "failed" lines from the logging changes.
 2. **`docs/INSTALLER_RELEASE_NOTES.txt`** (user-owned): add the five new 5.6.7 lines (see `PATCHNOTES_v5.6.7.md`).
-3. **Debounce gap (small):** `EliteFileHandler.on_modified` in `file_watcher.py` has a 100 ms debounce with no trailing call, so a quick follow-up change to Market.json or NavRoute.json can be dropped. Fix: schedule a trailing call.
 
 ## Deliberately skipped (and why)
 
