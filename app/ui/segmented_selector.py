@@ -2,22 +2,26 @@
 import tkinter as tk
 import tkinter.font as tkfont
 
+from ui.themed_slider import text_on
+
 
 class SegmentedSelector(tk.Canvas):
     def __init__(self, parent, choices, variable, bg="#1e1e1e", track="#3a3a3a", accent="#ff8c00",
-                 fg="#ffffff", selected_fg="#000000", disabled="#666666", font=None, scale=1.0):
+                 fg="#ffffff", selected_fg=None, disabled="#666666", font=None, scale=1.0):
         self._choices = list(choices)
         self._var = variable
         self._enabled = True
         self._font = font
-        self._colors = dict(track=track, accent=accent, fg=fg, selected_fg=selected_fg, disabled=disabled)
-        pad = int(14 * scale)
+        self._colors = dict(track=track, accent=accent, fg=fg, selected_fg=selected_fg or text_on(accent),
+                            disabled=disabled)
+        self._outline = ""
+        pad = int(10 * scale)
         try:
             measure = tkfont.Font(font=font).measure
             self._seg_w = max(measure(label) for _, label in self._choices) + 2 * pad
         except tk.TclError:
             self._seg_w = int(80 * scale)
-        self._h = int(26 * scale)
+        self._h = int(21 * scale)
         self._m = max(2, int(2 * scale))
         super().__init__(parent, width=self._seg_w * len(self._choices) + 2 * self._m, height=self._h + 2 * self._m,
                          bg=bg, highlightthickness=0, bd=0, cursor="hand2")
@@ -40,7 +44,10 @@ class SegmentedSelector(tk.Canvas):
         c = self._colors
         m = self._m
         self.create_rectangle(0, 0, self._seg_w * len(self._choices) + 2 * m, self._h + 2 * m,
-                              fill=c["track"], outline="")
+                              fill=self._outline or c["track"], outline="")
+        if self._outline:
+            self.create_rectangle(m, m, self._seg_w * len(self._choices) + m, self._h + m,
+                                  fill=c["track"], outline="")
         current = self._var.get()
         for i, (key, label) in enumerate(self._choices):
             x0 = m + i * self._seg_w
@@ -62,6 +69,10 @@ class SegmentedSelector(tk.Canvas):
             self._var.set(self._choices[index][0])
 
     def configure(self, cnf=None, **kw):
+        # outline: border colour around the control (e.g. "changed since preset save"); "" for none
+        if "outline" in kw:
+            self._outline = kw.pop("outline") or ""
+            self.refresh()
         if "state" in kw:
             self._enabled = kw.pop("state") != "disabled"
             self.configure(cursor="hand2" if self._enabled else "arrow")

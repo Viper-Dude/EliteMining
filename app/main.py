@@ -18,7 +18,7 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 from ui.striped_treeview import StripedTreeview
-from ui.themed_checkbox import ThemedCheckbutton
+from ui.themed_checkbox import ThemedCheckbutton, ThemedRadiobutton
 from ui.theme import modern_color
 from ui.search_control import SearchControl
 from ui.color_swatches import ColorSwatchPicker
@@ -5810,8 +5810,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         header.grid(row=0, column=0, columnspan=4, sticky="w", pady=(0, 8))
 
         ttk.Label(frame, text=t('voiceattack.firegroup')).grid(row=1, column=1, sticky="w", padx=(0, 6))
-        ttk.Label(frame, text=t('voiceattack.primary_fire')).grid(row=1, column=2, sticky="w")
-        ttk.Label(frame, text=t('voiceattack.secondary_fire')).grid(row=1, column=3, sticky="w")
+        ttk.Label(frame, text=t('voiceattack.fire_button')).grid(row=1, column=2, columnspan=2, sticky="w")
 
         row = 2
         for tool in TOOL_ORDER:
@@ -5832,17 +5831,16 @@ class App(tk.Tk, ColumnVisibilityMixin):
                 ttk.Label(frame, text="—").grid(row=row, column=1, sticky="w")
 
             if cfg["btn"] is not None:
-                for btn_value, btn_text_key, btn_column in ((1, 'voiceattack.primary', 2), (2, 'voiceattack.secondary', 3)):
-                    radio = tk.Radiobutton(frame, text=t(btn_text_key), value=btn_value, variable=self.tool_btn[tool], bg="#1e1e1e", fg="#ffffff", selectcolor="#1e1e1e", activebackground="#1e1e1e", activeforeground="#ffffff", highlightthickness=0, bd=0, font=self._scaled_font(9), padx=4, pady=2, anchor="w")
-                    radio.grid(row=row, column=btn_column, sticky="w")
-                    # Only the selected button is coloured, so it shows what the new choice is
-                    self._ship_diff_widgets.append((radio, "fg", "#ffffff", (("Firegroups", tool, "btn"),),
-                                                    lambda var=self.tool_btn[tool], v=btn_value: var.get() == v))
+                fire_btn = SegmentedSelector(
+                    frame, [(1, t('voiceattack.primary')), (2, t('voiceattack.secondary'))], self.tool_btn[tool],
+                    bg="#1e1e1e", accent=slider_colors(self.current_theme)["accent"], font=self._scaled_font(8),
+                    scale=self._scaled_px(100) / 100)
+                fire_btn.grid(row=row, column=2, columnspan=2, sticky="w", pady=2)
+                self._ship_diff_widgets.append((fire_btn, "outline", "", (("Firegroups", tool, "btn"),)))
                 # Auto-save on change
                 self.tool_btn[tool].trace_add("write", lambda *args, t=tool: self._save_fire_button(t))
             else:
                 ttk.Label(frame, text="—").grid(row=row, column=2, sticky="w")
-                ttk.Label(frame, text="—").grid(row=row, column=3, sticky="w")
             row += 1
 
         # Tip card with bullets - use theme colors
@@ -7764,7 +7762,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
             [("Small", t('settings.text_size_small')), ("Normal", t('settings.text_size_normal')),
              ("Large", t('settings.text_size_large'))],
             self.text_overlay_size, bg=_gs_bg, accent=slider_colors(_gs_theme)["accent"],
-            font=self._scaled_font(9), scale=self._scaled_px(100) / 100)
+            font=self._scaled_font(8), scale=self._scaled_px(100) / 100)
         self.size_combo.pack(side="left")
         r += 1
         _desc(r, t('settings.overlay_appearance_desc'))
@@ -15997,7 +15995,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         # Start market API status check
         self.after(1000, self._check_market_api_status)
 
-        rb1 = tk.Radiobutton(row0_frame, text=t('marketplace.near_system'), variable=self.marketplace_search_mode,
+        rb1 = ThemedRadiobutton(row0_frame, text=t('marketplace.near_system'), variable=self.marketplace_search_mode,
                       value="near_system", bg=_mkt_cb_bg, fg="#ffffff", selectcolor=_mkt_cb_select,
                       activebackground=_mkt_cb_bg, activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=self._scaled_font(9))
@@ -16005,7 +16003,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         rb1.config(takefocus=0)
         ToolTip(rb1, t('tooltips.near_system_search'))
         
-        rb2 = tk.Radiobutton(row0_frame, text=t('marketplace.galaxy_wide'), variable=self.marketplace_search_mode,
+        rb2 = ThemedRadiobutton(row0_frame, text=t('marketplace.galaxy_wide'), variable=self.marketplace_search_mode,
                       value="galaxy_wide", bg=_mkt_cb_bg, fg="#ffffff", selectcolor=_mkt_cb_select,
                       activebackground=_mkt_cb_bg, activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=self._scaled_font(9))
@@ -16299,7 +16297,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                               bg=_trade_cb_bg, fg="gray", font=self._scaled_font(8))
             self.trade_total_label.pack(side="right", padx=(0, 5))
 
-        rb1 = tk.Radiobutton(row0_frame, text=t('marketplace.near_system'), variable=self.trade_search_mode,
+        rb1 = ThemedRadiobutton(row0_frame, text=t('marketplace.near_system'), variable=self.trade_search_mode,
                       value="near_system", bg=_trade_cb_bg, fg="#ffffff", selectcolor=_trade_cb_select,
                       activebackground=_trade_cb_bg, activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=self._scaled_font(9))
@@ -16307,7 +16305,7 @@ class App(tk.Tk, ColumnVisibilityMixin):
         rb1.config(takefocus=0)
         ToolTip(rb1, t('tooltips.near_system_search'))
         
-        rb2 = tk.Radiobutton(row0_frame, text=t('marketplace.galaxy_wide'), variable=self.trade_search_mode,
+        rb2 = ThemedRadiobutton(row0_frame, text=t('marketplace.galaxy_wide'), variable=self.trade_search_mode,
                       value="galaxy_wide", bg=_trade_cb_bg, fg="#ffffff", selectcolor=_trade_cb_select,
                       activebackground=_trade_cb_bg, activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=self._scaled_font(9))

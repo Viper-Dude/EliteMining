@@ -244,8 +244,15 @@ class VoiceAttackChecks(unittest.TestCase):
         keywords = {k.arg: ast.unparse(k.value) for k in call.keywords}
         self.assertEqual(keywords.get('command'), 'self._save_thrust_open')
 
+        # Load the stepper and its colour helper without importing the ui package (it needs the real config)
+        shapes = types.ModuleType('ui.smooth_shapes')
+        exec((ROOT / 'app/ui/smooth_shapes.py').read_text(encoding='utf-8'), shapes.__dict__)
+        slider = types.ModuleType('ui.themed_slider')
         stepper_ns = {}
-        exec((ROOT / 'app/ui/stepper.py').read_text(encoding='utf-8'), stepper_ns)
+        with patch.dict(sys.modules, {'ui': types.ModuleType('ui'), 'ui.smooth_shapes': shapes,
+                                      'ui.themed_slider': slider}):
+            exec((ROOT / 'app/ui/themed_slider.py').read_text(encoding='utf-8'), slider.__dict__)
+            exec((ROOT / 'app/ui/stepper.py').read_text(encoding='utf-8'), stepper_ns)
         Stepper = stepper_ns['Stepper']
         root = tk.Tk()
         root.withdraw()

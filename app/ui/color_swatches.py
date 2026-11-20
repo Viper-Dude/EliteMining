@@ -2,6 +2,8 @@
 import tkinter as tk
 import tkinter.font as tkfont
 
+from ui.smooth_shapes import smooth_circle
+
 
 class ColorSwatchPicker(tk.Canvas):
     def __init__(self, parent, options, variable, names=None, bg="#1e1e1e", ring="#ff8c00",
@@ -12,8 +14,8 @@ class ColorSwatchPicker(tk.Canvas):
         self._enabled = True
         self._font = font
         self._colors = dict(ring=ring, fg=fg, disabled=disabled, outline="#101010")
-        self._d = int(20 * scale)
-        self._gap = int(8 * scale)
+        self._d = int(15 * scale)
+        self._gap = int(6 * scale)
         self._pad = int(4 * scale)
         self._ring_w = max(2, int(2 * scale))
         n = len(options)
@@ -54,11 +56,13 @@ class ColorSwatchPicker(tk.Canvas):
             x0 = self._x0(i)
             cx = x0 + r
             if key == current:
-                ro = r + self._ring_w + 1
-                self.create_oval(cx - ro, self._cy - ro, cx + ro, self._cy + ro,
-                                 outline=c["ring"] if self._enabled else c["disabled"], width=self._ring_w)
-            self.create_oval(x0, self._cy - r, x0 + self._d, self._cy + r,
-                             fill=hexcol if self._enabled else c["disabled"], outline=c["outline"], width=1)
+                ring = smooth_circle(self, int(self._d + 2 * (self._ring_w + 1)), fill=self.cget("bg"),
+                                     outline=c["ring"] if self._enabled else c["disabled"],
+                                     outline_width=self._ring_w)
+                self.create_image(cx, self._cy, image=ring)
+            dot = smooth_circle(self, int(self._d), fill=hexcol if self._enabled else c["disabled"],
+                                outline=c["outline"], outline_width=1)
+            self.create_image(cx, self._cy, image=dot)
         self.create_text(self._text_x, self._cy, anchor="w", text=self._names.get(current, current),
                          fill=c["fg"] if self._enabled else c["disabled"], font=self._font)
 

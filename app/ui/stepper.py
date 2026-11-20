@@ -1,6 +1,8 @@
 """Flat number stepper: [-] value [+] with wheel, arrow keys and press-and-hold (replaces tk.Spinbox)."""
 import tkinter as tk
 
+from ui.themed_slider import text_on
+
 
 class Stepper(tk.Frame):
     _REPEAT_DELAY = 400
@@ -97,7 +99,7 @@ class Stepper(tk.Frame):
         if not self._enabled:
             return
         c = self._colors
-        btn.configure(bg=c["accent"] if inside else c["button_bg"], fg="#000000" if inside else c["fg"])
+        btn.configure(bg=c["accent"] if inside else c["button_bg"], fg=text_on(c["accent"]) if inside else c["fg"])
 
     def _on_wheel(self, event):
         self._nudge(1 if event.delta > 0 else -1)

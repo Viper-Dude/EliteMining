@@ -7,7 +7,7 @@ from ui.striped_treeview import StripedTreeview
 from ui.theme import modern_color
 from ui.search_control import SearchControl
 from ui.stepper import Stepper
-from ui.themed_checkbox import ThemedCheckbutton
+from ui.themed_checkbox import ThemedCheckbutton, ThemedRadiobutton
 from ui.themed_slider import slider_colors
 
 import tkinter as tk
@@ -916,11 +916,11 @@ class RingFinder(ColumnVisibilityMixin):
         rb_style_spansh = rb_style.copy()
         rb_style_spansh["fg"] = "#00CED1"  # Cyan color for Spansh
         
-        self.data_source_db_rb = tk.Radiobutton(source_frame, text=t('ring_finder.data_source_database'), variable=self.data_source_var, 
+        self.data_source_db_rb = ThemedRadiobutton(source_frame, text=t('ring_finder.data_source_database'), variable=self.data_source_var, 
                       value="database", command=self._on_data_source_changed, **rb_style_db)
         self.data_source_db_rb.pack(side="left", padx=(0, 15))
         
-        self.data_source_spansh_rb = tk.Radiobutton(source_frame, text=t('ring_finder.data_source_spansh'), variable=self.data_source_var, 
+        self.data_source_spansh_rb = ThemedRadiobutton(source_frame, text=t('ring_finder.data_source_spansh'), variable=self.data_source_var, 
                       value="spansh", command=self._on_data_source_changed, **rb_style_spansh)
         self.data_source_spansh_rb.pack(side="left", padx=(0, 15))
         
@@ -931,7 +931,7 @@ class RingFinder(ColumnVisibilityMixin):
         self.auto_save_cb.configure(state="disabled")  # enabled by _on_data_source_changed for Spansh/Both
         ToolTip(self.auto_save_cb, t('ring_finder.auto_save_tooltip'))
 
-        self.data_source_both_rb = tk.Radiobutton(source_frame, text=t('ring_finder.data_source_both'), variable=self.data_source_var,
+        self.data_source_both_rb = ThemedRadiobutton(source_frame, text=t('ring_finder.data_source_both'), variable=self.data_source_var,
                       value="both", command=self._on_data_source_changed, **rb_style)
         self.data_source_both_rb.pack(side="left", padx=(0, 15))
 
@@ -11053,7 +11053,7 @@ class RingFinder(ColumnVisibilityMixin):
             for i, (label, value) in enumerate(reserve_options):
                 rb_row = i // 3
                 rb_col = i % 3
-                tk.Radiobutton(reserve_frame, text=label, variable=reserve_var, value=value, **rb_style).grid(row=rb_row, column=rb_col, sticky="w", padx=(0, 10), pady=2)
+                ThemedRadiobutton(reserve_frame, text=label, variable=reserve_var, value=value, **rb_style).grid(row=rb_row, column=rb_col, sticky="w", padx=(0, 10), pady=2)
 
             current_reserve = self.user_db.get_reserve_level(system_name, ring_name)
             reserve_var.set(current_reserve if current_reserve else "None")
@@ -11474,9 +11474,9 @@ class RingFinder(ColumnVisibilityMixin):
             # Dark themed radio buttons
             rb_style = {"bg": "#1e1e1e", "fg": "#e0e0e0", "activebackground": "#2b2b2b", 
                         "activeforeground": "#ffffff", "selectcolor": "#1e1e1e", "relief": "flat"}
-            tk.Radiobutton(overlap_frame, text=t('context_menu.none'), variable=overlap_var, value="None", **rb_style).pack(side="left", padx=(0, 10))
-            tk.Radiobutton(overlap_frame, text="2x", variable=overlap_var, value="2x", **rb_style).pack(side="left", padx=(0, 10))
-            tk.Radiobutton(overlap_frame, text="3x", variable=overlap_var, value="3x", **rb_style).pack(side="left")
+            ThemedRadiobutton(overlap_frame, text=t('context_menu.none'), variable=overlap_var, value="None", **rb_style).pack(side="left", padx=(0, 10))
+            ThemedRadiobutton(overlap_frame, text="2x", variable=overlap_var, value="2x", **rb_style).pack(side="left", padx=(0, 10))
+            ThemedRadiobutton(overlap_frame, text="3x", variable=overlap_var, value="3x", **rb_style).pack(side="left")
             
             # Load current overlap value when material changes
             def on_material_change(*args):
@@ -11882,7 +11882,7 @@ class RingFinder(ColumnVisibilityMixin):
             for i, (label, value) in enumerate(ring_type_options):
                 row = i // 3
                 col = i % 3
-                tk.Radiobutton(ring_type_frame, text=label, variable=ring_type_var, value=value, **rb_style).grid(row=row, column=col, sticky="w", padx=(0, 10), pady=2)
+                ThemedRadiobutton(ring_type_frame, text=label, variable=ring_type_var, value=value, **rb_style).grid(row=row, column=col, sticky="w", padx=(0, 10), pady=2)
 
             # Load current ring type value
             current_ring_type = self.user_db.get_ring_type(system_name, ring_name)

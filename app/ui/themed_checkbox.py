@@ -1,18 +1,20 @@
-"""tk.Checkbutton with a drawn rounded box and tick instead of the Windows indicator.
+"""Checkbutton / Radiobutton with a drawn rounded box (tick) or ring (dot) instead of the Windows indicator.
 
-Stays a real Checkbutton (same class name, variable, command, state and fg), so code that
-walks or recolours checkbuttons keeps working.
+They stay real Checkbutton / Radiobutton widgets (same class name, variable, command, state and fg),
+so code that walks or recolours them keeps working.
 """
 import tkinter as tk
 
 from PIL import Image, ImageDraw, ImageTk
 
+from ui.themed_slider import text_on
+
 _SS = 4  # supersampling factor for smooth corners
 
 
-def _box_image(root, size, gap, border, fill, tick):
+def _box_image(root, size, gap, border, fill, tick, round_shape=False):
     cache = root.__dict__.setdefault("_themed_check_images", {})
-    key = (size, gap, border, fill, tick)
+    key = (size, gap, border, fill, tick, round_shape)
     if key in cache:
         return cache[key]
     s = size * _SS
@@ -21,7 +23,10 @@ def _box_image(root, size, gap, border, fill, tick):
     w = max(_SS, int(s * 0.09))
     d.rounded_rectangle((w // 2, w // 2, s - 1 - w // 2, s - 1 - w // 2), radius=int(s * 0.22),
                         fill=fill, outline=border, width=w)
-    if tick:
+    if tick and round_shape:
+        c, r = s / 2, s * 0.17
+        d.ellipse((c - r, c - r, c + r, c + r), fill=tick)
+    elif tick:
         d.line([(s * 0.26, s * 0.52), (s * 0.43, s * 0.69), (s * 0.75, s * 0.33)], fill=tick,
                width=max(_SS, int(s * 0.13)), joint="curve")
     img = img.resize((size + gap, size), Image.LANCZOS)
@@ -49,7 +54,9 @@ def _parent_bg(parent):
         return ttk.Style().lookup(style, "background") or "#1e1e1e"
 
 
-class ThemedCheckbutton(tk.Checkbutton):
+class _ThemedToggle:
+    _round = False
+
     # Tk draws a stipple over images on a disabled widget, so "disabled" is emulated: the Tk
     # state stays normal while clicks are blocked and cget('state') reports "disabled".
 
@@ -63,10 +70,10 @@ class ThemedCheckbutton(tk.Checkbutton):
         root = parent._root()
         gap = int(6 * scale) if kw.get("text") else 0
         self._images = {
-            False: (_box_image(root, size, gap, "#8a8a8a", "#151515", None),
-                    _box_image(root, size, gap, accent, accent, "#101010")),
-            True: (_box_image(root, size, gap, "#4a4a4a", "#151515", None),
-                   _box_image(root, size, gap, "#555555", "#555555", "#8a8a8a")),
+            False: (_box_image(root, size, gap, "#8a8a8a", "#151515", None, self._round),
+                    self._on_image(root, size, gap, accent, False)),
+            True: (_box_image(root, size, gap, "#4a4a4a", "#151515", None, self._round),
+                   self._on_image(root, size, gap, accent, True)),
         }
         self._disabled = kw.pop("state", "normal") == "disabled"
         self._fg = kw.pop("fg", kw.pop("foreground", "#e0e0e0"))
@@ -85,6 +92,15 @@ class ThemedCheckbutton(tk.Checkbutton):
             root._themed_check_tag_bound = True
         self.bindtags((_TAG,) + self.bindtags())
         self._apply_look()
+
+    def _on_image(self, root, size, gap, accent, disabled):
+        if self._round:
+            if disabled:
+                return _box_image(root, size, gap, "#555555", "#555555", "#8a8a8a", True)
+            return _box_image(root, size, gap, accent, accent, text_on(accent), True)
+        if disabled:
+            return _box_image(root, size, gap, "#555555", "#555555", "#8a8a8a")
+        return _box_image(root, size, gap, accent, accent, text_on(accent))
 
     def _apply_look(self):
         off, on = self._images[self._disabled]
@@ -134,3 +150,11 @@ class ThemedCheckbutton(tk.Checkbutton):
     def invoke(self):
         if not self._disabled:
             return super().invoke()
+
+
+class ThemedCheckbutton(_ThemedToggle, tk.Checkbutton):
+    pass
+
+
+class ThemedRadiobutton(_ThemedToggle, tk.Radiobutton):
+    _round = True
