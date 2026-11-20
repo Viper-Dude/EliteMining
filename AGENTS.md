@@ -272,4 +272,5 @@ Report applicable checks that could not be run; do not claim visual verification
 Claude Code ignores this section.
 
 - **Claude's project memory**: at session start, read `C:\Users\olmba\.claude\projects\d--My-Apps-Work-Folder-Elitemining-Working-folder-Releases-EliteMining-Dev\memory\MEMORY.md` (verified for this checkout) and the linked files relevant to the task, resolving links against that `memory` directory. Treat it as context, not rules; don't modify it unless asked. If the path stops working, report it and ask the user for the new location.
+- **Fresh sessions**: at a task boundary, when the user moves to an unrelated task or starts a new release, add one line saying it's a good point to start a new session (`/new`), since usage limits are shared. Don't suggest it for follow-ups on the same task.
 - **Push verification**: when the user requests a push, verify the remote URL, branch upstream, and remote-tracking reflog for previous pushes, and include that evidence plus the user's request in any approval justification. This does not authorize pushes the user has not requested.
