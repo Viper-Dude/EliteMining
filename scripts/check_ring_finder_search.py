@@ -228,6 +228,92 @@ class RingFinderSearchTests(unittest.TestCase):
                                   for key in f.results_tree.order], expected)
 
 
+SPANSH_CONSTANTS = ('SPANSH_SIGNAL_NAMES', 'APP_SIGNAL_NAMES', 'SPANSH_HOTSPOT_SIGNALS')
+
+
+def load_spansh_search():
+    cls = load_methods('app/ring_finder_search.py', 'RingFinderSearchMixin', {
+        '_search_spansh_with_filters', '_spansh_bodies_to_hotspots', '_is_valid_mining_material',
+    })
+    namespace = cls._search_spansh_with_filters.__globals__
+    tree = ast.parse((ROOT / 'app/ring_finder_search.py').read_text(encoding='utf-8-sig'))
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(getattr(target, 'id', None) in SPANSH_CONSTANTS
+                                                for target in node.targets):
+            exec(compile(ast.Module(body=[node], type_ignores=[]), 'ring_finder_search.py', 'exec'), namespace)
+    namespace.update(log=logging.getLogger('spansh-search-test'),
+                     translate_ring_type=lambda value: value,
+                     translate_reserve_level=lambda value: value)
+    return cls
+
+
+SpanshSearch = load_spansh_search()
+
+
+class SpanshPagingTests(unittest.TestCase):
+    def setUp(self):
+        f = self.finder = SpanshSearch()
+        f.parent = Parent()
+        f.status_var = Mock()
+        f._ring_type_rev_map = {}
+        f._resolve_spansh_system_name = Mock(return_value=None)
+        f._is_all_minerals = lambda value: value == 'All Minerals'
+        f._update_spansh_status = Mock()
+        f._last_spansh_call = 0
+        f.user_db = Mock()
+        self.payloads = []
+        sleep = patch('time.sleep')
+        sleep.start()
+        self.addCleanup(sleep.stop)
+
+    def serve(self, signal='Painite', pages=10, page_size=500):
+        def request(service, method, url, json=None, **kwargs):
+            self.payloads.append(json)
+            page = json['page']
+            bodies = [] if page >= pages else [
+                dict(system_name=f'Sys {page}-{i}', name=f'Body {i}', distance=0.01 * (page * page_size + i),
+                     rings=[dict(type='Icy', name=f'Sys {page}-{i} A Ring',
+                                 signals=[dict(name=signal, count=2)])])
+                for i in range(page_size)]
+            return SimpleNamespace(raise_for_status=lambda: None,
+                                   json=lambda: dict(count=pages * page_size, results=bodies))
+        self.finder._search_spansh_with_filters.__globals__['tracked_request'] = request
+
+    def search(self, material='All Minerals', limit=150, stop_at_limit=True):
+        return self.finder._search_spansh_with_filters(
+            'Sol', 'All', material, 100, limit, dict(x=0, y=0, z=0), stop_at_limit=stop_at_limit)
+
+    def test_paging_stops_once_enough_rings_are_collected(self):
+        self.serve()
+        rows = self.search(limit=600)
+        self.assertEqual(len(self.payloads), 2)
+        self.assertEqual(len(rows), 1000)
+
+    def test_paging_continues_when_later_filters_may_drop_rows(self):
+        self.serve()
+        self.search(limit=150, stop_at_limit=False)
+        self.assertEqual(len(self.payloads), 10)
+
+    def test_short_page_ends_paging(self):
+        self.serve(pages=1, page_size=40)
+        self.search(stop_at_limit=False)
+        self.assertEqual(len(self.payloads), 1)
+
+    def test_all_minerals_asks_spansh_for_hotspot_rings_only(self):
+        self.serve()
+        self.search()
+        names = self.payloads[0]['filters']['ring_signals'][0]['name']
+        self.assertIn('Void Opal', names)
+        self.assertIn('Painite', names)
+
+    def test_void_opals_use_spansh_spelling_and_come_back_in_app_spelling(self):
+        self.serve(signal='Void Opal', pages=1, page_size=1)
+        rows = self.search(material='Void Opals')
+        self.assertEqual(self.payloads[0]['filters']['ring_signals'][0]['name'], ['Void Opal'])
+        self.assertEqual(len(rows), 1)
+        self.assertEqual((rows[0]['type'], rows[0]['count']), ('Void Opals (2)', 2))
+
+
 class RingFinderSaveFailureTests(unittest.TestCase):
     def setUp(self):
         Saves._save_filter_settings.__globals__.update(os=os, log=logging.getLogger('ring-save-test'))

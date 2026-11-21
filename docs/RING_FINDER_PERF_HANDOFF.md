@@ -36,8 +36,8 @@ Make Ring Finder searches (Local, Spansh, Both, Ring Search, Any Ring) show resu
 |---|---|---|---|---|
 | 0a | Delete unused methods | Sonnet 5.5, low | No | Done, user-tested, committed `1ce9b69` |
 | 0b | Move search code into its own module | Opus 5.5, high | No | Done 21 Nov 2026, user-tested, committed |
-| 1 | Stop Spansh paging at the result limit, plus the D2 test | Opus 5.5, medium | No | Next |
-| 2 | EDSM fallback after display | Opus 5.5, high | Yes | Not started |
+| 1 | Stop Spansh paging at the result limit, plus the D2 test | Opus 5.5, medium | No | Done 21 Nov 2026, user-tested, committed |
+| 2 | EDSM fallback after display | Opus 5.5, high | Yes | Next |
 | 3 | PowerPlay backfill: parallel and cached | Opus 5.5, high | Yes | Not started |
 | 4 | Cache the Spansh name lookup | Sonnet 5.5, medium | No | Not started |
 | 5 | Remove shared state from worker threads | Opus 5.5, high | Yes | Not started |
@@ -94,6 +94,16 @@ Recommended order: 0a, 0b, 1, 2, 3, 4, 5, 6, 7, 8, 9. Steps 1–3 give the bigge
 - D2 experiment: for "All Minerals", send `ring_signals` with every valid mineral name (`_is_valid_mining_material` list) and `count: [1, 9999]`. Compare ring counts against the current method for 2–3 reference systems before keeping it.
 - Tests: paging stops at the limit, Stop still works between pages, and the limit counts rings, not rows.
 - Model: Opus 5.5, medium effort.
+- Done 21 Nov 2026, all in `ring_finder_search.py`:
+  - The per-body conversion moved into `_spansh_bodies_to_hotspots()` and now runs per page.
+  - Paging stops once `max_results` rings are collected, or on a short page.
+  - The early stop is off (`spansh_stop_at_limit=False`) when a filter that runs after the fetch could drop rows: Min Hotspots > 1, Unvisited Only, a Reserve filter, or a Power/PowerPlay State filter. The flag is computed in `search_hotspots` and passed through `_search_worker` and `_get_hotspots`.
+- D2 kept. "All Minerals" sends `ring_signals` with `SPANSH_HOTSPOT_SIGNALS`, the 13 names Spansh actually uses. Live test, closest 150 rings:
+  - Sol 50 LY: identical. The old method used 10 pages (20.6 s) and only reached 33 LY. The filtered one covered the full 50 LY.
+  - Colonia 100 LY: identical. Old: 10 pages, 21.9 s, 21 LY.
+  - The real function, live, for Sol 50 LY with limit 150: 1 request, 0.7 s.
+- Bug found and fixed: Spansh spells it "Void Opal". A Spansh "Void Opals" search returned 0 results, and "All Minerals" dropped Void Opal hotspots, because `_is_valid_mining_material` doesn't know the singular. `SPANSH_SIGNAL_NAMES` and `APP_SIGNAL_NAMES` now map the name both ways, so saved rows stay "Void Opals". Any Ring mode (`_search_spansh_rings`) still shows the raw Spansh name; step 8 replaces that path.
+- Tests: 5 new in `check_ring_finder_search.py` (`SpanshPagingTests`); 16 OK. `check_search_stop` 19 OK.
 
 ### 2 — EDSM fallback after display
 

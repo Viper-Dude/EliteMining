@@ -22,6 +22,16 @@ except Exception:
 # Same logger name as ring_finder.py so log lines keep their source
 log = logging.getLogger('ring_finder')
 
+# Spansh names Void Opal hotspots in the singular; the app and saved data use "Void Opals"
+SPANSH_SIGNAL_NAMES = {'Void Opals': 'Void Opal'}
+APP_SIGNAL_NAMES = {spansh: app for app, spansh in SPANSH_SIGNAL_NAMES.items()}
+# Every hotspot mineral Spansh indexes, in Spansh's spelling
+SPANSH_HOTSPOT_SIGNALS = [
+    'Alexandrite', 'Benitoite', 'Bromellite', 'Grandidierite', 'Low Temperature Diamonds',
+    'Monazite', 'Musgravite', 'Painite', 'Platinum', 'Rhodplumsite', 'Serendibite',
+    'Tritium', 'Void Opal',
+]
+
 
 def translate_reserve_level(reserve_level) -> str:
     """Translate reserve level to localized display text
@@ -243,16 +253,24 @@ class RingFinderSearchMixin:
             max_results = None
             data_source = "database"
 
+        # Spansh may stop paging once it has enough rings, unless a filter applied after the
+        # fetch could still discard some of them and leave the list short
+        reserve_filter = self.reserve_var.get()
+        spansh_stop_at_limit = not (
+            min_hotspots > 1 or self.unvisited_only_var.get()
+            or (reserve_filter and reserve_filter != t('ring_finder.all_reserves'))
+            or pp_power_filter != 'Any' or pp_state_filter != 'Any')
+
         # Increment search generation to cancel any in-flight searches
         self._search_generation += 1
         current_generation = self._search_generation
 
         # Run search in background - pass reference system coords and max results to worker
         threading.Thread(target=self._search_worker,
-                        args=(reference_system, material_filter, specific_material, confirmed_only, max_distance, self.current_system_coords, max_results, min_hotspots, any_ring_mode, overlaps_only, res_only, data_source, ring_type_only, current_generation, pp_power_filter, pp_state_filter, use_spansh_pp),
+                        args=(reference_system, material_filter, specific_material, confirmed_only, max_distance, self.current_system_coords, max_results, min_hotspots, any_ring_mode, overlaps_only, res_only, data_source, ring_type_only, current_generation, pp_power_filter, pp_state_filter, use_spansh_pp, spansh_stop_at_limit),
                         daemon=True).start()
 
-    def _search_worker(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, reference_coords, max_results, min_hotspots: int = 1, any_ring_mode: bool = False, overlaps_only: bool = False, res_only: bool = False, data_source: str = "both", ring_type_only: bool = False, search_generation: int = 0, pp_power: str = 'Any', pp_state: str = 'Any', use_spansh_pp: bool = True):
+    def _search_worker(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, reference_coords, max_results, min_hotspots: int = 1, any_ring_mode: bool = False, overlaps_only: bool = False, res_only: bool = False, data_source: str = "both", ring_type_only: bool = False, search_generation: int = 0, pp_power: str = 'Any', pp_state: str = 'Any', use_spansh_pp: bool = True, spansh_stop_at_limit: bool = False):
         """Background worker for hotspot search"""
         try:
             # Wait for database to be ready (with timeout)
@@ -342,7 +360,8 @@ class RingFinderSearchMixin:
                     print(f" DEBUG: RES Only mode - found {len(hotspots)} RES locations")
             else:
                 hotspots = self._get_hotspots(reference_system, material_filter, specific_material, confirmed_only, max_distance, max_results, data_source=data_source, ring_type_only_active=ring_type_only,
-                                               is_cancelled=lambda: search_generation != self._search_generation)
+                                               is_cancelled=lambda: search_generation != self._search_generation,
+                                               spansh_stop_at_limit=spansh_stop_at_limit)
             
             # Apply PowerPlay filter using EDDN cache (local database only — Power/State
             # combos are greyed out and reset to Any for Spansh/Both data sources)
@@ -648,7 +667,7 @@ class RingFinderSearchMixin:
             log.error(f"[SPANSH] System name resolution failed: {e}")
             return None
     
-    def _search_spansh_with_filters(self, reference_system: str, material_filter: str, specific_material: str, max_distance: float, max_results: int, reference_coords, ring_type_only: bool = False, is_cancelled=None) -> List[Dict]:
+    def _search_spansh_with_filters(self, reference_system: str, material_filter: str, specific_material: str, max_distance: float, max_results: int, reference_coords, ring_type_only: bool = False, is_cancelled=None, stop_at_limit: bool = False) -> List[Dict]:
         """Search Spansh API with proper filters for hotspot fallback (EDMC approach)
 
         Args:
@@ -662,6 +681,8 @@ class RingFinderSearchMixin:
             is_cancelled: optional zero-arg callable checked between pagination pages —
                 lets Stop end a Ring Search (which can page up to 30 requests) after the
                 current page instead of waiting for the whole sweep to finish.
+            stop_at_limit: If True, stop paging once max_results rings are collected. Results are
+                sorted by distance, so these are the closest ones.
 
         Returns:
             List of hotspot-format dicts compatible with _update_results
@@ -702,16 +723,18 @@ class RingFinderSearchMixin:
                 # Don't add ring_signals filter - we want ALL rings of the type
                 pass
             else:
-                # Normal mode - add ring_signals filter for specific material searches
-                # For "All Minerals", don't add ring_signals filter (Spansh requires a name field)
-                # Client-side filtering will handle removing bodies without valid signals
+                # Normal mode - only bodies with hotspot rings. "All Minerals" lists every hotspot
+                # mineral, since Spansh needs a name; without it most returned bodies have no
+                # hotspots and the pages run out before reaching the search radius.
                 if not self._is_all_minerals(specific_material):
-                    # Specific material selected - filter for that material
-                    filters['ring_signals'] = [{
-                        'comparison': '<=>', 
-                        'count': [1, 9999],
-                        'name': [specific_material]  # Single material as list
-                    }]
+                    signal_names = [SPANSH_SIGNAL_NAMES.get(specific_material, specific_material)]
+                else:
+                    signal_names = SPANSH_HOTSPOT_SIGNALS
+                filters['ring_signals'] = [{
+                    'comparison': '<=>',
+                    'count': [1, 9999],
+                    'name': signal_names
+                }]
             
             # Add ring type filter (both modes) - only if specific type selected
             if ring_type_english != 'All':
@@ -747,7 +770,7 @@ class RingFinderSearchMixin:
             }
             
             # Fetch pages until we reach max_distance or run out of pages
-            all_results = []
+            hotspots = []
             for page_num in range(max_pages):
                 if is_cancelled and is_cancelled():
                     print(f"[SPANSH PAGINATION] Cancelled before page {page_num}, stopping")
@@ -790,147 +813,22 @@ class RingFinderSearchMixin:
                 
                 # Check if we've reached bodies beyond max_distance
                 last_body_distance = results[-1].get('distance', 0) if results else 0
-                all_results.extend(results)
                 
                 print(f"[SPANSH PAGINATION] Page {page_num}: Distance range {results[0].get('distance', 0):.1f} - {last_body_distance:.1f} LY")
                 
+                hotspots.extend(self._spansh_bodies_to_hotspots(
+                    results, ring_type_english, ring_type_only, specific_material, reference_coords))
+
                 # Stop if we've gone beyond max_distance
                 if last_body_distance >= max_distance:
                     print(f"[SPANSH PAGINATION] Reached max distance ({max_distance} LY) at page {page_num}, stopping")
                     break
+                if stop_at_limit and max_results and len(hotspots) >= max_results:
+                    print(f"[SPANSH PAGINATION] Have {len(hotspots)} rings (limit {max_results}) at page {page_num}, stopping")
+                    break
+                if len(results) < page_size:
+                    break
             
-            results = all_results
-            
-            # Convert to user_db format
-            hotspots = []
-            for body in results:
-                system_name = body.get('system_name', '')
-                body_name = body.get('name', '')
-                distance_ly = body.get('distance', 0)
-                distance_ls = body.get('distance_to_arrival', 0)
-                reserve_level = body.get('reserve_level', '')  # Extract reserve level from Spansh
-                # Extract actual system coordinates provided by Spansh API
-                sys_x = body.get('system_x')
-                sys_y = body.get('system_y')
-                sys_z = body.get('system_z')
-                body_coords = {'x': sys_x, 'y': sys_y, 'z': sys_z} if sys_x is not None else reference_coords
-
-                rings = body.get('rings', [])
-                for ring in rings:
-                    ring_type = ring.get('type', 'Unknown')
-                    ring_name = ring.get('name', '')
-                    signals = ring.get('signals', [])
-                    
-                    # Filter by ring type (client-side) - skip rings that don't match the selected type
-                    if ring_type_english != 'All' and ring_type != ring_type_english:
-                        continue
-                    
-                    # Track whether hotspot data came from local DB
-                    found_in_local_db = False
-                    
-                    # In "Ring Type Only" mode, check local database FIRST, then fallback to Spansh signals
-                    if ring_type_only:
-                        # Try to get hotspots from local database first
-                        materials_found = []
-                        found_in_local_db = False
-                        try:
-                            # Strip system prefix from ring name for database lookup
-                            db_ring_name = ring_name
-                            if ring_name.lower().startswith(system_name.lower()):
-                                db_ring_name = ring_name[len(system_name):].strip()
-                            
-                            db_hotspots = self.user_db.get_body_hotspots(system_name, db_ring_name)
-                            if db_hotspots:
-                                # Found in local database - use that data
-                                for h in db_hotspots:
-                                    material = h.get('material_name', '')
-                                    count = h.get('hotspot_count', 1)
-                                    if material:
-                                        from material_utils import abbreviate_material
-                                        abbrev = abbreviate_material(material)
-                                        materials_found.append(f"{abbrev} ({count})")
-                                # Sort materials by count (descending), then alphabetically
-                                # This ensures consistent ordering: highest count first, then alphabetical
-                                materials_found.sort(key=lambda x: (-int(x.split('(')[1].rstrip(')')), x.split(' (')[0]))
-                                found_in_local_db = True
-                                print(f"[RING SEARCH] Found {len(materials_found)} hotspots in local DB for {system_name} {db_ring_name}")
-                        except Exception as e:
-                            log.error(f"[RING SEARCH] DB lookup error for {system_name} {ring_name}: {e}")
-                        
-                        # Fallback to Spansh signals if no local data
-                        if not materials_found and signals:
-                            for sig in signals:
-                                sig_name = sig.get('name', '')
-                                sig_count = max(sig.get('count', 0), 1)  # At least 1 if signal exists
-                                # Filter out invalid signal names (e.g., "signals")
-                                if sig_name and self._is_valid_mining_material(sig_name):
-                                    materials_found.append(f"{sig_name} ({sig_count})")
-                            # Sort materials by count (descending), then alphabetically
-                            materials_found.sort(key=lambda x: (-int(x.split('(')[1].rstrip(')')), x.split(' (')[0]))
-                        
-                        # If still nothing, show "-"
-                        if not materials_found:
-                            materials_found = ["-"]
-                    else:
-                        # Filter by material if searching for specific mineral
-                        materials_found = []
-                        selected_count = None
-                        for sig in signals:
-                            sig_name = sig.get('name', '')
-                            sig_count = max(sig.get('count', 0), 1)  # At least 1 if signal exists
-                            
-                            # Filter out invalid signal names (e.g., "signals")
-                            if not sig_name or not self._is_valid_mining_material(sig_name):
-                                continue
-                            
-                            materials_found.append(f"{sig_name} ({sig_count})")
-                            if not self._is_all_minerals(specific_material) and sig_name == specific_material:
-                                selected_count = sig_count
-
-                        # Sort materials by count (descending), then alphabetically
-                        if materials_found and materials_found != ["-"]:
-                            materials_found.sort(key=lambda x: (-int(x.split('(')[1].rstrip(')')), x.split(' (')[0]))
-
-                        # Skip rings without matching materials (normal mode only)
-                        if not materials_found:
-                            continue
-                        if not self._is_all_minerals(specific_material) and selected_count is None:
-                            continue
-                    
-                    # Format LS distance for display (same as user DB format)
-                    ls_display = "No data"
-                    if distance_ls and distance_ls > 0:
-                        try:
-                            ls_display = f"{int(float(distance_ls)):,}"
-                        except (ValueError, TypeError):
-                            ls_display = "No data"
-                    
-                    # In Ring Search mode, source is ALWAYS Spansh (ring discovery source)
-                    # Local DB only provides hotspot details, not the ring discovery
-                    entry_source = 'Spansh'
-                    
-                    # Format for display (match user database format)
-                    hotspot_entry = {
-                        'systemName': system_name,
-                        'bodyName': ring_name,  # Use ring name for bodyName
-                        'type': ', '.join(materials_found),
-                        'count': (selected_count if not ring_type_only and selected_count is not None
-                                  else sum(int(m.split('(')[1].rstrip(')')) for m in materials_found if '(' in m)),
-                        'distance': f"{distance_ly:.1f}" if distance_ly > 0 else "0.0",  # String format
-                        'coords': body_coords,
-                        'data_source': entry_source,
-                        'ring_type': translate_ring_type(ring_type),
-                        'ls': ls_display,  # Formatted LS distance
-                        'ls_distance': distance_ls,  # Raw LS value
-                        'reserve': translate_reserve_level(reserve_level) if reserve_level else '-',  # Translate reserve level
-                        'inner_radius': None,
-                        'outer_radius': None,
-                        'source': entry_source,
-                        'ring': ring_name,  # Add ring field
-                        'system': system_name,  # Add system field
-                        'body': body_name  # Add body field
-                    }
-                    hotspots.append(hotspot_entry)
             
             print(f"[SPANSH] Converted {len(hotspots)} rings to hotspot format")
             
@@ -959,6 +857,141 @@ class RingFinderSearchMixin:
             traceback.print_exc()
             return []
     
+    def _spansh_bodies_to_hotspots(self, results, ring_type_english, ring_type_only, specific_material, reference_coords):
+        """Convert one page of Spansh body results to hotspot rows, one per matching ring."""
+        hotspots = []
+        for body in results:
+            system_name = body.get('system_name', '')
+            body_name = body.get('name', '')
+            distance_ly = body.get('distance', 0)
+            distance_ls = body.get('distance_to_arrival', 0)
+            reserve_level = body.get('reserve_level', '')  # Extract reserve level from Spansh
+            # Extract actual system coordinates provided by Spansh API
+            sys_x = body.get('system_x')
+            sys_y = body.get('system_y')
+            sys_z = body.get('system_z')
+            body_coords = {'x': sys_x, 'y': sys_y, 'z': sys_z} if sys_x is not None else reference_coords
+
+            rings = body.get('rings', [])
+            for ring in rings:
+                ring_type = ring.get('type', 'Unknown')
+                ring_name = ring.get('name', '')
+                signals = ring.get('signals', [])
+                
+                # Filter by ring type (client-side) - skip rings that don't match the selected type
+                if ring_type_english != 'All' and ring_type != ring_type_english:
+                    continue
+                
+                # Track whether hotspot data came from local DB
+                found_in_local_db = False
+                
+                # In "Ring Type Only" mode, check local database FIRST, then fallback to Spansh signals
+                if ring_type_only:
+                    # Try to get hotspots from local database first
+                    materials_found = []
+                    found_in_local_db = False
+                    try:
+                        # Strip system prefix from ring name for database lookup
+                        db_ring_name = ring_name
+                        if ring_name.lower().startswith(system_name.lower()):
+                            db_ring_name = ring_name[len(system_name):].strip()
+                        
+                        db_hotspots = self.user_db.get_body_hotspots(system_name, db_ring_name)
+                        if db_hotspots:
+                            # Found in local database - use that data
+                            for h in db_hotspots:
+                                material = h.get('material_name', '')
+                                count = h.get('hotspot_count', 1)
+                                if material:
+                                    from material_utils import abbreviate_material
+                                    abbrev = abbreviate_material(material)
+                                    materials_found.append(f"{abbrev} ({count})")
+                            # Sort materials by count (descending), then alphabetically
+                            # This ensures consistent ordering: highest count first, then alphabetical
+                            materials_found.sort(key=lambda x: (-int(x.split('(')[1].rstrip(')')), x.split(' (')[0]))
+                            found_in_local_db = True
+                            print(f"[RING SEARCH] Found {len(materials_found)} hotspots in local DB for {system_name} {db_ring_name}")
+                    except Exception as e:
+                        log.error(f"[RING SEARCH] DB lookup error for {system_name} {ring_name}: {e}")
+                    
+                    # Fallback to Spansh signals if no local data
+                    if not materials_found and signals:
+                        for sig in signals:
+                            sig_name = sig.get('name', '')
+                            sig_name = APP_SIGNAL_NAMES.get(sig_name, sig_name)
+                            sig_count = max(sig.get('count', 0), 1)  # At least 1 if signal exists
+                            # Filter out invalid signal names (e.g., "signals")
+                            if sig_name and self._is_valid_mining_material(sig_name):
+                                materials_found.append(f"{sig_name} ({sig_count})")
+                        # Sort materials by count (descending), then alphabetically
+                        materials_found.sort(key=lambda x: (-int(x.split('(')[1].rstrip(')')), x.split(' (')[0]))
+                    
+                    # If still nothing, show "-"
+                    if not materials_found:
+                        materials_found = ["-"]
+                else:
+                    # Filter by material if searching for specific mineral
+                    materials_found = []
+                    selected_count = None
+                    for sig in signals:
+                        sig_name = sig.get('name', '')
+                        sig_name = APP_SIGNAL_NAMES.get(sig_name, sig_name)
+                        sig_count = max(sig.get('count', 0), 1)  # At least 1 if signal exists
+                        
+                        # Filter out invalid signal names (e.g., "signals")
+                        if not sig_name or not self._is_valid_mining_material(sig_name):
+                            continue
+                        
+                        materials_found.append(f"{sig_name} ({sig_count})")
+                        if not self._is_all_minerals(specific_material) and sig_name == specific_material:
+                            selected_count = sig_count
+
+                    # Sort materials by count (descending), then alphabetically
+                    if materials_found and materials_found != ["-"]:
+                        materials_found.sort(key=lambda x: (-int(x.split('(')[1].rstrip(')')), x.split(' (')[0]))
+
+                    # Skip rings without matching materials (normal mode only)
+                    if not materials_found:
+                        continue
+                    if not self._is_all_minerals(specific_material) and selected_count is None:
+                        continue
+                
+                # Format LS distance for display (same as user DB format)
+                ls_display = "No data"
+                if distance_ls and distance_ls > 0:
+                    try:
+                        ls_display = f"{int(float(distance_ls)):,}"
+                    except (ValueError, TypeError):
+                        ls_display = "No data"
+                
+                # In Ring Search mode, source is ALWAYS Spansh (ring discovery source)
+                # Local DB only provides hotspot details, not the ring discovery
+                entry_source = 'Spansh'
+                
+                # Format for display (match user database format)
+                hotspot_entry = {
+                    'systemName': system_name,
+                    'bodyName': ring_name,  # Use ring name for bodyName
+                    'type': ', '.join(materials_found),
+                    'count': (selected_count if not ring_type_only and selected_count is not None
+                              else sum(int(m.split('(')[1].rstrip(')')) for m in materials_found if '(' in m)),
+                    'distance': f"{distance_ly:.1f}" if distance_ly > 0 else "0.0",  # String format
+                    'coords': body_coords,
+                    'data_source': entry_source,
+                    'ring_type': translate_ring_type(ring_type),
+                    'ls': ls_display,  # Formatted LS distance
+                    'ls_distance': distance_ls,  # Raw LS value
+                    'reserve': translate_reserve_level(reserve_level) if reserve_level else '-',  # Translate reserve level
+                    'inner_radius': None,
+                    'outer_radius': None,
+                    'source': entry_source,
+                    'ring': ring_name,  # Add ring field
+                    'system': system_name,  # Add system field
+                    'body': body_name  # Add body field
+                }
+                hotspots.append(hotspot_entry)
+        return hotspots
+
     def _search_spansh_rings(self, reference_system: str, ring_type: str, max_distance: float, max_results: int, reference_coords, is_cancelled=None) -> List[Dict]:
         """Search Spansh API for rings of a specific type (Any Ring mode)
         
@@ -1295,7 +1328,7 @@ class RingFinderSearchMixin:
             filtered.append(h)
         return filtered
 
-    def _get_hotspots(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, max_results: int = None, data_source: str = None, ring_type_only_active: bool = False, is_cancelled=None) -> List[Dict]:
+    def _get_hotspots(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, max_results: int = None, data_source: str = None, ring_type_only_active: bool = False, is_cancelled=None, spansh_stop_at_limit: bool = False) -> List[Dict]:
         """Get hotspot data based on user's data source selection"""
         
         # Get user's data source preference (or force database for auto-search)
@@ -1355,7 +1388,8 @@ class RingFinderSearchMixin:
                         spansh_limit,  # Use spansh_limit (2x for Both mode, or max_results for spansh-only)
                         self.current_system_coords,
                         ring_type_only=ring_type_only_active,
-                        is_cancelled=is_cancelled
+                        is_cancelled=is_cancelled,
+                        stop_at_limit=spansh_stop_at_limit
                     )
                     print(f"[SEARCH] Spansh returned {len(spansh_results)} results")
                     # Cache the Spansh results for potential reuse
