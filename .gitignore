@@ -92,6 +92,7 @@ copilot-instructions.md
 *.temp
 *.bak
 *.backup
+*.backup_*
 *.old
 
 # User-specific data
