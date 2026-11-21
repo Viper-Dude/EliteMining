@@ -46,7 +46,7 @@ Dropped after review:
 
 ## Next (21 Nov 2026)
 
-Steps 0–5 (including 3b) are committed. In-game test passed on all items (user, 21 Nov 2026 19:14). Next: step 6. The user maps one ring with new hotspots in the dev app; check that the 881 ms stall is gone, then remove the logger in its own commit and add the patch note. Earlier notes follow.
+**Finished 21 Nov 2026.** All steps are done. After 3b, the in-game re-test of a ring map with new hotspots showed a 57 ms stall where there had been 881 ms, and the hotspots still appeared. The logger was removed in `a36f2df` and one patch note line was added. Possible follow-ups, not started: the 1–2 s post-jump stalls (73–157 ms, from auto-search and Auto Prices), and startup tab building. Earlier notes follow.
 
 Startup stalls are recorded under Measurements. The logger starts during `__init__`, so most of the startup stalls happen behind the splash while tabs are built. The first dev test (18:40) failed: the step 0 logger used `sys` in `cargo_monitor.py` without importing it, so no live journal events were processed. Fixed in `2ad283e`. Ignore that log and use only logs from after the fix. Nothing left can be done without the game: 3b (D2) and step 6 both need the in-game log. Waiting for the user's combined in-game test plus `~\EliteMining.log` (`[UI-STALL]` lines). Then: record the jump/scan/FSS stalls, decide 3b, do 3b if needed, then step 6.
 
@@ -61,7 +61,7 @@ Startup stalls are recorded under Measurements. The logger starts during `__init
 | 3b | Ring-scan EDSM lookup off the UI thread (narrowed from "Scan / SAA writes") | Opus 5.5, high | Yes | Done (`dde292c`): the EDSM lookup in `_on_hotspot_added` runs on the 3a worker (`_queue_background_job`); the auto-refresh is posted after it. Scan/SAA DB writes stay on the UI thread (about 1 ms). `check_journal_reading.py` 51/51 |
 | 4 | Import matplotlib after the splash | Sonnet 5.5, medium | No | Done: numpy deferred too; `import prospector_panel` 1.01 s → 0.21 s; specs already list the hidden imports |
 | 5 | Skip unchanged cargo overlay redraw and cursor changes | Sonnet 5.5, low | No | Done: skip keyed on text + font size + colour; alpha logic untouched |
-| 6 | Remove the stall logger, re-measure, final notes | Sonnet 5.5, low | No | Not started |
+| 6 | Remove the stall logger, re-measure, final notes | Sonnet 5.5, low | No | Done: ring map 881 ms → 57 ms in-game; logger removed (`a36f2df`); patch note added |
 
 Recommended order: 0, 1, 2, 3a, (3b), 4, 5, 6. Steps 1 and 3a give the biggest gain.
 

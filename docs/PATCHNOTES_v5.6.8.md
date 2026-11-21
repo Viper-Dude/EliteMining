@@ -10,6 +10,7 @@
 ## Bug Fixes
 - Hotspots Finder now always shows the closest rings, keeps rings already found if Spansh drops out, and no longer searches around the wrong system after a typo.
 - Jumping during a Hotspots Finder search no longer changes your system name and filters, and the result count and German message are now correct.
+- The app no longer freezes for a moment when you map a ring with new hotspots.
 
 ### Voiceattack Profile - no update (V5.6.7)
 
