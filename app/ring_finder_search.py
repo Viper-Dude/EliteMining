@@ -106,10 +106,8 @@ class RingFinderSearchMixin:
             highlight_bodies: List of (system, body) tuples to highlight (for multiple rapid scans)
             force_database: If True, only search local database (ignore user's data source setting)
         """
-        import traceback
         import time as _time
-        print(f"[SEARCH] search_hotspots() called at {_time.time():.1f} (force_database={force_database}, auto_refresh={auto_refresh}) from:")
-        print(''.join(traceback.format_stack(limit=4)[:-1]))
+        print(f"[SEARCH] search_hotspots() called at {_time.time():.1f} (force_database={force_database}, auto_refresh={auto_refresh})")
 
         # Save current reference system (complete name at search time)
         self._save_filter_settings()
@@ -693,7 +691,7 @@ class RingFinderSearchMixin:
         import time
         
         # Update status to show Spansh search is starting
-        self.parent.after(0, lambda: self.status_var.set("Querying Spansh API...")
+        self.parent.after(0, lambda: self.status_var.set(t('ring_finder.spansh_querying'))
                           if self.parent.winfo_exists() and not (is_cancelled and is_cancelled()) else None)
         
         try:
@@ -780,7 +778,7 @@ class RingFinderSearchMixin:
 
                 # Update status message for pagination (especially for "All Minerals" searches)
                 if use_pagination and page_num > 0:
-                    progress_msg = f"Fetching Spansh data... page {page_num + 1}/{max_pages}"
+                    progress_msg = t('ring_finder.spansh_fetching_page').format(page=page_num + 1, total=max_pages)
                     self.parent.after(0, lambda msg=progress_msg: self.status_var.set(msg)
                                       if self.parent.winfo_exists() and not (is_cancelled and is_cancelled()) else None)
                 
@@ -841,14 +839,14 @@ class RingFinderSearchMixin:
             
         except requests.exceptions.Timeout:
             print("[SPANSH] Request timed out")
-            self.parent.after(0, lambda: self.status_var.set("Spansh search timed out")
+            self.parent.after(0, lambda: self.status_var.set(t('ring_finder.spansh_timeout'))
                               if not (is_cancelled and is_cancelled()) else None)
             # Update status: Spansh is offline/timing out
             self.parent.after(0, lambda: self._update_spansh_status("offline"))
             return []
         except requests.exceptions.RequestException as e:
             log.error(f"[SPANSH] API error: {e}")
-            self.parent.after(0, lambda: self.status_var.set("Spansh API error")
+            self.parent.after(0, lambda: self.status_var.set(t('ring_finder.spansh_error'))
                               if not (is_cancelled and is_cancelled()) else None)
             # Update status: Spansh has errors
             self.parent.after(0, lambda: self._update_spansh_status("offline"))
@@ -912,7 +910,6 @@ class RingFinderSearchMixin:
                             # This ensures consistent ordering: highest count first, then alphabetical
                             materials_found.sort(key=lambda x: (-int(x.split('(')[1].rstrip(')')), x.split(' (')[0]))
                             found_in_local_db = True
-                            print(f"[RING SEARCH] Found {len(materials_found)} hotspots in local DB for {system_name} {db_ring_name}")
                     except Exception as e:
                         log.error(f"[RING SEARCH] DB lookup error for {system_name} {ring_name}: {e}")
                     
@@ -1182,12 +1179,6 @@ class RingFinderSearchMixin:
                 # Clean up the ring name using the existing method
                 raw_ring_name = body_name
                 clean_ring_name = self._clean_ring_name(raw_ring_name, body_name, system_name, source="user_database")
-                
-                # Debug: Check conversion for Delkar 7A entries
-                if system_name == "Delkar" and "7 A" in body_name:
-                    hotspot_ring_type = hotspot.get('ring_type', 'Missing')
-                    hotspot_material = hotspot.get('type', 'Missing')
-                    print(f"CONVERSION: {system_name} {body_name} -> material: {hotspot_material} | ring_type: {hotspot_ring_type}")
                 
                 # Create compatible result entry
                 compatible_result = {
@@ -1540,11 +1531,6 @@ class RingFinderSearchMixin:
                     if direct_results:
                         results = direct_results
                     else:
-                        # Update status to show no results found
-                        try:
-                            self.status_label.config(text=f"No systems found within search criteria for '{reference_system}'. Try adjusting your search terms.")
-                        except:
-                            pass
                         return []
                 
                 material_matches = 0

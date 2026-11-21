@@ -44,7 +44,7 @@ Make Ring Finder searches (Local, Spansh, Both, Ring Search, Any Ring) show resu
 | 6 | Local range query rewrite | Opus 5.5, high | Yes | Done 21 Nov 2026, user-tested, committed |
 | 7 | `_update_results`: prefetch after the limit | Sonnet 5.5, medium | No | Done 21 Nov 2026, awaiting user test |
 | 8 | Delete the dead Any Ring mode (changed from: use the paged Spansh path) | Opus 5.5, medium | No | Done 21 Nov 2026, awaiting user test |
-| 9 | Cleanup: debug prints, hardcoded text | Sonnet 5.5, low | No | Next |
+| 9 | Cleanup: debug prints, hardcoded text | Sonnet 5.5, low | No | Done 21 Nov 2026, awaiting user test |
 
 Recommended order: 0a, 0b, 1, 2, 3, 4, 5, 6, 7, 8, 9. Steps 1–3 give the biggest time savings.
 
@@ -245,6 +245,7 @@ Fix:
   - "Spansh API error"
   - the `status_label` text at about line 5153
 - Remove the unused string keys left by step 8 (listed there) from `strings_en.json` and `strings_de.json`.
+- Done 21 Nov 2026: removed the stack-trace print, the `[RING SEARCH] Found` print and the Delkar debug block (the `[SPANSH DB LOOKUP]` print went with step 8). The four Spansh status messages now use `t()`: new keys `spansh_querying` and `spansh_fetching_page`, and the existing `spansh_timeout` / `spansh_error` (so the old "try reducing distance" wording now shows). The dead `status_label` update (no such attribute on the finder, error swallowed) was removed. The unused `any_ring*` keys were removed from both string files. The remaining `traceback.print_exc()` calls in error handlers stay. Checks: ring_finder_search 44, search_stop 26, OK.
 - D3 (deferred): in `user_database.py`, `idx_system_name` duplicates `idx_hotspot_system` and `idx_body_name` duplicates `idx_hotspot_body`. Both system indexes are also covered by `idx_hotspot_unique_key`.
 - Model: Sonnet 5.5, low effort.
 
