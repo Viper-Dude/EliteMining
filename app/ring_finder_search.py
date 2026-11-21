@@ -111,9 +111,6 @@ class RingFinderSearchMixin:
         print(f"[SEARCH] search_hotspots() called at {_time.time():.1f} (force_database={force_database}, auto_refresh={auto_refresh}) from:")
         print(''.join(traceback.format_stack(limit=4)[:-1]))
 
-        # Store force_database flag for use in search
-        self._force_database = force_database
-
         # Save current reference system (complete name at search time)
         self._save_filter_settings()
 
@@ -263,17 +260,25 @@ class RingFinderSearchMixin:
             or (reserve_filter and reserve_filter != t('ring_finder.all_reserves'))
             or pp_power_filter != 'Any' or pp_state_filter != 'Any')
 
+        # Reuse the last Spansh rows (set after saving them to the database) for this search only
+        cached_spansh = self._cached_spansh_results if self._use_cached_spansh else None
+        self._use_cached_spansh = False
+
         # Increment search generation to cancel any in-flight searches
         self._search_generation += 1
         current_generation = self._search_generation
 
         # Run search in background - pass reference system coords and max results to worker
         threading.Thread(target=self._search_worker,
-                        args=(reference_system, material_filter, specific_material, confirmed_only, max_distance, self.current_system_coords, max_results, min_hotspots, any_ring_mode, overlaps_only, res_only, data_source, ring_type_only, current_generation, pp_power_filter, pp_state_filter, use_spansh_pp, spansh_stop_at_limit),
+                        args=(reference_system, material_filter, specific_material, confirmed_only, max_distance, self.current_system_coords, max_results, min_hotspots, any_ring_mode, overlaps_only, res_only, data_source, ring_type_only, current_generation, pp_power_filter, pp_state_filter, use_spansh_pp, spansh_stop_at_limit, force_database, cached_spansh),
                         daemon=True).start()
 
-    def _search_worker(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, reference_coords, max_results, min_hotspots: int = 1, any_ring_mode: bool = False, overlaps_only: bool = False, res_only: bool = False, data_source: str = "both", ring_type_only: bool = False, search_generation: int = 0, pp_power: str = 'Any', pp_state: str = 'Any', use_spansh_pp: bool = True, spansh_stop_at_limit: bool = False):
-        """Background worker for hotspot search"""
+    def _search_worker(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, reference_coords, max_results, min_hotspots: int = 1, any_ring_mode: bool = False, overlaps_only: bool = False, res_only: bool = False, data_source: str = "both", ring_type_only: bool = False, search_generation: int = 0, pp_power: str = 'Any', pp_state: str = 'Any', use_spansh_pp: bool = True, spansh_stop_at_limit: bool = False, force_database: bool = False, cached_spansh=None):
+        """Background worker for hotspot search.
+
+        Writes no search state on self: coordinates, PowerPlay data and Spansh rows go to
+        _complete_search, which stores them only if this search is still the current one.
+        """
         try:
             # Wait for database to be ready (with timeout)
             import time
@@ -324,13 +329,13 @@ class RingFinderSearchMixin:
                                       self.status_var.set, t('ring_finder.coords_not_found_warning').format(system=reference_system))
                     return
             
-            # Set the reference system coords for this worker thread
             if search_generation != self._search_generation:
                 return
-            self.current_system_coords = reference_coords
             print(f"[SEARCH-DEBUG] ref='{reference_system}' coords={reference_coords} systems_data={self.systems_data.get(reference_system.lower())}")
             print(f"[SEARCH] Coordinate resolution done at {time.time():.1f}, entering search dispatch")
 
+            pp_enrichment = {}
+            fetched = {}
             # Any Ring mode: Search Spansh for rings of specific type (ignoring hotspot data)
             if any_ring_mode:
                 # Use max_results if set, otherwise default to 150 for more results
@@ -363,8 +368,10 @@ class RingFinderSearchMixin:
             else:
                 hotspots = self._get_hotspots(reference_system, material_filter, specific_material, confirmed_only, max_distance, max_results, data_source=data_source, ring_type_only_active=ring_type_only,
                                                is_cancelled=lambda: search_generation != self._search_generation,
-                                               spansh_stop_at_limit=spansh_stop_at_limit)
-            
+                                               spansh_stop_at_limit=spansh_stop_at_limit, force_database=force_database,
+                                               reference_coords=reference_coords, cached_spansh=cached_spansh,
+                                               spansh_fetched=fetched)
+
             # Apply PowerPlay filter using EDDN cache (local database only — Power/State
             # combos are greyed out and reset to Any for Spansh/Both data sources)
             pp_backfill = None
@@ -372,14 +379,13 @@ class RingFinderSearchMixin:
                 if search_generation != self._search_generation:
                     print(f"[SEARCH] Search gen {search_generation} cancelled before PowerPlay filter (current: {self._search_generation})")
                     return
-                hotspots = self._apply_powerplay_filter(
+                hotspots, pp_enrichment = self._apply_powerplay_filter(
                     hotspots, pp_power, pp_state, reference_system, max_distance,
                     is_cancelled=lambda: search_generation != self._search_generation,
                     use_spansh=use_spansh_pp)
             else:
                 # No Power/PP State filter active — the PowerPlay column is still backfilled
                 # with Spansh's own data, after the rows are shown (_start_pp_backfill).
-                self._spansh_pp_enrichment = {}
                 if use_spansh_pp:
                     pp_backfill = (reference_system, max_distance)
 
@@ -397,13 +403,15 @@ class RingFinderSearchMixin:
                     # User clicked Stop (not superseded by a newer search) — show whatever
                     # was collected so far instead of discarding it.
                     print(f"[SEARCH] Search gen {search_generation} stopped by user - showing {len(hotspots)} partial result(s)")
-                    self.parent.after(0, self._complete_search, search_generation, hotspots, max_results, pp_backfill)
+                    self.parent.after(0, self._complete_search, search_generation, hotspots, max_results, pp_backfill,
+                                      reference_coords, pp_enrichment, fetched.get('spansh'))
                 else:
                     print(f"[SEARCH] Search gen {search_generation} cancelled before display (current: {self._search_generation})")
                 return
             
             # Update UI in main thread
-            self.parent.after(0, self._complete_search, search_generation, hotspots, max_results, pp_backfill)
+            self.parent.after(0, self._complete_search, search_generation, hotspots, max_results, pp_backfill,
+                              reference_coords, pp_enrichment, fetched.get('spansh'))
             
         except Exception as e:
             error_msg = f"Search failed: {str(e)}"
@@ -425,13 +433,19 @@ class RingFinderSearchMixin:
         if search_generation == self._search_generation:
             callback(*args)
 
-    def _complete_search(self, search_generation, hotspots, max_results, pp_backfill=None):
+    def _complete_search(self, search_generation, hotspots, max_results, pp_backfill=None,
+                         reference_coords=None, pp_enrichment=None, spansh_results=None):
         stopped = (getattr(self, '_stopped_generation', None) == search_generation
                    and self._search_generation == search_generation + 1)
         if search_generation != self._search_generation and not stopped:
             return
         self._search_result_limit = max_results
         self._pp_backfill_request = pp_backfill
+        self._spansh_pp_enrichment = pp_enrichment or {}
+        if reference_coords:
+            self.current_system_coords = reference_coords
+        if spansh_results is not None:
+            self._cached_spansh_results = spansh_results
         self._update_results(hotspots)
 
     def _hotspot_missing_metadata(self, hotspot: Dict):
@@ -1296,16 +1310,16 @@ class RingFinderSearchMixin:
 
         is_cancelled: optional zero-arg callable, passed through to the Spansh enrichment
         call so a Stop click before that request is sent skips it instead of waiting on it.
+
+        Returns (filtered rows, Spansh entries newer than the EDDN cache). The entries are
+        for _update_results' PowerPlay column, so a matched row shows real data instead of
+        "No data" when the EDDN cache is empty for it.
         """
         from system_finder_api import SystemFinderAPI
         system_names = list({h.get('system', h.get('systemName', '')) for h in hotspots})
         system_names = [s for s in system_names if s]
         pp_cache = SystemFinderAPI._batch_get_powerplay(system_names)
-
-        # Stashed for _update_results to reuse when building the PowerPlay column, so a
-        # matched row shows real data instead of "No data" when the EDDN cache is empty
-        # for it. Reset every search so stale results never leak in.
-        self._spansh_pp_enrichment = {}
+        enrichment = {}
 
         if use_spansh and pp_state in ('Exploited', 'Fortified', 'Stronghold', 'Unoccupied'):
             # max_distance is already widened to 500 LY by _search_worker for these states
@@ -1316,7 +1330,7 @@ class RingFinderSearchMixin:
                 cached = pp_cache.get(sys_name)
                 if SystemFinderAPI._spansh_pp_should_replace_cache(entry, cached):
                     pp_cache[sys_name] = entry
-                    self._spansh_pp_enrichment[sys_name] = entry
+                    enrichment[sys_name] = entry
                     to_persist[sys_name] = entry
             if to_persist:
                 SystemFinderAPI._store_powerplay_batch(to_persist)
@@ -1332,15 +1346,18 @@ class RingFinderSearchMixin:
             if pp_state != 'Any' and state != pp_state:
                 continue
             filtered.append(h)
-        return filtered
+        return filtered, enrichment
 
-    def _get_hotspots(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, max_results: int = None, data_source: str = None, ring_type_only_active: bool = False, is_cancelled=None, spansh_stop_at_limit: bool = False) -> List[Dict]:
-        """Get hotspot data based on user's data source selection"""
-        
+    def _get_hotspots(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, max_results: int = None, data_source: str = None, ring_type_only_active: bool = False, is_cancelled=None, spansh_stop_at_limit: bool = False, force_database: bool = False, reference_coords=None, cached_spansh=None, spansh_fetched=None) -> List[Dict]:
+        """Get hotspot data based on user's data source selection.
+
+        cached_spansh: Spansh rows to reuse instead of asking Spansh again.
+        spansh_fetched: optional dict; receives the fresh Spansh rows under 'spansh'.
+        """
+
         # Get user's data source preference (or force database for auto-search)
-        if getattr(self, '_force_database', False):
+        if force_database:
             data_source = "database"
-            self._force_database = False  # Reset flag after use
             print(f"[SEARCH] Auto-search: forcing database only")
         elif ring_type_only_active:
             # Force Spansh-only when Ring Search mode is enabled
@@ -1372,16 +1389,15 @@ class RingFinderSearchMixin:
         
         # Query user database if selected
         if data_source in ["database", "both"]:
-            user_results = self._search_user_database_first(reference_system, material_filter, specific_material, max_distance, db_limit, is_cancelled=is_cancelled)
+            user_results = self._search_user_database_first(reference_system, material_filter, specific_material, max_distance, db_limit, is_cancelled=is_cancelled, reference_coords=reference_coords)
             print(f"[SEARCH] User database returned {len(user_results)} results")
         
         # Query Spansh if selected
         if data_source in ["spansh", "both"]:
-            # Check if we should use cached Spansh results (e.g., after save to database)
-            if getattr(self, '_use_cached_spansh', False) and getattr(self, '_cached_spansh_results', None):
-                spansh_results = self._cached_spansh_results
+            # Reuse the Spansh rows passed in (e.g., after save to database)
+            if cached_spansh:
+                spansh_results = cached_spansh
                 print(f"[SEARCH] Using cached Spansh results: {len(spansh_results)} entries")
-                self._use_cached_spansh = False  # Reset flag after use
             else:
                 try:
                     print(f"[SEARCH] Calling Spansh API...")
@@ -1392,14 +1408,14 @@ class RingFinderSearchMixin:
                         specific_material,
                         max_distance,
                         spansh_limit,  # Use spansh_limit (2x for Both mode, or max_results for spansh-only)
-                        self.current_system_coords,
+                        reference_coords if reference_coords else self.current_system_coords,
                         ring_type_only=ring_type_only_active,
                         is_cancelled=is_cancelled,
                         stop_at_limit=spansh_stop_at_limit
                     )
                     print(f"[SEARCH] Spansh returned {len(spansh_results)} results")
-                    # Cache the Spansh results for potential reuse
-                    self._cached_spansh_results = spansh_results
+                    if spansh_fetched is not None:
+                        spansh_fetched['spansh'] = spansh_results
                 except Exception as e:
                     log.error(f"[SEARCH] Spansh query failed: {e}")
                     import traceback
@@ -1437,11 +1453,11 @@ class RingFinderSearchMixin:
             
             return combined_results
     
-    def _search_user_database_first(self, reference_system: str, material_filter: str, specific_material: str, max_distance: float, max_results: int = None, is_cancelled=None) -> List[Dict]:
+    def _search_user_database_first(self, reference_system: str, material_filter: str, specific_material: str, max_distance: float, max_results: int = None, is_cancelled=None, reference_coords=None) -> List[Dict]:
         """Search user database first for confirmed hotspots, return results in _update_results compatible format"""
         try:
             # Get user database hotspots
-            user_hotspots = self._get_user_database_hotspots(reference_system, material_filter, specific_material, max_distance, is_cancelled=is_cancelled)
+            user_hotspots = self._get_user_database_hotspots(reference_system, material_filter, specific_material, max_distance, is_cancelled=is_cancelled, reference_coords=reference_coords)
             
             if not user_hotspots:
                 return []
@@ -1668,7 +1684,7 @@ class RingFinderSearchMixin:
             log.error(f"Error cleaning ring name: {e}")
             return full_ring_name
 
-    def _get_user_database_hotspots(self, reference_system: str, material_filter: str, specific_material: str, max_distance: float, is_cancelled=None) -> List[Dict]:
+    def _get_user_database_hotspots(self, reference_system: str, material_filter: str, specific_material: str, max_distance: float, is_cancelled=None, reference_coords=None) -> List[Dict]:
         """Search user database for hotspots - pure user database approach without EDSM"""
         try:
             import sqlite3
@@ -1683,7 +1699,8 @@ class RingFinderSearchMixin:
             # self.current_system_coords cache if it was actually set for this reference_system -
             # otherwise a caller searching a different system (e.g. Find Best Mining System's
             # target_system) would silently inherit stale coords from the main tab's last search.
-            reference_coords = self.current_system_coords if getattr(self, '_last_search_key', '').split('_')[0] == reference_system else None
+            if not reference_coords:
+                reference_coords = self.current_system_coords if getattr(self, '_last_search_key', '').split('_')[0] == reference_system else None
             if not reference_coords and reference_system:
                 reference_coords = self.systems_data.get(reference_system.lower())
             if not reference_coords and reference_system:

@@ -2047,10 +2047,11 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
                 return False
     
     def _load_systems_cache(self):
-        """Initialize empty systems cache for coordinate lookups"""
-        # Start with empty cache - coordinates will be fetched from EDSM as needed
-        self.systems_data = {}
+        """Load the saved filter settings once the window is ready.
 
+        systems_data is created in __init__ and kept as is: a journal jump may already have
+        cached coordinates in it before this preload thread runs.
+        """
         # Schedule tkinter operations on main thread to avoid "main thread is not in main loop" error
         # These operations involve tkinter variable .set() and trace_add() calls
         def _setup_filter_settings_on_main_thread():

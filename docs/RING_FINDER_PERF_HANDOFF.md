@@ -40,8 +40,8 @@ Make Ring Finder searches (Local, Spansh, Both, Ring Search, Any Ring) show resu
 | 2 | EDSM fallback after display | Opus 5.5, high | Yes | Done 21 Nov 2026, user-tested |
 | 3 | PowerPlay backfill: parallel and cached | Opus 5.5, high | Yes | Done 21 Nov 2026, user-tested, committed |
 | 4 | Cache the Spansh name lookup | Sonnet 5.5, medium | No | Done 21 Nov 2026, user-tested, committed |
-| 5 | Remove shared state from worker threads | Opus 5.5, high | Yes | Next |
-| 6 | Local range query rewrite | Opus 5.5, high | Yes | Not started |
+| 5 | Remove shared state from worker threads | Opus 5.5, high | Yes | Done 21 Nov 2026, user-tested, committed |
+| 6 | Local range query rewrite | Opus 5.5, high | Yes | Next |
 | 7 | `_update_results`: prefetch after the limit | Sonnet 5.5, medium | No | Not started |
 | 8 | Any Ring mode uses the paged Spansh path | Opus 5.5, medium | No | Not started |
 | 9 | Cleanup: debug prints, hardcoded text | Sonnet 5.5, low | No | Not started |
@@ -171,6 +171,12 @@ Recommended order: 0a, 0b, 1, 2, 3, 4, 5, 6, 7, 8, 9. Steps 1–3 give the bigge
 - Also: at startup, `_load_systems_cache` sets `systems_data = {}` from the preload thread and can wipe coordinates cached from an FSDJump. Merge instead of replacing.
 - Tests: an old search finishing late cannot change the PowerPlay data of a newer search.
 - Model: Opus 5.5, high effort.
+- Done 21 Nov 2026:
+  - `search_hotspots` passes `force_database` and the reused Spansh rows (`cached_spansh`, taken when `_use_cached_spansh` is set, and the flag is cleared right away) to the worker. Before, the flag stayed set after a Local search and a later Spansh search reused old rows.
+  - `_search_worker` writes nothing on self. `_apply_powerplay_filter` returns `(rows, enrichment)`. `_get_hotspots` takes `force_database`, `reference_coords`, `cached_spansh` and `spansh_fetched` (a dict that receives fresh Spansh rows). `_complete_search` stores `_spansh_pp_enrichment`, `current_system_coords` and `_cached_spansh_results` only after its generation check.
+  - `reference_coords` is passed down to `_search_user_database_first` / `_get_user_database_hotspots`. Find Best Mining System passes none, so it keeps the old `_last_search_key` fallback. That's why `search_hotspots` still resets `current_system_coords` on the UI thread at the start.
+  - `_load_systems_cache` no longer replaces `systems_data` (it was only ever set to `{}`).
+  - Tests: `SearchStateTests` (4) in `check_ring_finder_search.py`, 37 OK. `check_search_stop.py` 26 OK, `check_star_systems.py` 19 OK.
 
 ### 6 — Local range query rewrite
 

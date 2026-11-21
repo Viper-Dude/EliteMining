@@ -40,7 +40,7 @@ Finder = type('RingFinder', (
         '_limit_results_by_unique_rings', '_run_search_callback', '_complete_search',
         '_search_worker', '_hotspot_missing_metadata', '_start_edsm_metadata_fill',
         '_edsm_metadata_worker', '_read_filled_ring_metadata', '_apply_edsm_metadata',
-        '_start_pp_backfill', '_pp_backfill_worker', '_apply_pp_backfill',
+        '_start_pp_backfill', '_pp_backfill_worker', '_apply_pp_backfill', '_get_hotspots',
     }),
 ), {})
 EDSM_GLOBALS = Finder._start_edsm_metadata_fill.__globals__
@@ -258,6 +258,87 @@ class RingFinderSearchTests(unittest.TestCase):
                 f._sort_column('Visits', reverse)
                 self.assertEqual([f.results_tree.rows[key]['Visits']
                                   for key in f.results_tree.order], expected)
+
+
+class SearchStateTests(unittest.TestCase):
+    """Search state on the finder is written only for the current search."""
+
+    def setUp(self):
+        f = self.finder = Finder()
+        f.parent = Parent()
+        f._search_generation = 1
+        f.db_ready = True
+        f.systems_data = {}
+        f._is_all_minerals = Mock(return_value=True)
+        f._update_results = Mock()
+        f._reset_search_button = Mock()
+        f._spansh_pp_enrichment = {'Newer': 'newer entry'}
+        f.current_system_coords = dict(x=9, y=9, z=9)
+        f._cached_spansh_results = ['newer row']
+
+        def get_hotspots(*args, spansh_fetched=None, **kwargs):
+            spansh_fetched['spansh'] = ['old row']
+            return [row('Old')]
+        f._get_hotspots = Mock(side_effect=get_hotspots)
+
+    def run_worker(self, newer_search_starts):
+        f = self.finder
+
+        def pp_filter(hotspots, *args, **kwargs):
+            if newer_search_starts:
+                f._search_generation = 2
+            return hotspots, {'Old': 'old entry'}
+        f._apply_powerplay_filter = Mock(side_effect=pp_filter)
+        f._search_worker('Old', 'All', 'All Minerals', False, 50, dict(x=1, y=2, z=3), 10,
+                         search_generation=1, pp_power='Some Power', use_spansh_pp=False)
+        f.parent.flush()
+
+    def test_old_search_finishing_late_cannot_change_a_newer_search(self):
+        self.run_worker(newer_search_starts=True)
+        f = self.finder
+        f._update_results.assert_not_called()
+        self.assertEqual(f._spansh_pp_enrichment, {'Newer': 'newer entry'})
+        self.assertEqual(f.current_system_coords, dict(x=9, y=9, z=9))
+        self.assertEqual(f._cached_spansh_results, ['newer row'])
+
+    def test_current_search_keeps_its_powerplay_data_coords_and_spansh_rows(self):
+        self.run_worker(newer_search_starts=False)
+        f = self.finder
+        f._update_results.assert_called_once()
+        self.assertEqual(f._spansh_pp_enrichment, {'Old': 'old entry'})
+        self.assertEqual(f.current_system_coords, dict(x=1, y=2, z=3))
+        self.assertEqual(f._cached_spansh_results, ['old row'])
+        self.assertEqual(f._get_hotspots.call_args.kwargs['reference_coords'], dict(x=1, y=2, z=3))
+
+    def test_search_without_powerplay_filter_clears_old_powerplay_data(self):
+        f = self.finder
+        f._search_worker('Old', 'All', 'All Minerals', False, 50, dict(x=1, y=2, z=3), 10,
+                         search_generation=1, use_spansh_pp=False)
+        f.parent.flush()
+        self.assertEqual(f._spansh_pp_enrichment, {})
+
+    def test_local_only_and_reused_spansh_rows_apply_to_one_search_only(self):
+        f = Finder()
+        f.current_system_coords = None
+        f._search_user_database_first = Mock(return_value=[row(source='Local')])
+        f._search_spansh_with_filters = Mock(return_value=[row(source='Spansh')])
+        self.assertEqual(f._get_hotspots('Sol', 'All', 'All Minerals', False, 50, 10,
+                                         data_source='spansh', force_database=True),
+                         [row(source='Local')])
+        f._search_spansh_with_filters.assert_not_called()
+        fetched = {}
+        self.assertEqual(f._get_hotspots('Sol', 'All', 'All Minerals', False, 50, 10,
+                                         data_source='spansh', cached_spansh=[row(source='Saved')],
+                                         spansh_fetched=fetched),
+                         [row(source='Saved')])
+        f._search_spansh_with_filters.assert_not_called()
+        self.assertEqual(fetched, {})
+        self.assertEqual(f._get_hotspots('Sol', 'All', 'All Minerals', False, 50, 10,
+                                         data_source='spansh', reference_coords=dict(x=1, y=2, z=3),
+                                         spansh_fetched=fetched),
+                         [row(source='Spansh')])
+        self.assertEqual(f._search_spansh_with_filters.call_args.args[5], dict(x=1, y=2, z=3))
+        self.assertEqual(fetched, {'spansh': [row(source='Spansh')]})
 
 
 class InlineThread:
