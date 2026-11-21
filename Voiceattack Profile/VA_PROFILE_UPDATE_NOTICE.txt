@@ -4,7 +4,7 @@
 
 This release includes an updated VoiceAttack profile (v5.6.7).
 What's changed:
-- Fixed a sound effect playing even when the prospector sequence was not launched due to unmet conditions.
+- Fixed sound effect playing even when the prospector sequence was not launched due to unmet conditions.
 
 Keep the VoiceAttack profile option ticked on the next page to install the updated
 profile. Follow the app's profile update instructions to import it into VoiceAttack.

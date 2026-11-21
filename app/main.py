@@ -172,7 +172,7 @@ from overlays import (
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.6.7"
+APP_VERSION = "v5.6.8"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
