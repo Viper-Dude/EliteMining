@@ -46,7 +46,7 @@ Dropped after review:
 
 ## Next (21 Nov 2026)
 
-Steps 0, 1, 2, 3a, 4 and 5 are committed. Startup stalls are recorded under Measurements. The logger starts during `__init__`, so most of the startup stalls happen behind the splash while tabs are built. Nothing left can be done without the game: 3b (D2) and step 6 both need the in-game log. Waiting for the user's combined in-game test plus `~\EliteMining.log` (`[UI-STALL]` lines). Then: record the jump/scan/FSS stalls, decide 3b, do 3b if needed, then step 6.
+Steps 0, 1, 2, 3a, 4 and 5 are committed. Startup stalls are recorded under Measurements. The logger starts during `__init__`, so most of the startup stalls happen behind the splash while tabs are built. The first dev test (18:40) failed: the step 0 logger used `sys` in `cargo_monitor.py` without importing it, so no live journal events were processed. Fixed in `2ad283e`. Ignore that log and use only logs from after the fix. Nothing left can be done without the game: 3b (D2) and step 6 both need the in-game log. Waiting for the user's combined in-game test plus `~\EliteMining.log` (`[UI-STALL]` lines). Then: record the jump/scan/FSS stalls, decide 3b, do 3b if needed, then step 6.
 
 ## Progress
 
