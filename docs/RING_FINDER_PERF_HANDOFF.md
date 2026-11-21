@@ -34,9 +34,9 @@ Make Ring Finder searches (Local, Spansh, Both, Ring Search, Any Ring) show resu
 
 | Step | What | Model, effort | Plan mode | Status |
 |---|---|---|---|---|
-| 0a | Delete unused methods | Sonnet 5.5, low | No | Done 21 Nov 2026 (−620 lines; 11 + 19 checks OK); app test and commit pending |
-| 0b | Move search code into its own module | Opus 5.5, high | No | Next |
-| 1 | Stop Spansh paging at the result limit, plus the D2 test | Opus 5.5, medium | No | Not started |
+| 0a | Delete unused methods | Sonnet 5.5, low | No | Done, user-tested, committed `1ce9b69` |
+| 0b | Move search code into its own module | Opus 5.5, high | No | Done 21 Nov 2026, user-tested, committed |
+| 1 | Stop Spansh paging at the result limit, plus the D2 test | Opus 5.5, medium | No | Next |
 | 2 | EDSM fallback after display | Opus 5.5, high | Yes | Not started |
 | 3 | PowerPlay backfill: parallel and cached | Opus 5.5, high | Yes | Not started |
 | 4 | Cache the Spansh name lookup | Sonnet 5.5, medium | No | Not started |
@@ -75,6 +75,13 @@ Recommended order: 0a, 0b, 1, 2, 3, 4, 5, 6, 7, 8, 9. Steps 1–3 give the bigge
 - Run a scope-aware undefined-name scan (`symtable`) of the new module. Watch for `t`, `log`, `tracked_request`, `translate_ring_type`, `translate_reserve_level`, `requests`, `math`, `threading` and the `typing` names.
 - Check scripts that read `ring_finder.py` source must point to the new file where needed.
 - Model: Opus 5.5, high effort (the move is large, and a missed import crashes at runtime).
+- Done 21 Nov 2026:
+  - Moved the contiguous block from `search_hotspots` up to `_update_results` (2,133 lines, 23 methods). Besides the methods listed above, that block also holds `_is_valid_mining_material`, `_material_matches`, `_determine_ring_type_from_material` and `_clean_ring_name`. Overlaps and RES search stayed in `ring_finder.py`.
+  - `translate_reserve_level` and `translate_ring_type` moved too, to avoid a circular import. `ring_finder.py` re-imports them, so `from ring_finder import translate_ring_type` (`prospector_panel.py`, `mining_card_mixin.py`) still works.
+  - The new module uses `logging.getLogger('ring_finder')`, so log lines keep the same logger name.
+  - Verified: the moved text is byte-identical to `1ce9b69`, and the rest of `ring_finder.py` is unchanged apart from the import and class bases. The `symtable` scan found nothing new (only `__file__`, same as before). There are no method name clashes in the MRO.
+  - `check_ring_finder_search.py` now builds `Finder` from both files, and `check_search_stop.py`'s syntax test includes the new file. Checks passed: ring_finder_search 11, search_stop 19, bookmarks 34, star_systems 19, visited_systems 6, distance_calculator 17.
+- Line numbers in steps 1–9 below still refer to the old `ring_finder.py`. Search by method name; most of them now live in `ring_finder_search.py`.
 
 ### 1 — Stop Spansh paging at the result limit
 

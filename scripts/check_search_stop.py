@@ -406,7 +406,7 @@ class RemainingWorkerTests(unittest.TestCase):
 
 class SyntaxTests(unittest.TestCase):
     def test_changed_modules_parse(self):
-        for name in ('main.py', 'ring_finder.py', 'marketplace_api.py', 'system_finder_api.py',
+        for name in ('main.py', 'ring_finder.py', 'ring_finder_search.py', 'marketplace_api.py', 'system_finder_api.py',
                      'multi_mineral_tab.py', 'cargo_sell_planner.py', 'ui/search_control.py'):
             with self.subTest(name=name):
                 ast.parse((ROOT / 'app' / name).read_text(encoding='utf-8-sig'))

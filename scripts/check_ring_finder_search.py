@@ -30,10 +30,15 @@ def load_methods(filename, class_name, names):
     return namespace[class_name]
 
 
-Finder = load_methods('app/ring_finder.py', 'RingFinder', {
-    '_limit_results_by_unique_rings', '_run_search_callback', '_complete_search',
-    '_insert_row_batch', '_sort_column', '_update_results', '_search_worker',
-})
+Finder = type('RingFinder', (
+    load_methods('app/ring_finder.py', 'RingFinder', {
+        '_insert_row_batch', '_sort_column', '_update_results',
+    }),
+    load_methods('app/ring_finder_search.py', 'RingFinderSearchMixin', {
+        '_limit_results_by_unique_rings', '_run_search_callback', '_complete_search',
+        '_search_worker',
+    }),
+), {})
 Database = load_methods('app/user_database.py', 'UserDatabase', {'_normalize_body_name'})
 Saves = load_methods('app/ring_finder.py', 'RingFinder', {'_save_filter_settings', '_save_auto_search_state'})
 
