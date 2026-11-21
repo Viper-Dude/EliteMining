@@ -6559,6 +6559,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin, MiningCardMixin):
                 
                     # Auto-switch to Hotspots Finder on FSD jump (not during startup)
                     if ev == "FSDJump" and not self.startup_processing:
+                        self._sc_tab_switched = False  # Each new system gets its own switch
                         self._pending_ring_finder_switch = False
                         self._schedule_ring_finder_switch()
             
@@ -7459,15 +7460,15 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin, MiningCardMixin):
         """Auto-switch to Hotspots Finder tab if the setting is enabled
 
         Note: Will NOT switch if a mining session is active (user is still mining)
-        Only switches once per supercruise entry — reset by SupercruiseExit.
+        Only switches once per supercruise entry or new system — reset by SupercruiseExit and FSDJump.
         """
         try:
             if self.main_app and not self.main_app._can_auto_switch_tabs():
                 return
 
-            # Only switch once per supercruise entry
+            # Only switch once per supercruise entry or new system
             if getattr(self, '_sc_tab_switched', False):
-                print("[AUTO-TAB] Already switched for this supercruise entry, skipping")
+                print("[AUTO-TAB] Already switched for this supercruise entry or system, skipping")
                 return
 
             # Don't switch if a mining session is active
