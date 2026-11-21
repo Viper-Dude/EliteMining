@@ -48,7 +48,7 @@ Dropped after review:
 
 | Step | What | Model, effort | Plan mode | Status |
 |---|---|---|---|---|
-| 0 | Temporary UI stall logger (dev only) and baseline | Sonnet 5.5, low | No | Not started |
+| 0 | Temporary UI stall logger (dev only) and baseline | Sonnet 5.5, low | No | Logger committed; baseline test pending |
 | 1 | `marketplace_cache.db` to WAL | Opus 5.5, high | No | Not started |
 | 2 | One route timer, no folder listing, atomic `jumpsleft` | Sonnet 5.5, medium | No | Not started |
 | 3a | FSDJump cache upserts off the UI thread | Opus 5.5, high | Yes | Not started |
@@ -147,7 +147,7 @@ Recommended order: 0, 1, 2, 3a, (3b), 4, 5, 6. Steps 1 and 3a give the biggest g
 | matplotlib + pyplot + dates import (warm) | 0.33 s |
 | Ring Finder count queries (49,647 rows) | 66 + 14 + 10 ms |
 
-Step 0 baseline: not done yet.
+Step 0 baseline: logger added (`_start_ui_stall_logger` in `main.py`, `last_batch_info` in `cargo_monitor._deliver_journal_events`, both marked TEMP); user test and log numbers pending.
 
 ## Not verified
 

@@ -663,6 +663,8 @@ class App(tk.Tk, ColumnVisibilityMixin):
                                         app_dir=app_dir)
         # Set the main app reference so cargo monitor can access prospector panel later
         self.cargo_monitor.main_app_ref = self
+        if not getattr(sys, 'frozen', False):
+            self._start_ui_stall_logger()  # TEMP dev-only (GUI_PERF_HANDOFF step 0)
         self._set_splash_status("Preparing interface...")
 
         # Centralized current system tracking (single source of truth)
@@ -6451,6 +6453,23 @@ class App(tk.Tk, ColumnVisibilityMixin):
         finally:
             self.after(2000, self._poll_va_variables)
     
+    def _start_ui_stall_logger(self) -> None:
+        # TEMP dev-only (GUI_PERF_HANDOFF step 0): logs when the UI thread runs a 100 ms timer >50 ms late
+        self._stall_expected = time.perf_counter() + 0.1
+        def beat():
+            now = time.perf_counter()
+            late_ms = (now - self._stall_expected) * 1000
+            if late_ms > 50:
+                info = getattr(self.cargo_monitor, 'last_batch_info', None)
+                last = f"{info[1]} ({time.time() - info[0]:.2f}s ago)" if info else "none"
+                log.info("[UI-STALL] %.0f ms late; last journal batch: %s", late_ms, last)
+            self._stall_expected = time.perf_counter() + 0.1
+            try:
+                self.after(100, beat)
+            except Exception:
+                pass
+        self.after(100, beat)
+
     def _poll_route_status(self) -> None:
         """Poll journal and NavRoute for changes (runs every 2 seconds)"""
         try:
