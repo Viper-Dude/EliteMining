@@ -938,6 +938,15 @@ Enable, disable, or check the status of 15 EliteMining settings by voice. Spoken
 
 - Works alongside EDCopilot.
 
+### Linux (Untested)
+
+EliteMining is built for Windows, and Linux is not officially supported. It may run under Proton if you start it inside the game's Proton prefix, so it can read your journal files:
+
+1. Download the ZIP version (`EliteMining <version>.zip`) and unpack it anywhere.
+2. Run `protontricks-launch --appid 359320 /path/to/EliteMining.exe`.
+
+VoiceAttack features, sounds and overlays may not work. If you try it, please report what works and what doesn't on [Discord](#discord).
+
 ## Known Limitations
 - **Only works with in-game keybinds (HOTAS setup manual)**
 - **DPI / Resolution changes require restart** — If you change your display DPI scaling or screen resolution, restart EliteMining for the text overlays to render correctly.
