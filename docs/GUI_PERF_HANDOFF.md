@@ -46,7 +46,7 @@ Dropped after review:
 
 ## Next (21 Nov 2026)
 
-Steps 0, 1, 2, 3a, 4 and 5 are committed. Waiting for the user's combined in-game test plus `~\EliteMining.log` (`[UI-STALL]` lines). Then: record the stalls under Measurements, decide 3b (D2), do 3b if needed, then step 6.
+Steps 0, 1, 2, 3a, 4 and 5 are committed. Startup stalls are recorded under Measurements. The logger starts during `__init__`, so most of the startup stalls happen behind the splash while tabs are built. Nothing left can be done without the game: 3b (D2) and step 6 both need the in-game log. Waiting for the user's combined in-game test plus `~\EliteMining.log` (`[UI-STALL]` lines). Then: record the jump/scan/FSS stalls, decide 3b, do 3b if needed, then step 6.
 
 ## Progress
 
@@ -152,7 +152,19 @@ Recommended order: 0, 1, 2, 3a, (3b), 4, 5, 6. Steps 1 and 3a give the biggest g
 | matplotlib + pyplot + dates import (warm) | 0.33 s |
 | Ring Finder count queries (49,647 rows) | 66 + 14 + 10 ms |
 
-Step 0 baseline: logger added (`_start_ui_stall_logger` in `main.py`, `last_batch_info` in `cargo_monitor._deliver_journal_events`, both marked TEMP); user test and log numbers pending.
+Step 0 baseline: logger added (`_start_ui_stall_logger` in `main.py`, `last_batch_info` in `cargo_monitor._deliver_journal_events`, both marked TEMP).
+
+Step 0 log, 21 Nov 2026 18:15 (with WAL, steps 1–5 in place). This session covered startup only: no journal batches were delivered, so there are no jump, ring-scan or FSS numbers yet.
+
+| When | Stall | Logged next to |
+|---|---|---|
+| Startup, right after the EDDN listener started | 477 ms | EDDN init |
+| Startup, tabs being built | 1,970 ms | Game info update, Reports CSV load |
+| "EliteMining ready" / VoiceAttack import / auto tab switch | 472 ms | |
+| Following 4 s of startup | 135, 94, 84, 111, 50, 90 ms | Route poll, sash setup, update check |
+| Idle, 1 minute later | 85 ms | nothing |
+
+Still needed for D2: one short log with 2–3 jumps, a honk and FSS of a ringed system, and Commodity Market results.
 
 ## Not verified
 
