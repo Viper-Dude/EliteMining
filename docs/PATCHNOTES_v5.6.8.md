@@ -8,10 +8,8 @@
 - Share to Discord now posts your Mining Card, with the system name ready to copy.
 
 ## Bug Fixes
-- Hotspots Finder Max Results now always shows the closest rings, also when searching your own scans for a specific mineral.
-- Hotspots Finder Spansh searches keep the rings already found if the connection drops partway, and a mistyped system name no longer searches around a different system.
-- Jumping to a new system while a Hotspots Finder search is running no longer changes the system name and filters without searching.
-- The Hotspots Finder result count now counts each ring once, and the German result message reads correctly.
+- Hotspots Finder now always shows the closest rings, keeps rings already found if Spansh drops out, and no longer searches around the wrong system after a typo.
+- Jumping during a Hotspots Finder search no longer changes your system name and filters, and the result count and German message are now correct.
 
 ### Voiceattack Profile - no update (V5.6.7)
 
