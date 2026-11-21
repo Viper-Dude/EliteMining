@@ -1,11 +1,11 @@
-﻿What's new in EliteMining v5.6.7
+﻿What's new in EliteMining v5.6.8
 
 New Features & Improvements
-- Hover the Updated column wherever prices are shown to see where each price came from.
-- Sell My Hold now shows the landing pad size of each station.
-- New modern look for sliders, number boxes, checkboxes and the text color and size options.
-- The session summary line and the journal history import window now follow your language and theme colors.
+- General code optimalization
+- Hotspots Finder searches should be much faster and show results sooner.
+- Mining Cards have a new slimmer look that follows your app theme and language, with all minerals in one table, the session date, cores found, and the comment you saved with the session filled in for you.
+- Share to Discord now posts your Mining Card, with the system name ready to copy.
 
 Bug Fixes
-- General stability and code optimization: settings such as the journal folder now apply immediately, journal handling and jumps-left tracking are more reliable, and mining events are no longer missed right after startup.
-- Typed timer values in VoiceAttack Controls are now saved right away.
+- Hotspots Finder now always shows the closest rings, keeps rings already found if Spansh drops out, and no longer searches around the wrong system after a typo.
+- Jumping during a Hotspots Finder search no longer changes your system name and filters, and the result count and German message are now correct.
