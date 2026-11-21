@@ -8,7 +8,7 @@ import logging
 import sqlite3
 import re
 import datetime
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 
 from localization import t
 import system_info_cache
@@ -124,13 +124,14 @@ class SystemFinderAPI:
     ENRICHMENT_TIMEOUT = 10
 
     @classmethod
-    def _fetch_spansh_powerplay_systems(cls, reference_system: str, max_distance: float,
-                                         power: str, pp_state: str, is_cancelled=None) -> Dict[str, Dict]:
+    def _query_spansh_powerplay_systems(cls, reference_system: str, max_distance: float,
+                                         power: str, pp_state: str, is_cancelled=None) -> Tuple[Dict[str, Dict], bool]:
         """
         Query Spansh's systems-search for authoritative Fortified/Stronghold power/state data,
         scoped to the same reference_system + max_distance as the ring search.
-        Returns {system_name: {controlling_power, power_state}}. Empty dict on any failure —
-        this is a supplementary enrichment call, never required for the search to succeed.
+        Returns ({system_name: {controlling_power, power_state}}, answered). On any failure or
+        cancellation that is ({}, False) — this is a supplementary enrichment call, never
+        required for the search to succeed.
 
         is_cancelled: optional zero-arg callable checked right before the request is sent —
         lets the caller (e.g. the user clicking Stop) skip the call entirely if it's already
@@ -139,11 +140,11 @@ class SystemFinderAPI:
         """
         if is_cancelled and is_cancelled():
             log.debug("[SYSTEM_FINDER] Spansh PowerPlay enrichment skipped (search already cancelled)")
-            return {}
+            return {}, False
         spansh_filters = cls._build_spansh_filters({'power': power, 'pp_state': pp_state})
         if not spansh_filters:
             log.debug(f"[SYSTEM_FINDER] Spansh PowerPlay enrichment skipped (no filters built for power={power!r}, pp_state={pp_state!r})")
-            return {}
+            return {}, False
 
         payload = {
             'reference_system': reference_system,
@@ -182,33 +183,62 @@ class SystemFinderAPI:
                     'distance': system.get('distance', 0),
                 }
             log.debug(f"[SYSTEM_FINDER] Spansh PowerPlay enrichment: {len(pp_systems)} within {max_distance} LY after distance filter")
-            return pp_systems
+            return pp_systems, True
         except Exception as e:
             log.debug(f"[SYSTEM_FINDER] Spansh PowerPlay enrichment failed: {e}")
-            return {}
+            return {}, False
+
+    @classmethod
+    def _fetch_spansh_powerplay_systems(cls, reference_system: str, max_distance: float,
+                                         power: str, pp_state: str, is_cancelled=None) -> Dict[str, Dict]:
+        """Like _query_spansh_powerplay_systems, but returns only the systems."""
+        return cls._query_spansh_powerplay_systems(
+            reference_system, max_distance, power, pp_state, is_cancelled=is_cancelled)[0]
 
     # PowerPlay states Spansh's systems-search can filter on directly (Expansion/Contested
     # aren't in its index at all - see LOCAL_ONLY_PP_STATES).
     SPANSH_BACKED_PP_STATES = ('Exploited', 'Fortified', 'Stronghold', 'Unoccupied')
 
+    # Merged backfill answers by (reference system, radius), so repeat and Auto searches skip Spansh
+    PP_BACKFILL_CACHE_SECS = 300
+    _pp_backfill_cache: Dict[tuple, tuple] = {}
+
     @classmethod
     def _fetch_spansh_powerplay_backfill(cls, reference_system: str, max_distance: float,
                                           is_cancelled=None) -> Dict[str, Dict]:
         """
-        Query Spansh for all 4 Spansh-backed PP states (one request each) scoped to
+        Query Spansh for all 4 Spansh-backed PP states (one request each, in parallel) scoped to
         reference_system/max_distance, merging results into a single {system_name: {...}} map.
         Used to backfill the PowerPlay column with Spansh's own data when no Power/PP State
         filter is active, so results aren't limited to whatever the sparse EDDN cache has.
         Empty dict on failure/cancellation for any given state - never blocks the search.
+        Complete answers are reused for PP_BACKFILL_CACHE_SECS; failed or cancelled ones are not.
         """
+        import time
+        from concurrent.futures import ThreadPoolExecutor
+        key = (reference_system.lower(), max_distance)
+        now = time.monotonic()
+        cached = cls._pp_backfill_cache.get(key)
+        if cached and now - cached[0] < cls.PP_BACKFILL_CACHE_SECS:
+            return dict(cached[1])
+        if is_cancelled and is_cancelled():
+            return {}
+
+        states = cls.SPANSH_BACKED_PP_STATES
+        with ThreadPoolExecutor(max_workers=len(states)) as pool:
+            answers = list(pool.map(
+                lambda state: cls._query_spansh_powerplay_systems(
+                    reference_system, max_distance, 'Any', state, is_cancelled=is_cancelled),
+                states))
         merged: Dict[str, Dict] = {}
-        for state in cls.SPANSH_BACKED_PP_STATES:
-            if is_cancelled and is_cancelled():
-                break
-            state_systems = cls._fetch_spansh_powerplay_systems(
-                reference_system, max_distance, 'Any', state, is_cancelled=is_cancelled)
+        for state_systems, _answered in answers:
             merged.update(state_systems)
-        return merged
+        if all(answered for _systems, answered in answers):
+            for old_key, (stamp, _systems) in list(cls._pp_backfill_cache.items()):
+                if now - stamp >= cls.PP_BACKFILL_CACHE_SECS:
+                    cls._pp_backfill_cache.pop(old_key, None)
+            cls._pp_backfill_cache[key] = (now, merged)
+        return dict(merged)
 
     @classmethod
     def _store_powerplay_batch(cls, pp_systems: Dict[str, Dict]) -> None:

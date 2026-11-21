@@ -38,8 +38,8 @@ Make Ring Finder searches (Local, Spansh, Both, Ring Search, Any Ring) show resu
 | 0b | Move search code into its own module | Opus 5.5, high | No | Done 21 Nov 2026, user-tested, committed |
 | 1 | Stop Spansh paging at the result limit, plus the D2 test | Opus 5.5, medium | No | Done 21 Nov 2026, user-tested, committed |
 | 2 | EDSM fallback after display | Opus 5.5, high | Yes | Done 21 Nov 2026, user-tested |
-| 3 | PowerPlay backfill: parallel and cached | Opus 5.5, high | Yes | Next |
-| 4 | Cache the Spansh name lookup | Sonnet 5.5, medium | No | Not started |
+| 3 | PowerPlay backfill: parallel and cached | Opus 5.5, high | Yes | Done 21 Nov 2026, user-tested, committed |
+| 4 | Cache the Spansh name lookup | Sonnet 5.5, medium | No | Next |
 | 5 | Remove shared state from worker threads | Opus 5.5, high | Yes | Not started |
 | 6 | Local range query rewrite | Opus 5.5, high | Yes | Not started |
 | 7 | `_update_results`: prefetch after the limit | Sonnet 5.5, medium | No | Not started |
@@ -139,6 +139,14 @@ Recommended order: 0a, 0b, 1, 2, 3, 4, 5, 6, 7, 8, 9. Steps 1–3 give the bigge
   - The Star Systems tab shares this function, so check it too.
 - With D1 = yes: run the backfill after display and refresh only the PowerPlay column.
 - Model: Opus 5.5, high effort.
+- Done 21 Nov 2026:
+  - `system_finder_api.py`: `_query_spansh_powerplay_systems` returns `(systems, answered)`; `_fetch_spansh_powerplay_systems` is now a wrapper returning only the systems. `_fetch_spansh_powerplay_backfill` sends the 4 requests through a 4-thread pool (each checks `is_cancelled` first) and caches complete answers in `_pp_backfill_cache` by `(reference_system.lower(), max_distance)` for `PP_BACKFILL_CACHE_SECS = 300`. Failed or cancelled answers are not cached. The Star Systems tab gets both.
+  - `_search_worker` no longer calls Spansh for PowerPlay. It passes `pp_backfill = (reference_system, max_distance)` to `_complete_search`, which stores it in `_pp_backfill_request` after the generation check. `_finish_update_results` then calls `_start_pp_backfill(generation)` next to the EDSM fill. A daemon thread fetches the backfill, keeps the shown systems where `_spansh_pp_should_replace_cache` says Spansh is better, saves them with `_store_powerplay_batch`, and `_apply_pp_backfill` sets only the PowerPlay cells, with the same generation checks as step 2.
+  - The PowerPlay cell text moved into `RingFinder._powerplay_display(pp_entry, hotspot)` (`ring_finder.py`), used by `_update_results` and the in-place update.
+  - `use_spansh_pp` is now `data_source == 'database' and spansh_pp_var`: Spansh/Both searches hide the PowerPlay column, so they no longer send the 4 requests.
+  - Only the shown rows are backfilled now (before: every row before the Max Results cut). Like the EDSM fill, the backfill also runs after Stop shows partial results.
+  - Live, real function: Sol 50 LY sequential 7.9 s, parallel 2.3 s, same 998 systems; cached repeat 0 s. Colonia 100 LY: 4.0 s to 2.7 s (0 systems).
+  - Tests: `PowerPlayAfterDisplayTests` (5) plus a worker test in `check_ring_finder_search.py`, 29 OK. `PowerPlayBackfillTests` (5) in `check_search_stop.py`, 26 OK. `check_star_systems.py` 19 OK.
 
 ### 4 — Cache the Spansh name lookup
 

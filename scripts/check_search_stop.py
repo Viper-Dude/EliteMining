@@ -428,6 +428,63 @@ class RemainingWorkerTests(unittest.TestCase):
         render.assert_not_called()
 
 
+class PowerPlayBackfillTests(unittest.TestCase):
+    def setUp(self):
+        SystemFinderAPI._pp_backfill_cache.clear()
+        self.addCleanup(SystemFinderAPI._pp_backfill_cache.clear)
+        self.calls = []
+
+    def answer(self, *args, **kwargs):
+        state = args[3]
+        self.calls.append((args[0], args[1], state))
+        return {f'{state} system': dict(power_state=state)}, True
+
+    def backfill(self, reference='Sol', distance=50, **kwargs):
+        return SystemFinderAPI._fetch_spansh_powerplay_backfill(reference, distance, **kwargs)
+
+    def test_all_states_are_requested_at_the_same_time(self):
+        barrier = threading.Barrier(len(SystemFinderAPI.SPANSH_BACKED_PP_STATES), timeout=5)
+        def answer(*args, **kwargs):
+            barrier.wait()
+            return self.answer(*args, **kwargs)
+        with patch.object(SystemFinderAPI, '_query_spansh_powerplay_systems', side_effect=answer):
+            merged = self.backfill()
+        self.assertEqual(set(merged), {f'{state} system' for state in SystemFinderAPI.SPANSH_BACKED_PP_STATES})
+
+    def test_repeat_search_reuses_the_answer_until_it_expires(self):
+        with patch.object(SystemFinderAPI, '_query_spansh_powerplay_systems', side_effect=self.answer):
+            first = self.backfill()
+            first.clear()
+            self.assertEqual(len(self.backfill('sol')), 4)
+            self.assertEqual(len(self.calls), 4)
+            self.backfill(distance=100)
+            self.assertEqual(len(self.calls), 8)
+            with patch('time.monotonic', return_value=10 ** 9):
+                self.backfill()
+            self.assertEqual(len(self.calls), 12)
+
+    def test_failed_or_cancelled_answers_are_not_reused(self):
+        def one_fails(*args, **kwargs):
+            systems, answered = self.answer(*args, **kwargs)
+            return (systems, answered) if args[3] != 'Fortified' else ({}, False)
+        with patch.object(SystemFinderAPI, '_query_spansh_powerplay_systems', side_effect=one_fails):
+            self.assertEqual(len(self.backfill()), 3)
+            self.backfill()
+        self.assertEqual(len(self.calls), 8)
+
+    def test_stop_before_the_requests_sends_nothing(self):
+        with patch.object(SystemFinderAPI, '_query_spansh_powerplay_systems', side_effect=self.answer):
+            self.assertEqual(self.backfill(is_cancelled=lambda: True), {})
+        self.assertEqual(self.calls, [])
+
+    def test_each_request_checks_stop_before_it_is_sent(self):
+        checks = iter([False])  # Stop arrives right after the backfill starts
+        with patch('requests.post') as post:
+            self.backfill(is_cancelled=lambda: next(checks, True))
+        self.assertEqual(post.call_count, 0)
+        self.assertEqual(SystemFinderAPI._pp_backfill_cache, {})
+
+
 class SyntaxTests(unittest.TestCase):
     def test_changed_modules_parse(self):
         for name in ('main.py', 'ring_finder.py', 'ring_finder_search.py', 'marketplace_api.py', 'system_finder_api.py',

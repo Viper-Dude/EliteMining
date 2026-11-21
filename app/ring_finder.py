@@ -307,6 +307,29 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         from app_utils import format_relative_age
         return format_relative_age(updated_at)
 
+    def _powerplay_display(self, pp_entry: Dict, hotspot: Dict) -> str:
+        """PowerPlay cell text for a result row; falls back to the row's own Spansh fields."""
+        pp_power = pp_entry.get('controlling_power', '')
+        pp_state = pp_entry.get('power_state', '')
+        # Age suffix only applies to EDDN cache data (Spansh data has no matching timestamp)
+        pp_age = self._format_pp_age(pp_entry.get('updated_at')) if (pp_power or pp_state) else ''
+        pp_age_suffix = f" ({pp_age})" if pp_age else ''
+        if pp_power == '~none~':
+            return (pp_state or t('common.pp_no_power')) + pp_age_suffix
+        if not pp_power:
+            pp_power = hotspot.get('spansh_pp', '')
+        if not pp_state:
+            pp_state = hotspot.get('spansh_pp_state', '')
+        if pp_power and pp_state:
+            return f"{pp_power} / {pp_state}{pp_age_suffix}"
+        if pp_power:
+            return f"{pp_power}{pp_age_suffix}"
+        if pp_state:
+            # Known state with confirmed-blank controlling_power (e.g. Unoccupied) -
+            # this is real data, not a missing lookup.
+            return f"{pp_state}{pp_age_suffix}"
+        return t('common.pp_no_data')
+
     def _sort_hotspots_display(self, hotspot_text: str) -> str:
         """Sort hotspot display string by count (descending), then alphabetically
         
@@ -3136,29 +3159,7 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
                         pass
 
             # Build PowerPlay display string — prefer EDDN cache, fall back to Spansh
-            pp_entry = _pp_data.get(system_name, {})
-            pp_power = pp_entry.get('controlling_power', '')
-            pp_state = pp_entry.get('power_state', '')
-            # Age suffix only applies to EDDN cache data (Spansh data has no matching timestamp)
-            pp_age = self._format_pp_age(pp_entry.get('updated_at')) if (pp_power or pp_state) else ''
-            pp_age_suffix = f" ({pp_age})" if pp_age else ''
-            if pp_power == '~none~':
-                pp_str = (pp_state or t('common.pp_no_power')) + pp_age_suffix
-            else:
-                if not pp_power:
-                    pp_power = hotspot.get('spansh_pp', '')
-                if not pp_state:
-                    pp_state = hotspot.get('spansh_pp_state', '')
-                if pp_power and pp_state:
-                    pp_str = f"{pp_power} / {pp_state}{pp_age_suffix}"
-                elif pp_power:
-                    pp_str = f"{pp_power}{pp_age_suffix}"
-                elif pp_state:
-                    # Known state with confirmed-blank controlling_power (e.g. Unoccupied) -
-                    # this is real data, not a missing lookup.
-                    pp_str = f"{pp_state}{pp_age_suffix}"
-                else:
-                    pp_str = t('common.pp_no_data')
+            pp_str = self._powerplay_display(_pp_data.get(system_name, {}), hotspot)
 
             # Favourite indicator (using pre-fetched bulk data, no per-row DB calls)
             favourite_display = "⭐" if _early_favourites.get(_bulk_key, False) else ""
@@ -3260,6 +3261,7 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
 
         if generation is not None:
             self._start_edsm_metadata_fill(generation)
+            self._start_pp_backfill(generation)
 
     def _show_error(self, error_msg: str):
         """Show error message and reset UI"""

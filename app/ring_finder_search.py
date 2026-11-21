@@ -234,7 +234,8 @@ class RingFinderSearchMixin:
         ring_type_only = hasattr(self, 'ring_type_only_var') and self.ring_type_only_var.get()
         pp_power_filter = self.pp_power_var.get() if hasattr(self, 'pp_power_var') else 'Any'
         pp_state_filter = self.pp_state_var.get() if hasattr(self, 'pp_state_var') else 'Any'
-        use_spansh_pp = data_source != 'database' or self.spansh_pp_var.get()
+        # The PowerPlay column is hidden for Spansh/Both, so only Local searches fetch it
+        use_spansh_pp = data_source == 'database' and self.spansh_pp_var.get()
 
         # For Any Ring mode, use a large fixed distance (dropdown is disabled)
         # Some regions of space have limited ring data, so use large radius
@@ -366,6 +367,7 @@ class RingFinderSearchMixin:
             
             # Apply PowerPlay filter using EDDN cache (local database only — Power/State
             # combos are greyed out and reset to Any for Spansh/Both data sources)
+            pp_backfill = None
             if pp_power != 'Any' or pp_state != 'Any':
                 if search_generation != self._search_generation:
                     print(f"[SEARCH] Search gen {search_generation} cancelled before PowerPlay filter (current: {self._search_generation})")
@@ -375,30 +377,11 @@ class RingFinderSearchMixin:
                     is_cancelled=lambda: search_generation != self._search_generation,
                     use_spansh=use_spansh_pp)
             else:
-                # No Power/PP State filter active — still backfill the PowerPlay column with
-                # Spansh's own Exploited/Fortified/Stronghold/Unoccupied data (the 4 states
-                # Spansh reliably indexes) for rows where the EDDN cache has nothing newer,
-                # so results aren't limited to whatever the sparse EDDN cache happens to have.
+                # No Power/PP State filter active — the PowerPlay column is still backfilled
+                # with Spansh's own data, after the rows are shown (_start_pp_backfill).
                 self._spansh_pp_enrichment = {}
-                if use_spansh_pp and search_generation == self._search_generation:
-                    from system_finder_api import SystemFinderAPI
-                    system_names = list({h.get('system', h.get('systemName', '')) for h in hotspots})
-                    system_names = [s for s in system_names if s]
-                    if system_names:
-                        pp_cache = SystemFinderAPI._batch_get_powerplay(system_names)
-                        spansh_pp = SystemFinderAPI._fetch_spansh_powerplay_backfill(
-                            reference_system, max_distance,
-                            is_cancelled=lambda: search_generation != self._search_generation)
-                        to_persist = {}
-                        for sys_name, entry in spansh_pp.items():
-                            if sys_name not in system_names:
-                                continue
-                            cached = pp_cache.get(sys_name)
-                            if SystemFinderAPI._spansh_pp_should_replace_cache(entry, cached):
-                                self._spansh_pp_enrichment[sys_name] = entry
-                                to_persist[sys_name] = entry
-                        if to_persist:
-                            SystemFinderAPI._store_powerplay_batch(to_persist)
+                if use_spansh_pp:
+                    pp_backfill = (reference_system, max_distance)
 
             # Apply min hotspots filter if needed (skip for overlaps/RES only mode)
             if min_hotspots > 1 and not self._is_all_minerals(specific_material) and not overlaps_only and not res_only:
@@ -414,13 +397,13 @@ class RingFinderSearchMixin:
                     # User clicked Stop (not superseded by a newer search) — show whatever
                     # was collected so far instead of discarding it.
                     print(f"[SEARCH] Search gen {search_generation} stopped by user - showing {len(hotspots)} partial result(s)")
-                    self.parent.after(0, self._complete_search, search_generation, hotspots, max_results)
+                    self.parent.after(0, self._complete_search, search_generation, hotspots, max_results, pp_backfill)
                 else:
                     print(f"[SEARCH] Search gen {search_generation} cancelled before display (current: {self._search_generation})")
                 return
             
             # Update UI in main thread
-            self.parent.after(0, self._complete_search, search_generation, hotspots, max_results)
+            self.parent.after(0, self._complete_search, search_generation, hotspots, max_results, pp_backfill)
             
         except Exception as e:
             error_msg = f"Search failed: {str(e)}"
@@ -442,12 +425,13 @@ class RingFinderSearchMixin:
         if search_generation == self._search_generation:
             callback(*args)
 
-    def _complete_search(self, search_generation, hotspots, max_results):
+    def _complete_search(self, search_generation, hotspots, max_results, pp_backfill=None):
         stopped = (getattr(self, '_stopped_generation', None) == search_generation
                    and self._search_generation == search_generation + 1)
         if search_generation != self._search_generation and not stopped:
             return
         self._search_result_limit = max_results
+        self._pp_backfill_request = pp_backfill
         self._update_results(hotspots)
 
     def _hotspot_missing_metadata(self, hotspot: Dict):
@@ -546,6 +530,57 @@ class RingFinderSearchMixin:
                 hotspot['ls_distance'] = ls_distance
                 hotspot['ls'] = ls_display
                 self.results_tree.set(item_id, 'LS', ls_display)
+
+    def _start_pp_backfill(self, generation):
+        """Fill the PowerPlay column of the shown rows with Spansh data after they are displayed.
+
+        Covers Spansh's Exploited/Fortified/Stronghold/Unoccupied states, for rows where the
+        EDDN cache has nothing newer. Only runs when the search asked for it (no Power/PP State
+        filter, and Spansh PowerPlay data enabled).
+        """
+        request = getattr(self, '_pp_backfill_request', None)
+        rows = dict(getattr(self, '_result_row_hotspots', {}))
+        if not request or not rows:
+            return
+        systems = {h.get('system', h.get('systemName', '')) for h in rows.values() if h}
+        systems.discard('')
+        if not systems:
+            return
+
+        def is_cancelled():
+            return generation != self._results_generation or generation[0] != self._search_generation
+
+        threading.Thread(target=self._pp_backfill_worker,
+                         args=(generation, request, systems, is_cancelled), daemon=True).start()
+
+    def _pp_backfill_worker(self, generation, request, systems, is_cancelled):
+        """Background part of _start_pp_backfill."""
+        try:
+            from system_finder_api import SystemFinderAPI
+            reference_system, max_distance = request
+            spansh_pp = SystemFinderAPI._fetch_spansh_powerplay_backfill(
+                reference_system, max_distance, is_cancelled=is_cancelled)
+            found = [name for name in systems if name in spansh_pp]
+            if not found:
+                return
+            pp_cache = SystemFinderAPI._batch_get_powerplay(found)
+            updates = {name: spansh_pp[name] for name in found
+                       if SystemFinderAPI._spansh_pp_should_replace_cache(spansh_pp[name], pp_cache.get(name))}
+            if updates:
+                SystemFinderAPI._store_powerplay_batch(updates)
+                self.parent.after(0, self._apply_pp_backfill, generation, updates)
+        except Exception as e:
+            log.error(f"[POWERPLAY] Spansh backfill failed (non-critical): {e}")
+
+    def _apply_pp_backfill(self, generation, updates: Dict):
+        """Set the PowerPlay cells of the shown rows in place."""
+        if (not self.parent.winfo_exists() or generation != self._results_generation
+                or generation[0] != self._search_generation):
+            return
+        for item_id, hotspot in self._result_row_hotspots.items():
+            entry = updates.get(hotspot.get('system', hotspot.get('systemName', ''))) if hotspot else None
+            if entry and self.results_tree.exists(item_id):
+                self.results_tree.set(item_id, 'PowerPlay', self._powerplay_display(entry, hotspot))
 
     def _limit_results_by_unique_rings(self, results: List[Dict], max_rings: int) -> List[Dict]:
         """Limit results by counting unique rings (system+body pairs) instead of individual rows.

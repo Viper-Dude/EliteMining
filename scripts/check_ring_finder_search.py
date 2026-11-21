@@ -34,12 +34,13 @@ def load_methods(filename, class_name, names):
 
 Finder = type('RingFinder', (
     load_methods('app/ring_finder.py', 'RingFinder', {
-        '_insert_row_batch', '_sort_column', '_update_results',
+        '_insert_row_batch', '_sort_column', '_update_results', '_powerplay_display',
     }),
     load_methods('app/ring_finder_search.py', 'RingFinderSearchMixin', {
         '_limit_results_by_unique_rings', '_run_search_callback', '_complete_search',
         '_search_worker', '_hotspot_missing_metadata', '_start_edsm_metadata_fill',
         '_edsm_metadata_worker', '_read_filled_ring_metadata', '_apply_edsm_metadata',
+        '_start_pp_backfill', '_pp_backfill_worker', '_apply_pp_backfill',
     }),
 ), {})
 EDSM_GLOBALS = Finder._start_edsm_metadata_fill.__globals__
@@ -168,6 +169,26 @@ class RingFinderSearchTests(unittest.TestCase):
         f.parent.flush()
         f._update_results.assert_called_once()
         self.assertEqual(f.edsm.mock_calls, [])
+
+    def test_results_show_without_waiting_for_powerplay(self):
+        f = self.finder
+        f.db_ready = True
+        f.systems_data = {}
+        f._get_hotspots = Mock(return_value=[row()])
+        f._is_all_minerals = Mock(return_value=True)
+        f._update_results = Mock()
+        f._reset_search_button = Mock()
+        module = ModuleType('system_finder_api')
+        module.SystemFinderAPI = Mock()
+        for use_spansh_pp, request in ((True, ('Sol', 50)), (False, None)):
+            with self.subTest(use_spansh_pp=use_spansh_pp), patch.dict(sys.modules, system_finder_api=module):
+                f._update_results.reset_mock()
+                f._search_worker('Sol', 'All', 'All Minerals', False, 50,
+                                 dict(x=0, y=0, z=0), 10, search_generation=1, use_spansh_pp=use_spansh_pp)
+                f.parent.flush()
+                f._update_results.assert_called_once()
+                self.assertEqual(f._pp_backfill_request, request)
+        self.assertEqual(module.SystemFinderAPI.mock_calls, [])
 
     def test_old_row_batches_stop_after_a_new_search_or_refresh(self):
         f = self.finder
@@ -350,6 +371,91 @@ class EdsmAfterDisplayTests(unittest.TestCase):
                 self.finder.parent.flush()
                 self.assertEqual(self.finder.results_tree.rows[key]['LS'], 'No data')
                 self.assertIsNone(hotspot['ls_distance'])
+
+
+class PowerPlayAfterDisplayTests(unittest.TestCase):
+    def setUp(self):
+        f = self.finder = Finder()
+        f.parent = Parent()
+        f.results_tree = Tree()
+        f._search_generation = 1
+        f._results_generation = self.generation = (1, object())
+        f._result_row_hotspots = {}
+        f._pp_backfill_request = ('Sol', 50)
+        f._format_pp_age = lambda value: ''
+        api = self.api = Mock()
+        api._fetch_spansh_powerplay_backfill.return_value = {
+            'Newer': dict(controlling_power='Aisling Duval', power_state='Fortified'),
+            'Older': dict(controlling_power='Zemina Torval', power_state='Exploited'),
+            'Not shown': dict(controlling_power='Nakato Kaine', power_state='Stronghold'),
+        }
+        api._batch_get_powerplay.return_value = {}
+        api._spansh_pp_should_replace_cache.side_effect = lambda entry, cached: entry['power_state'] != 'Exploited'
+        self.module = ModuleType('system_finder_api')
+        self.module.SystemFinderAPI = api
+
+    def show(self, *hotspots):
+        for hotspot in hotspots:
+            key = self.finder.results_tree.insert('', 'end', {'PowerPlay': 'common.pp_no_data'}, ())
+            self.finder._result_row_hotspots[key] = hotspot
+        return list(self.finder._result_row_hotspots)
+
+    def run_backfill(self):
+        with patch.dict(EDSM_GLOBALS, threading=SimpleNamespace(Thread=InlineThread)), \
+                patch.dict(sys.modules, system_finder_api=self.module):
+            self.finder._start_pp_backfill(self.generation)
+
+    def test_newer_spansh_data_fills_the_shown_rows_in_place(self):
+        newer, older, second = self.show(row('Newer'), row('Older'), row('Newer', '2 A Ring'))
+        self.run_backfill()
+        self.finder.parent.flush()
+        rows = self.finder.results_tree.rows
+        self.assertEqual(rows[newer]['PowerPlay'], 'Aisling Duval / Fortified')
+        self.assertEqual(rows[second]['PowerPlay'], 'Aisling Duval / Fortified')
+        self.assertEqual(rows[older]['PowerPlay'], 'common.pp_no_data')
+        self.api._fetch_spansh_powerplay_backfill.assert_called_once()
+        self.assertEqual(self.api._fetch_spansh_powerplay_backfill.call_args[0], ('Sol', 50))
+        stored, = self.api._store_powerplay_batch.call_args[0]
+        self.assertEqual(set(stored), {'Newer'})
+
+    def test_no_request_or_no_rows_starts_no_lookup(self):
+        self.run_backfill()
+        self.finder._pp_backfill_request = None
+        self.show(row('Newer'))
+        self.run_backfill()
+        self.api._fetch_spansh_powerplay_backfill.assert_not_called()
+
+    def test_lookup_is_cancelled_by_a_new_search_or_redraw(self):
+        self.show(row('Newer'))
+        self.run_backfill()
+        is_cancelled = self.api._fetch_spansh_powerplay_backfill.call_args[1]['is_cancelled']
+        self.assertFalse(is_cancelled())
+        self.finder._results_generation = (1, object())
+        self.assertTrue(is_cancelled())
+        self.finder._results_generation = self.generation
+        self.finder._search_generation = 2
+        self.assertTrue(is_cancelled())
+
+    def test_late_values_cannot_change_a_newer_search_or_redraw(self):
+        for newer_search in (True, False):
+            with self.subTest(newer_search=newer_search):
+                self.setUp()
+                key, = self.show(row('Newer'))
+                self.run_backfill()
+                if newer_search:
+                    self.finder._search_generation = 2
+                else:
+                    self.finder._results_generation = (1, object())
+                self.finder.parent.flush()
+                self.assertEqual(self.finder.results_tree.rows[key]['PowerPlay'], 'common.pp_no_data')
+
+    def test_complete_search_keeps_the_request_for_the_shown_results(self):
+        f = self.finder
+        f._update_results = Mock()
+        f._complete_search(1, [row()], 10, ('Colonia', 100))
+        self.assertEqual(f._pp_backfill_request, ('Colonia', 100))
+        f._complete_search(1, [row()], 10)
+        self.assertIsNone(f._pp_backfill_request)
 
 
 SPANSH_CONSTANTS = ('SPANSH_SIGNAL_NAMES', 'APP_SIGNAL_NAMES', 'SPANSH_HOTSPOT_SIGNALS')
