@@ -173,6 +173,10 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         self.refresh_button.pack(in_=controls, side='right')
         self.note = ttk.Label(parent, text=t('statistics_expanded.scope'), wraplength=1000)
         self.note.pack(anchor='w', pady=(0, 5))
+        from config import load_theme as _load_note_theme
+        from ui.theme import get_theme_colors as _note_colors
+        _note_palette = _note_colors(_load_note_theme())
+        self.note.configure(foreground=_note_palette.get('help_fg', _note_palette['fg']))
         parent.bind('<Configure>', lambda event: self.note.configure(
             wraplength=max(scaled_px(100), min(event.width - scaled_px(20), scaled_px(800)))), add='+')
         self.book = ttk.Notebook(parent)
@@ -196,6 +200,7 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
                            bg=colors['bg'], fg=colors['fg'], insertbackground=colors['fg'],
                            padx=scaled_px(12), pady=scaled_px(12))
             text.tag_configure('heading', font=scaled_font(11, 'bold'))
+            text.tag_configure('note', foreground=colors.get('help_fg', colors['fg']))
             text.bind('<Configure>', lambda event: self._fit_overview_text(event.widget))
             setattr(self, name, text)
         self.overview_content.bind('<Configure>', lambda event: self.overview_canvas.configure(
@@ -659,6 +664,7 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         self.progress.delete('1.0', 'end')
         self.progress.insert('1.0', '\n'.join(progress))
         self.progress.tag_add('heading', '1.0', '1.end')
+        self._tag_note(self.progress, progress[2])
         self.progress.configure(state='disabled')
         self.parent.after_idle(lambda: self._fit_overview_text(self.progress))
         self.overview.configure(state='normal')
@@ -672,6 +678,7 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
             position = self.overview.search(heading, '1.0', stopindex='end', exact=True)
             if position:
                 self.overview.tag_add('heading', position, f'{position}+{len(heading)}c')
+        self._tag_note(self.overview, t('statistics_expanded.record_help'))
         if rows:
             self._link_location('location_record', f"{record.get('system', '')} | {record.get('body', '')}",
                                 record.get('system', ''))
@@ -680,6 +687,12 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
             self._link_location('location_most', prefix + system, system, len(prefix))
         self.overview.configure(state='disabled')
         self.parent.after_idle(lambda: self._fit_overview_text(self.overview))
+
+    @staticmethod
+    def _tag_note(widget, text):
+        position = widget.search(text, '1.0', stopindex='end', exact=True)
+        if position:
+            widget.tag_add('note', position, f'{position}+{len(text)}c')
 
     def _link_location(self, tag, text, system, offset=0):
         if not system:
