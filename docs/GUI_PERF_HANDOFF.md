@@ -54,7 +54,7 @@ Dropped after review:
 | 3a | FSDJump cache upserts off the UI thread | Opus 5.5, high | Yes | Done: one worker (`_queue_cache_upserts`), also used for CarrierJump and Location (same code); `check_journal_reading.py` 47/47 |
 | 3b | Scan / SAA writes off the UI thread (only if step 0 shows stalls) | Opus 5.5, high | Yes | Not started |
 | 4 | Import matplotlib after the splash | Sonnet 5.5, medium | No | Done: numpy deferred too; `import prospector_panel` 1.01 s → 0.21 s; specs already list the hidden imports |
-| 5 | Skip unchanged cargo overlay redraw and cursor changes | Sonnet 5.5, low | No | Not started |
+| 5 | Skip unchanged cargo overlay redraw and cursor changes | Sonnet 5.5, low | No | Done: skip keyed on text + font size + colour; alpha logic untouched |
 | 6 | Remove the stall logger, re-measure, final notes | Sonnet 5.5, low | No | Not started |
 
 Recommended order: 0, 1, 2, 3a, (3b), 4, 5, 6. Steps 1 and 3a give the biggest gain.

@@ -336,5 +336,32 @@ class PanelChecks(unittest.TestCase):
             refresh.assert_called_once()
 
 
+class ReportCursorChecks(unittest.TestCase):
+    def test_cursor_is_only_set_when_it_changes(self):
+        class Tree:
+            def __init__(self):
+                self.cursor = ''
+                self.sets = []
+                self.cell = '✓'
+            identify_row = lambda self, y: 'row1'
+            identify_column = lambda self, x: '#1'
+            set = lambda self, item, column: self.cell
+            cget = lambda self, option: self.cursor
+
+            def configure(self, cursor):
+                self.cursor = cursor
+                self.sets.append(cursor)
+
+        tree = Tree()
+        event = SimpleNamespace(x=1, y=1)
+        with patch('prospector_panel.displayed_column', return_value='enhanced'):
+            for _ in range(3):
+                ProspectorPanel._handle_mouse_motion(None, event, tree)
+            tree.cell = ''
+            for _ in range(3):
+                ProspectorPanel._handle_mouse_motion(None, event, tree)
+        self.assertEqual(tree.sets, ['hand2', ''])
+
+
 if __name__ == '__main__':
     unittest.main()

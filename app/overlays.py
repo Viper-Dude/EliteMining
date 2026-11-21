@@ -590,6 +590,7 @@ class CargoTextOverlay:
         self.text_color = "#FFFFFF"
         self.font_size = 12
         self._outline_items = []
+        self._drawn_key = None
         self._update_timer = None
         self._game_hidden = False  # Track if hidden due to game focus check
         self.focus_blocked = lambda: False  # set by the app: True while the focus rule says hide
@@ -632,6 +633,11 @@ class CargoTextOverlay:
         base_y = 2
         offsets = [(-1, -1), (1, -1), (-1, 1), (1, 1),
                    (0, 1), (0, -1), (1, 0), (-1, 0)]
+        # Every rebuild path empties _outline_items, so a new or cleared canvas always redraws
+        key = (message, self.font_size, text_color)
+        if self._outline_items and key == self._drawn_key:
+            return
+        self._drawn_key = key
         if hasattr(self, '_outline_items') and self._outline_items:
             for item in self._outline_items:
                 self.canvas.itemconfig(item, text=message, font=font_spec)

@@ -11300,11 +11300,13 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin, MiningCardMixin):
                 if column_name == "enhanced":
                     cell_value = tree.set(item, column_name)
                     if cell_value == "✓":  # Has enhanced report
-                        tree.configure(cursor="hand2")
+                        if str(tree.cget("cursor")) != "hand2":
+                            tree.configure(cursor="hand2")
                         return
             
             # Reset cursor to default (but don't interfere with comment column)
-            tree.configure(cursor="")
+            if str(tree.cget("cursor")) != "":
+                tree.configure(cursor="")
             
         except Exception as e:
             # Silently handle any errors to avoid disrupting user experience

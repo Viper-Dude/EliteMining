@@ -184,5 +184,39 @@ class CargoTrackingChecks(unittest.TestCase):
         self.assertEqual(config.update_config_values.call_args.args[0], {name: value.get() for name, value in values.items()})
 
 
+class CargoOverlayRedrawChecks(unittest.TestCase):
+    def setUp(self):
+        import sys
+        sys.path.insert(0, str(ROOT / 'app'))
+        from overlays import CargoTextOverlay
+        self.overlay = CargoTextOverlay()
+        self.overlay.canvas = Mock()
+        self.overlay.canvas.create_text.side_effect = range(1, 1000)
+
+    def draws(self):
+        canvas = self.overlay.canvas
+        return canvas.create_text.call_count + canvas.itemconfig.call_count
+
+    def test_unchanged_text_is_not_redrawn(self):
+        self.overlay._draw_text('CARGO 10t')
+        first = self.draws()
+        self.assertEqual(first, 9)
+        self.overlay._draw_text('CARGO 10t')
+        self.assertEqual(self.draws(), first)
+        self.overlay._draw_text('CARGO 12t')
+        self.assertEqual(self.draws(), first + 9)
+
+    def test_font_colour_and_rebuild_force_a_redraw(self):
+        self.overlay._draw_text('CARGO')
+        for change in (lambda: self.overlay.set_font_size(14),
+                       lambda: self.overlay.set_color('#FF0000'),
+                       lambda: self.overlay.set_transparency(50),
+                       lambda: setattr(self.overlay, '_outline_items', [])):
+            before = self.draws()
+            change()
+            self.overlay._draw_text('CARGO')
+            self.assertGreater(self.draws(), before)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
