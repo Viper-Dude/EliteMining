@@ -7777,8 +7777,9 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         except Exception:
             self.status_var.set("Auto-search: Detection failed")
 
-        # Clear status after 5 seconds
-        self.parent.after(5000, lambda: self.status_var.set(""))
+        # Clear this message after 5 seconds, but never a newer one (e.g. a running search's)
+        shown = self.status_var.get()
+        self.parent.after(5000, lambda: self.status_var.get() == shown and self.status_var.set(""))
 
     def _get_overlap_display(self, system_name: str, body_name: str, material_filter: str = None, prefetched: list = None) -> str:
         """Get formatted overlap display string for a ring.

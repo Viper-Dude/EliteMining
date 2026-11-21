@@ -449,8 +449,6 @@ class CargoMonitor:
                     
                     # Pass ALL accumulated bodies so they all get highlighted
                     ring_finder.search_hotspots(highlight_bodies=bodies_to_highlight)
-                    # Clear status after 3 seconds
-                    ring_finder.parent.after(3000, lambda: ring_finder.status_var.set(""))
                     self._auto_refresh_timer = None  # Clear timer reference
                     self._pending_highlight_bodies = []  # Clear after successful refresh
                 except Exception:
