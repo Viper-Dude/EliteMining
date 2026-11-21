@@ -1102,7 +1102,7 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         for col in columns:
             # Left-align headers - use display name if mapped, otherwise use column name
             display_name = column_display_names.get(col, col)
-            self.results_tree.heading(col, text=display_name, anchor="center" if col in ("Favourite", "Source", "Visits") else "w", command=lambda c=col: self._sort_column(c, self.sort_reverse.get(c, False)))
+            self.results_tree.heading(col, text=display_name, anchor="center" if col in ("Favourite", "Visits") else "w", command=lambda c=col: self._sort_column(c, self.sort_reverse.get(c, False)))
 
             # Bind right-click on header to show column menu
             # Note: This binds to the entire tree, we'll check if click is on header in handler
@@ -1129,7 +1129,7 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
             elif col == "Sol Dist":
                 self.results_tree.column(col, width=column_widths[col], minwidth=50, anchor="w", stretch=False)
             elif col == "Source":
-                self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="center", stretch=False)
+                self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
             elif col == "Reserve":
                 # Reserve column - visible and showing reserve level
                 self.results_tree.column(col, width=column_widths[col], minwidth=60, anchor="w", stretch=False)
