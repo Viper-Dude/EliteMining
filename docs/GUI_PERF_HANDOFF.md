@@ -44,6 +44,10 @@ Dropped after review:
   - Ring Finder step 5 removed shared state from worker threads; don't bring it back.
 - The user restarts the app and tests. Report what was and wasn't verified.
 
+## Next (21 Nov 2026)
+
+Steps 0, 1, 2, 3a, 4 and 5 are committed. Waiting for the user's combined in-game test plus `~\EliteMining.log` (`[UI-STALL]` lines). Then: record the stalls under Measurements, decide 3b (D2), do 3b if needed, then step 6.
+
 ## Progress
 
 | Step | What | Model, effort | Plan mode | Status |
