@@ -89,7 +89,9 @@ class EDDNListener:
         try:
             wal_conn = sqlite3.connect(self.database_path)
             try:
-                wal_conn.execute('PRAGMA journal_mode=WAL')
+                mode = wal_conn.execute('PRAGMA journal_mode=WAL').fetchone()[0]
+                if str(mode).lower() != 'wal':
+                    log.warning(f"EDDN database stayed in {mode} mode, continuing")
             finally:
                 wal_conn.close()
         except Exception as e:
