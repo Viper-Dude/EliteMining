@@ -85,6 +85,15 @@ class EDDNListener:
 
     def _init_database(self):
         """Create tables if they don't exist"""
+        # WAL lets the UI read and write while this thread commits; the mode is stored in the file
+        try:
+            wal_conn = sqlite3.connect(self.database_path)
+            try:
+                wal_conn.execute('PRAGMA journal_mode=WAL')
+            finally:
+                wal_conn.close()
+        except Exception as e:
+            log.warning(f"Could not switch EDDN database to WAL, continuing: {e}")
         try:
             with sqlite3.connect(self.database_path) as conn:
                 cursor = conn.cursor()

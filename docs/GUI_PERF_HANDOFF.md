@@ -49,7 +49,7 @@ Dropped after review:
 | Step | What | Model, effort | Plan mode | Status |
 |---|---|---|---|---|
 | 0 | Temporary UI stall logger (dev only) and baseline | Sonnet 5.5, low | No | Logger committed; baseline test pending |
-| 1 | `marketplace_cache.db` to WAL | Opus 5.5, high | No | Not started |
+| 1 | `marketplace_cache.db` to WAL | Opus 5.5, high | No | Done (checks pass; in-game test at the end) |
 | 2 | One route timer, no folder listing, atomic `jumpsleft` | Sonnet 5.5, medium | No | Not started |
 | 3a | FSDJump cache upserts off the UI thread | Opus 5.5, high | Yes | Not started |
 | 3b | Scan / SAA writes off the UI thread (only if step 0 shows stalls) | Opus 5.5, high | Yes | Not started |

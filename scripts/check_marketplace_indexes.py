@@ -184,6 +184,40 @@ class CacheIndexChecks(unittest.TestCase):
         self.assertEqual([row[:-1] for row in after], before)
         self.assertTrue(all(row[-1] is None for row in after))
 
+    def test_cache_uses_wal_and_readers_are_not_blocked_by_a_writer(self):
+        with closing(sqlite3.connect(self.path)) as conn:
+            self.assertEqual(conn.execute('PRAGMA journal_mode').fetchone()[0], 'wal')
+        with closing(sqlite3.connect(self.path, timeout=0.2)) as writer:
+            writer.execute('BEGIN IMMEDIATE')
+            writer.execute("UPDATE system_powerplay SET power_state='Stronghold' WHERE system_name='Sol'")
+            with closing(sqlite3.connect(self.path, timeout=0.2)) as reader:
+                state = reader.execute("SELECT power_state FROM system_powerplay WHERE system_name='Sol'").fetchone()[0]
+            self.assertEqual(state, 'Fortified')
+            writer.rollback()
+
+    def test_wal_switch_failure_does_not_block_init(self):
+        real_connect = sqlite3.connect
+
+        class NoWal:
+            def __init__(self, conn): self.conn = conn
+            def execute(self, sql, *a):
+                if 'journal_mode' in sql:
+                    raise sqlite3.OperationalError('database is locked')
+                return self.conn.execute(sql, *a)
+            def close(self): self.conn.close()
+
+        calls = []
+        def connect(*args, **kwargs):
+            calls.append(1)
+            conn = real_connect(*args, **kwargs)
+            return NoWal(conn) if len(calls) == 1 else conn
+
+        with patch.object(sqlite3, 'connect', side_effect=connect):
+            EDDNListener(self.path)
+        self.assertGreater(len(calls), 1)
+        with closing(sqlite3.connect(self.path)) as conn:
+            self.assertEqual(conn.execute('SELECT count(*) FROM system_powerplay').fetchone()[0], 3)
+
     def test_cleanup_removes_old_prices_but_preserves_powerplay(self):
         self.assertEqual(self.listener._cleanup_old_data(), 1)
         with closing(sqlite3.connect(self.path)) as conn:
