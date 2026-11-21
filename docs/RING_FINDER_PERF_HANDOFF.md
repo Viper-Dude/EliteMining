@@ -42,9 +42,9 @@ Make Ring Finder searches (Local, Spansh, Both, Ring Search, Any Ring) show resu
 | 4 | Cache the Spansh name lookup | Sonnet 5.5, medium | No | Done 21 Nov 2026, user-tested, committed |
 | 5 | Remove shared state from worker threads | Opus 5.5, high | Yes | Done 21 Nov 2026, user-tested, committed |
 | 6 | Local range query rewrite | Opus 5.5, high | Yes | Done 21 Nov 2026, user-tested, committed |
-| 7 | `_update_results`: prefetch after the limit | Sonnet 5.5, medium | No | Done 21 Nov 2026, awaiting user test |
-| 8 | Delete the dead Any Ring mode (changed from: use the paged Spansh path) | Opus 5.5, medium | No | Done 21 Nov 2026, awaiting user test |
-| 9 | Cleanup: debug prints, hardcoded text | Sonnet 5.5, low | No | Done 21 Nov 2026, awaiting user test |
+| 7 | `_update_results`: prefetch after the limit | Sonnet 5.5, medium | No | Done 21 Nov 2026, user-tested, committed |
+| 8 | Delete the dead Any Ring mode (changed from: use the paged Spansh path) | Opus 5.5, medium | No | Done 21 Nov 2026, user-tested, committed |
+| 9 | Cleanup: debug prints, hardcoded text | Sonnet 5.5, low | No | Done 21 Nov 2026, user-tested, committed |
 
 Recommended order: 0a, 0b, 1, 2, 3, 4, 5, 6, 7, 8, 9. Steps 1–3 give the biggest time savings.
 
