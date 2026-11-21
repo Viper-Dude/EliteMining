@@ -1,5 +1,6 @@
 import ast
 from contextlib import closing
+import gc
 import logging
 import math
 import os
@@ -41,11 +42,14 @@ Finder = type('RingFinder', (
         '_search_worker', '_hotspot_missing_metadata', '_start_edsm_metadata_fill',
         '_edsm_metadata_worker', '_read_filled_ring_metadata', '_apply_edsm_metadata',
         '_start_pp_backfill', '_pp_backfill_worker', '_apply_pp_backfill', '_get_hotspots',
+        '_get_user_database_hotspots', '_local_systems_in_range', '_get_galaxy_coords_batch',
+        '_calculate_distance', '_get_system_coords_from_galaxy_db', '_material_matches',
     }),
 ), {})
 EDSM_GLOBALS = Finder._start_edsm_metadata_fill.__globals__
 EDSM_GLOBALS.update(log=logging.getLogger('edsm-fill-test'),
-                    translate_ring_type=lambda value: f'{value} (translated)')
+                    translate_ring_type=lambda value: f'{value} (translated)',
+                    translate_reserve_level=lambda value: value)
 Database = load_methods('app/user_database.py', 'UserDatabase', {'_normalize_body_name'})
 Saves = load_methods('app/ring_finder.py', 'RingFinder', {'_save_filter_settings', '_save_auto_search_state'})
 
@@ -666,6 +670,118 @@ class SpanshNameLookupTests(unittest.TestCase):
         self.answer = SimpleNamespace(status_code=200, json=lambda: dict(values=['Sol']))
         self.assertEqual(self.finder._resolve_spansh_system_name('sol'), 'Sol')
         self.assertEqual(len(self.calls), 3)
+
+
+class LocalRangeQueryTests(unittest.TestCase):
+    """Local database search around a reference system (real SQLite, temporary files)."""
+
+    HOTSPOT_COLUMNS = ('system_name', 'body_name', 'material_name', 'hotspot_count', 'x_coord', 'y_coord',
+                       'z_coord', 'coord_source', 'ring_type', 'ls_distance', 'reserve_level',
+                       'inner_radius', 'outer_radius', 'favourite')
+
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        # The search's `with sqlite3.connect()` blocks leave connections for the GC to close,
+        # and Windows can't delete a database file that is still open
+        self.addCleanup(gc.collect)
+        self.folder = Path(folder.name)
+        (self.folder / 'data').mkdir()
+        self.user_db = str(self.folder / 'user.db')
+        with closing(sqlite3.connect(self.user_db)) as conn:
+            conn.execute(f'CREATE TABLE hotspot_data ({", ".join(self.HOTSPOT_COLUMNS)})')
+            conn.execute('CREATE TABLE visited_systems (system_name, x_coord, y_coord, z_coord)')
+            conn.commit()
+        with closing(sqlite3.connect(self.folder / 'data' / 'galaxy_systems.db')) as conn:
+            conn.execute('CREATE TABLE systems (name TEXT, x REAL, y REAL, z REAL)')
+            conn.commit()
+        f = self.finder = Finder()
+        f.app_dir = str(self.folder)
+        f.user_db = SimpleNamespace(db_path=self.user_db)
+        f.systems_data = {}
+        f.current_system_coords = None
+        f._favourites_search = False
+        f.status_label = Mock()
+        f._is_all_minerals = lambda value: value == 'All Minerals'
+        f._sort_hotspots_display = lambda text: text
+        f._abbreviate_material_for_display = lambda text: text
+        f._get_system_coords_from_edsm = Mock(return_value=None)
+
+    def hotspots(self, *rows):
+        """rows: (system, body, material, count, coords or None[, favourite])"""
+        data = [(s, b, m, c, *(xyz or (None, None, None)), 'test' if xyz else None,
+                 'Icy', 100.0, None, None, None, fav[0] if fav else 0)
+                for s, b, m, c, xyz, *fav in rows]
+        with closing(sqlite3.connect(self.user_db)) as conn:
+            conn.executemany(f'INSERT INTO hotspot_data VALUES ({",".join("?" * 14)})', data)
+            conn.commit()
+
+    def galaxy(self, *systems):
+        with closing(sqlite3.connect(self.folder / 'data' / 'galaxy_systems.db')) as conn:
+            conn.executemany('INSERT INTO systems VALUES (?, ?, ?, ?)', systems)
+            conn.commit()
+
+    def search(self, material='All Minerals', distance=50, reference='Home'):
+        rows = self.finder._get_user_database_hotspots(reference, 'All', material, distance,
+                                                       reference_coords={'x': 0, 'y': 0, 'z': 0})
+        return {(h['systemName'], h['bodyName']): h for h in rows}
+
+    def test_rows_without_coordinates_use_galaxy_coordinates_and_save_them(self):
+        self.hotspots(('near system', '1 A Ring', 'Platinum', 1, None),
+                      ('Visited', '1 A Ring', 'Painite', 1, None))
+        self.galaxy(('Near System', 3, 4, 0))
+        with closing(sqlite3.connect(self.user_db)) as conn:
+            conn.execute("INSERT INTO visited_systems VALUES ('Visited', 0, 6, 8)")
+            conn.commit()
+        found = self.search()
+        self.assertEqual(found[('near system', '1 A Ring')]['distance'], 5.0)
+        self.assertEqual(found[('Visited', '1 A Ring')]['distance'], 10.0)
+        with closing(sqlite3.connect(self.user_db)) as conn:
+            saved = conn.execute("SELECT x_coord, y_coord, z_coord, coord_source FROM hotspot_data "
+                                 "WHERE system_name = 'near system'").fetchone()
+        self.assertEqual(saved, (3, 4, 0, 'galaxy_systems.db'))
+        self.finder._get_system_coords_from_edsm.assert_not_called()
+
+    def test_systems_outside_the_radius_are_left_out(self):
+        self.hotspots(('Inside', '1 A Ring', 'Platinum', 1, (10, 10, 10)),
+                      ('Box Corner', '1 A Ring', 'Platinum', 1, (40, 40, 40)),
+                      ('Far Lookup', '1 A Ring', 'Platinum', 1, None),
+                      ('Unknown', '1 A Ring', 'Platinum', 1, None))
+        self.galaxy(('Far Lookup', 100, 0, 0))
+        self.assertEqual(set(self.search()), {('Inside', '1 A Ring')})
+        self.finder._get_system_coords_from_edsm.assert_not_called()
+
+    def test_reference_system_without_any_coordinates_shows_at_zero(self):
+        self.hotspots(('Home', '2 A Ring', 'Tritium', 3, None))
+        found = self.search()
+        self.assertEqual(found[('Home', '2 A Ring')]['distance'], 0.0)
+        self.finder._get_system_coords_from_edsm.assert_not_called()
+
+    def test_rows_missing_coordinates_reuse_the_same_systems_other_rows(self):
+        self.hotspots(('Mixed', '1 A Ring', 'Platinum', 1, (0, 0, 20)),
+                      ('Mixed', '2 A Ring', 'Painite', 1, None))
+        found = self.search()
+        self.assertEqual({k: h['distance'] for k, h in found.items()},
+                         {('Mixed', '1 A Ring'): 20.0, ('Mixed', '2 A Ring'): 20.0})
+
+    def test_large_searches_are_not_cut_at_10000_rows(self):
+        self.hotspots(*[('Big', f'{i} A Ring', 'Platinum', 1, (1, 1, 1)) for i in range(10001)])
+        self.assertEqual(len(self.search()), 10001)
+
+    def test_specific_mineral_rows_list_the_rings_other_minerals_first_match_first(self):
+        self.hotspots(('Ring', '1 A Ring', 'Platinum', 1, (1, 0, 0)),
+                      ('Ring', '1 A Ring', 'Painite', 3, (1, 0, 0)),
+                      ('Ring', '1 A Ring', 'Osmium', 0, (1, 0, 0)),
+                      ('Ring', '2 A Ring', 'Painite', 2, (1, 0, 0)))
+        found = self.search('Platinum')
+        self.assertEqual(set(found), {('Ring', '1 A Ring')})
+        self.assertEqual(found[('Ring', '1 A Ring')]['type'], 'Platinum (1), Painite (3)')
+
+    def test_favourites_only_ignores_the_radius(self):
+        self.finder._favourites_search = True
+        self.hotspots(('Far Favourite', '1 A Ring', 'Platinum', 1, (5000, 0, 0), 1),
+                      ('Near Plain', '1 A Ring', 'Platinum', 1, (1, 0, 0), 0))
+        self.assertEqual(set(self.search(distance=200000.0)), {('Far Favourite', '1 A Ring')})
 
 
 class RingFinderSaveFailureTests(unittest.TestCase):

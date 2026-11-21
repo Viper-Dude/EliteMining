@@ -41,8 +41,8 @@ Make Ring Finder searches (Local, Spansh, Both, Ring Search, Any Ring) show resu
 | 3 | PowerPlay backfill: parallel and cached | Opus 5.5, high | Yes | Done 21 Nov 2026, user-tested, committed |
 | 4 | Cache the Spansh name lookup | Sonnet 5.5, medium | No | Done 21 Nov 2026, user-tested, committed |
 | 5 | Remove shared state from worker threads | Opus 5.5, high | Yes | Done 21 Nov 2026, user-tested, committed |
-| 6 | Local range query rewrite | Opus 5.5, high | Yes | Next |
-| 7 | `_update_results`: prefetch after the limit | Sonnet 5.5, medium | No | Not started |
+| 6 | Local range query rewrite | Opus 5.5, high | Yes | Done 21 Nov 2026, awaiting user test |
+| 7 | `_update_results`: prefetch after the limit | Sonnet 5.5, medium | No | Next |
 | 8 | Any Ring mode uses the paged Spansh path | Opus 5.5, medium | No | Not started |
 | 9 | Cleanup: debug prints, hardcoded text | Sonnet 5.5, low | No | Not started |
 
@@ -196,6 +196,20 @@ Fix:
 - Keep these paths working: Favourites Only (no radius), the reference system itself (distance 0), and rows without coordinates when there are no reference coordinates.
 - For specific-material searches, replace the per-row query for the other minerals on the same ring (about line 5267) with one batched query.
 - Model: Opus 5.5, high effort (local DB read path, many edge cases).
+- Done 21 Nov 2026, in `ring_finder_search.py`:
+  - `_find_systems_in_range` is replaced by `_local_systems_in_range(cursor, ...)`. It starts from `hotspot_data`, not the galaxy DB:
+    - systems whose rows have coordinates are filtered by sphere distance in Python (one scan of the distinct system coordinates);
+    - systems with rows missing coordinates get one batched, case-insensitive lookup through `_get_galaxy_coords_batch`, then `visited_systems`, then the same system's other rows;
+    - the reference system falls back to the reference coordinates (distance 0) instead of EDSM.
+  - The found coordinates go into `coord_cache`, so the per-row loop saves them with the existing `UPDATE` and makes no per-row galaxy or EDSM lookups on this path.
+  - Removed: the `LIMIT 50000`, the 5,000-system cap and `max_process_limit = 10000`. Favourites Only skips the range lookup. The name search used when there are no reference coordinates is unchanged.
+  - Specific-mineral searches load every ring's other minerals in one batched query before the loop.
+  - Comparison on copies of the user's DBs, old vs new, for Sol, Colonia and HIP 21991 at 50–500 LY (All Minerals, Platinum, Icy LTD, Painite):
+    - identical rows and order wherever the old path wasn't capped;
+    - 500 LY All Minerals: old 10,000 rows (cap), new about 15,500;
+    - 500 LY Painite: 4–5 extra rings without stored coordinates, previously lost to the galaxy limit.
+    - Time: 200 LY 1.6 s to 0.18 s, 500 LY 5.0 s to 0.34 s, 500 LY Painite 4.6 s to 0.23 s.
+  - Tests: `LocalRangeQueryTests` (7) in `check_ring_finder_search.py`, 44 OK. `check_search_stop.py` 26 OK, `check_star_systems.py` 19 OK.
 
 ### 7 — `_update_results`: prefetch after the limit
 

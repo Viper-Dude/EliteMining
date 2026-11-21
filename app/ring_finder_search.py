@@ -1750,42 +1750,15 @@ class RingFinderSearchMixin:
                 
                 # Get systems within range for optimization if we have reference coordinates
                 systems_in_range = None
-                if reference_coords and max_distance < 1000:  # Only pre-filter for specific distance searches
-                    # coord_cache is populated as a side effect here with {system: {x,y,z}} for
-                    # every system found, so the per-row loop below can reuse them instead of
-                    # re-querying galaxy_systems.db one connection at a time for each miss.
-                    systems_in_range = self._find_systems_in_range(reference_coords, max_distance, coord_out=coord_cache)
-                    
-                    if systems_in_range is None:
-                        systems_in_range = [reference_system]
-                        print(f" DEBUG: No systems found in range, starting with reference system '{reference_system}'")
-                    
-                    if systems_in_range:
-                        # PRIORITY FIX: Get all systems that have hotspots in the database
-                        cursor.execute('''
-                            SELECT DISTINCT system_name FROM hotspot_data
-                        ''')
-                        systems_with_hotspots = set(row[0] for row in cursor.fetchall())
-                        
-                        # Separate systems into priority (has hotspots) and non-priority
-                        priority_systems = [s for s in systems_in_range if s in systems_with_hotspots]
-                        non_priority_systems = [s for s in systems_in_range if s not in systems_with_hotspots]
-                        
-                        # Cap non-priority systems to prevent search hanging, but keep ALL priority systems
-                        LIMIT = 5000
-                        if len(priority_systems) + len(non_priority_systems) > LIMIT:
-                            slots_remaining = max(0, LIMIT - len(priority_systems))
-                            non_priority_systems = non_priority_systems[:slots_remaining]
-                        
-                        # Combine: priority systems first, then non-priority
-                        systems_in_range = priority_systems + non_priority_systems
-                        
-                        # Always include reference system itself (distance = 0 LY)
-                        if reference_system not in systems_in_range:
-                            systems_in_range.append(reference_system)
-                
+                favourites_search = getattr(self, '_favourites_search', False)
+                if reference_coords and max_distance < 1000 and not favourites_search:
+                    # coord_cache receives coordinates looked up for rows that have none, so the
+                    # per-row loop below uses (and saves) them without further lookups.
+                    systems_in_range = self._local_systems_in_range(
+                        cursor, reference_system, reference_coords, max_distance, coord_cache)
+
                 # Favourites Only: search exactly the systems that hold favourite rings (no radius pre-filter)
-                if getattr(self, '_favourites_search', False):
+                if favourites_search:
                     cursor.execute('SELECT DISTINCT system_name FROM hotspot_data WHERE favourite = 1')
                     systems_in_range = [row[0] for row in cursor.fetchall()]
                     if not systems_in_range:
@@ -1880,18 +1853,24 @@ class RingFinderSearchMixin:
                 material_matches = 0
                 systems_with_coords = 0
                 systems_without_coords = 0
-                processed_count = 0
-                max_process_limit = 10000  # Hard limit to prevent infinite processing
-                
+
+                # Specific mineral: every mineral on each ring, for the Hotspots column
+                ring_minerals = {}
+                if not self._is_all_minerals(specific_material) and results:
+                    result_systems = sorted({r[0] for r in results})
+                    for i in range(0, len(result_systems), 999):
+                        batch = result_systems[i:i + 999]
+                        cursor.execute(
+                            'SELECT system_name, body_name, material_name, hotspot_count FROM hotspot_data '
+                            f'WHERE hotspot_count > 0 AND system_name IN ({",".join("?" * len(batch))})',
+                            batch)
+                        for sys_name, body, mat, cnt in cursor.fetchall():
+                            ring_minerals.setdefault((sys_name, body), []).append((mat, cnt))
+
                 for system_name, body_name, material_name, hotspot_count, x_coord, y_coord, z_coord, coord_source, ls_distance, reserve_level, ring_type_db, inner_radius, outer_radius in results:
                     if is_cancelled and is_cancelled():
                         break
                     try:
-                        # Safety: Stop processing if we've hit the limit
-                        processed_count += 1
-                        if processed_count > max_process_limit:
-                            print(f" DEBUG: Hit processing limit ({max_process_limit}) - stopping to prevent hang")
-                            break
                         # Filter by specific material using our smart material matching
                         if not self._is_all_minerals(specific_material) and not self._material_matches(specific_material, material_name):
                             continue
@@ -1986,12 +1965,8 @@ class RingFinderSearchMixin:
                             sorted_material_name = self._sort_hotspots_display(material_name)
                             display_material_name = self._abbreviate_material_for_display(sorted_material_name)
                         else:
-                            cursor.execute(
-                                'SELECT material_name, hotspot_count FROM hotspot_data '
-                                'WHERE system_name = ? AND body_name = ? AND hotspot_count > 0',
-                                (system_name, body_name))
                             ring_mats = sorted(
-                                cursor.fetchall(),
+                                ring_minerals.get((system_name, body_name), []),
                                 key=lambda m: (not self._material_matches(specific_material, m[0]), -m[1], m[0]))
                             display_material_name = self._abbreviate_material_for_display(
                                 ', '.join(f"{n} ({c})" for n, c in ring_mats)) if ring_mats else material_name
@@ -2114,130 +2089,83 @@ class RingFinderSearchMixin:
             
         return None
     
-    def _find_systems_in_range(self, reference_coords: Dict, max_distance: float, coord_out: Dict[str, Dict] = None) -> List[str]:
-        """Find all systems within range using galaxy_systems.db spatial index
+    def _local_systems_in_range(self, cursor, reference_system: str, reference_coords: Dict, max_distance: float, coord_out: Dict[str, Dict]) -> List[str]:
+        """Systems with hotspot rows within max_distance of reference_coords, closest first.
 
-        coord_out: optional dict the caller passes in; populated here with
-        {system_name: {x, y, z}} for every system this function already looked up, so callers
-        that need coordinates for these systems (e.g. distance calculations) can reuse them
-        instead of re-querying galaxy_systems.db one system at a time.
+        Only systems in hotspot_data can match, so the galaxy database is only asked for
+        systems whose rows have no coordinates. coord_out receives the coordinates used for
+        those rows, so the caller can calculate their distance and save them.
         """
+        distances = {}
+        known_coords = {}
+        cursor.execute('''
+            SELECT DISTINCT system_name, x_coord, y_coord, z_coord FROM hotspot_data
+            WHERE x_coord IS NOT NULL AND y_coord IS NOT NULL AND z_coord IS NOT NULL
+        ''')
+        for name, x, y, z in cursor.fetchall():
+            coords = {'x': x, 'y': y, 'z': z}
+            known_coords.setdefault(name.lower(), coords)
+            distance = self._calculate_distance(reference_coords, coords)
+            if distance <= max_distance:
+                distances[name] = min(distance, distances.get(name, distance))
+
+        cursor.execute('''
+            SELECT DISTINCT system_name FROM hotspot_data
+            WHERE x_coord IS NULL OR y_coord IS NULL OR z_coord IS NULL
+        ''')
+        missing = [row[0] for row in cursor.fetchall()]
+        if missing:
+            galaxy_coords = self._get_galaxy_coords_batch(missing)
+            visited_coords = {}
+            if any(name.lower() not in galaxy_coords for name in missing):
+                try:
+                    cursor.execute('''
+                        SELECT system_name, x_coord, y_coord, z_coord FROM visited_systems
+                        WHERE x_coord IS NOT NULL AND y_coord IS NOT NULL AND z_coord IS NOT NULL
+                    ''')
+                    for name, x, y, z in cursor.fetchall():
+                        visited_coords.setdefault(name.lower(), {'x': x, 'y': y, 'z': z})
+                except Exception:
+                    log.exception("Reading visited system coordinates failed")
+            reference_key = (reference_system or '').lower()
+            for name in missing:
+                key = name.lower()
+                coords = galaxy_coords.get(key) or visited_coords.get(key) or known_coords.get(key)
+                if not coords and key == reference_key:
+                    coords = {'x': reference_coords['x'], 'y': reference_coords['y'], 'z': reference_coords['z']}
+                if not coords:
+                    continue
+                distance = self._calculate_distance(reference_coords, coords)
+                if distance <= max_distance:
+                    coord_out[name] = coords
+                    distances[name] = min(distance, distances.get(name, distance))
+
+        return sorted(distances, key=distances.get)
+
+    def _get_galaxy_coords_batch(self, system_names: List[str]) -> Dict[str, Dict]:
+        """Coordinates from galaxy_systems.db for many systems at once, keyed by lowercase name."""
+        found = {}
         try:
             import sqlite3
             from pathlib import Path
-            
-            # Use bundled galaxy database
+
             script_dir = Path(self.app_dir) if self.app_dir else Path(__file__).parent
             galaxy_db_path = script_dir / "data" / "galaxy_systems.db"
-            
             if not galaxy_db_path.exists():
-                return []
-                
-            systems_in_range = []
-            
-            with sqlite3.connect(str(galaxy_db_path)) as conn:
+                return found
+            with sqlite3.connect(str(galaxy_db_path), timeout=5.0) as conn:
                 cursor = conn.cursor()
-                
-                # Use spatial index for efficient range queries
-                # Create bounding box for spatial search
-                x_min = reference_coords['x'] - max_distance
-                x_max = reference_coords['x'] + max_distance
-                y_min = reference_coords['y'] - max_distance
-                y_max = reference_coords['y'] + max_distance
-                z_min = reference_coords['z'] - max_distance
-                z_max = reference_coords['z'] + max_distance
-                
-                # Add LIMIT to prevent query timeout on large searches
-                cursor.execute("""
-                    SELECT name, x, y, z FROM systems 
-                    WHERE x BETWEEN ? AND ? 
-                    AND y BETWEEN ? AND ? 
-                    AND z BETWEEN ? AND ?
-                    LIMIT 50000
-                """, (x_min, x_max, y_min, y_max, z_min, z_max))
-                
-                results = cursor.fetchall()
-                
-                # Calculate actual distance and filter - store as (name, distance) tuples
-                systems_with_distances = []
-                for name, x, y, z in results:
-                    system_coords = {'x': x, 'y': y, 'z': z}
-                    distance = self._calculate_distance(reference_coords, system_coords)
-
-                    if distance <= max_distance:
-                        systems_with_distances.append((name, distance))
-                        if coord_out is not None:
-                            coord_out[name] = system_coords
-                
-                # Sort by distance (closest first) before converting to name-only list
-                systems_with_distances.sort(key=lambda x: x[1])
-                systems_in_range = [name for name, dist in systems_with_distances]
-                
-                # Also check user database for visited systems within range
-                try:
-                    with sqlite3.connect(self.user_db.db_path) as user_conn:
-                        user_cursor = user_conn.cursor()
-                        
-                        # Get all visited systems with coordinates
-                        user_cursor.execute("""
-                            SELECT system_name, x_coord, y_coord, z_coord 
-                            FROM visited_systems
-                            WHERE x_coord IS NOT NULL
-                        """)
-                        
-                        user_systems_in_range = 0
-                        for system_name, x, y, z in user_cursor.fetchall():
-                            system_coords = {'x': x, 'y': y, 'z': z}
-                            distance = self._calculate_distance(reference_coords, system_coords)
-
-                            if distance <= max_distance and system_name not in systems_in_range:
-                                systems_in_range.append(system_name)
-                                user_systems_in_range += 1
-                                if coord_out is not None:
-                                    coord_out[system_name] = system_coords
-                        
-                        # ALSO check hotspot_data table for systems with hotspots
-                        # This ensures newly scanned hotspots are found immediately
-                        # Use bounding box filter for efficiency (like galaxy database query)
-                        x_min = reference_coords['x'] - max_distance
-                        x_max = reference_coords['x'] + max_distance
-                        y_min = reference_coords['y'] - max_distance
-                        y_max = reference_coords['y'] + max_distance
-                        z_min = reference_coords['z'] - max_distance
-                        z_max = reference_coords['z'] + max_distance
-                        
-                        user_cursor.execute("""
-                            SELECT DISTINCT system_name, x_coord, y_coord, z_coord 
-                            FROM hotspot_data
-                            WHERE x_coord IS NOT NULL
-                            AND x_coord BETWEEN ? AND ?
-                            AND y_coord BETWEEN ? AND ?
-                            AND z_coord BETWEEN ? AND ?
-                        """, (x_min, x_max, y_min, y_max, z_min, z_max))
-                        
-                        hotspot_systems_added = 0
-                        for system_name, x, y, z in user_cursor.fetchall():
-                            if system_name in systems_in_range:
-                                continue
-                            system_coords = {'x': x, 'y': y, 'z': z}
-                            distance = self._calculate_distance(reference_coords, system_coords)
-
-                            if distance <= max_distance:
-                                systems_in_range.append(system_name)
-                                hotspot_systems_added += 1
-                                if coord_out is not None:
-                                    coord_out[system_name] = system_coords
-                        
-                except Exception:
-                    pass
-                
-                return systems_in_range
-                        
+                for i in range(0, len(system_names), 999):
+                    batch = system_names[i:i + 999]
+                    cursor.execute(
+                        'SELECT name, x, y, z FROM systems '
+                        f'WHERE name COLLATE NOCASE IN ({",".join("?" * len(batch))})', batch)
+                    for name, x, y, z in cursor.fetchall():
+                        found.setdefault(name.lower(), {'x': x, 'y': y, 'z': z})
         except Exception:
-            pass
-            
-        return []
-        
+            log.exception("Galaxy coordinate lookup failed")
+        return found
+
     def _get_system_coords_from_edsm(self, system_name: str) -> Optional[Dict]:
         """Get system coordinates from EDSM API as fallback"""
         try:
