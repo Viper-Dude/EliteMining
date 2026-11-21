@@ -63,6 +63,7 @@ Recommended order: 0, 1, 2, 3a, (3b), 4, 5, 6. Steps 1 and 3a give the biggest g
 
 - **D1 — yes:** in step 2, switch `va_variables.write_variable` to `_atomic_write_text()` (AGENTS.md requires it for every `Variables/*.txt` value). Values stay exactly the same.
 - **D2 — yes:** do step 3b only if the step 0 log shows UI stalls over about 50 ms on a ring scan or FSS burst.
+- **D3 (user):** in-game testing is done once, when the whole task is finished. Ask for an earlier test only when a decision depends on it. So the step 0 log will be taken with WAL (step 1) already in place, and there are no pre-WAL numbers. Before deciding 3b, ask for one short ring-scan/FSS log.
 
 ## Steps
 
