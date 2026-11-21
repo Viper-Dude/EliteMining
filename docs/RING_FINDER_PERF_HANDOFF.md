@@ -37,8 +37,8 @@ Make Ring Finder searches (Local, Spansh, Both, Ring Search, Any Ring) show resu
 | 0a | Delete unused methods | Sonnet 5.5, low | No | Done, user-tested, committed `1ce9b69` |
 | 0b | Move search code into its own module | Opus 5.5, high | No | Done 21 Nov 2026, user-tested, committed |
 | 1 | Stop Spansh paging at the result limit, plus the D2 test | Opus 5.5, medium | No | Done 21 Nov 2026, user-tested, committed |
-| 2 | EDSM fallback after display | Opus 5.5, high | Yes | Next |
-| 3 | PowerPlay backfill: parallel and cached | Opus 5.5, high | Yes | Not started |
+| 2 | EDSM fallback after display | Opus 5.5, high | Yes | Done 21 Nov 2026, user-tested |
+| 3 | PowerPlay backfill: parallel and cached | Opus 5.5, high | Yes | Next |
 | 4 | Cache the Spansh name lookup | Sonnet 5.5, medium | No | Not started |
 | 5 | Remove shared state from worker threads | Opus 5.5, high | Yes | Not started |
 | 6 | Local range query rewrite | Opus 5.5, high | Yes | Not started |
@@ -117,6 +117,16 @@ Recommended order: 0a, 0b, 1, 2, 3, 4, 5, 6, 7, 8, 9. Steps 1–3 give the bigge
 - With D1 = yes: start it on a background thread after the rows are inserted, then update the affected rows in place, checking `_results_generation` so stale updates are dropped.
 - Overlaps Only and RES Only (lines 2491 and 2673) call it too; give them the same treatment.
 - Model: Opus 5.5, high effort (threading plus in-place row updates).
+- Done 21 Nov 2026:
+  - The worker no longer calls EDSM. When `_finish_update_results` runs, it calls `_start_edsm_metadata_fill(generation)` (`ring_finder_search.py`). That only checks the rows actually shown, through `_result_row_hotspots` (tree item → hotspot dict, filled in `_insert_row_batch`), closest first. The old cap stays: all systems under 100 rows, otherwise 30.
+  - A daemon thread runs the EDSM fill, then reads the filled values back from `hotspot_data` per (system, ring). `_apply_edsm_metadata` sets the LS and Ring Type cells, plus the hotspot dicts, in place. Stale updates are dropped by checking `_results_generation` and `_search_generation`. Rows are not re-sorted.
+  - `edsm_integration.py`:
+    - `_fetch_edsm_bodies` returns `(data, responded)`.
+    - `fill_missing_metadata_for_systems_direct` takes `is_cancelled` (checked before each system) and returns `no_data_systems`: systems EDSM answered for with nothing to fill. Timeouts and errors are not included.
+    - The Ring Finder remembers `no_data_systems` for the session in `_edsm_no_data_systems`. The Cargo Monitor's call on a new scan is unaffected.
+  - Overlaps Only and RES Only no longer call EDSM inside `_get_all_overlaps_for_search` / `_get_all_res_for_search`. They used to query twice.
+  - Bug fixed along the way: the old `_refresh_hotspot_metadata_from_db` matched on `material_name = hotspot['type']`, but `type` holds display text, so filled values only showed on the next search. Both old methods are removed.
+  - Tests: `EdsmAfterDisplayTests` (7) plus a worker test in `check_ring_finder_search.py`, 23 OK. 2 EDSM stop/error tests in `check_search_stop.py`, 21 OK.
 
 ### 3 — PowerPlay backfill: parallel and cached
 

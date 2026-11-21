@@ -159,6 +159,30 @@ class BackendStopTests(unittest.TestCase):
             get.assert_not_called()
             post.assert_not_called()
 
+    def test_edsm_fill_sends_no_request_after_stop(self):
+        from edsm_integration import EDSMIntegration
+        edsm = EDSMIntegration(':memory:')
+        cancel = threading.Event()
+
+        def answer_then_stop(name):
+            cancel.set()
+            return None, True
+        edsm._fetch_edsm_bodies = Mock(side_effect=answer_then_stop)
+        stats = edsm.fill_missing_metadata_for_systems_direct(['A', 'B'], is_cancelled=cancel.is_set)
+        edsm._fetch_edsm_bodies.assert_called_once_with('A')
+        self.assertEqual(stats['no_data_systems'], ['A'])
+        with patch('requests.get') as get:
+            EDSMIntegration(':memory:').fill_missing_metadata_for_systems_direct(['C'], is_cancelled=lambda: True)
+            get.assert_not_called()
+
+    def test_edsm_errors_are_not_reported_as_missing_data(self):
+        from edsm_integration import EDSMIntegration
+        edsm = EDSMIntegration(':memory:')
+        edsm._fetch_edsm_bodies = Mock(side_effect=[(None, False), ({'bodies': []}, True)])
+        edsm._get_rings_needing_metadata_in_system = Mock(return_value=[])
+        stats = edsm.fill_missing_metadata_for_systems_direct(['Timed out', 'Nothing to fill'])
+        self.assertEqual(stats['no_data_systems'], ['Nothing to fill'])
+
     def test_stop_keeps_nearby_rows_and_skips_local_request(self):
         for api in (MarketplaceAPI.search_buyers, MarketplaceAPI.search_sellers):
             with self.subTest(api=api.__name__), ExitStack() as stack:
@@ -407,7 +431,7 @@ class RemainingWorkerTests(unittest.TestCase):
 class SyntaxTests(unittest.TestCase):
     def test_changed_modules_parse(self):
         for name in ('main.py', 'ring_finder.py', 'ring_finder_search.py', 'marketplace_api.py', 'system_finder_api.py',
-                     'multi_mineral_tab.py', 'cargo_sell_planner.py', 'ui/search_control.py'):
+                     'edsm_integration.py', 'multi_mineral_tab.py', 'cargo_sell_planner.py', 'ui/search_control.py'):
             with self.subTest(name=name):
                 ast.parse((ROOT / 'app' / name).read_text(encoding='utf-8-sig'))
 

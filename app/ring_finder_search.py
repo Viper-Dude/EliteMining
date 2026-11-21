@@ -419,17 +419,6 @@ class RingFinderSearchMixin:
                     print(f"[SEARCH] Search gen {search_generation} cancelled before display (current: {self._search_generation})")
                 return
             
-            # EDSM FALLBACK: Smart throttling to prevent hanging
-            # Small searches: Query all systems
-            # Large searches: Query only first 30 systems for top results
-            import time
-            print(f"[SEARCH] Before EDSM fallback: {len(hotspots)} hotspots at {time.time():.1f}")
-            if hotspots and len(hotspots) < 100:
-                self._fill_missing_metadata_edsm(hotspots)
-            elif hotspots and len(hotspots) >= 100:
-                self._fill_missing_metadata_edsm(hotspots, max_systems=30)
-            print(f"[SEARCH] After EDSM fallback at {time.time():.1f}, scheduling _update_results")
-            
             # Update UI in main thread
             self.parent.after(0, self._complete_search, search_generation, hotspots, max_results)
             
@@ -461,134 +450,103 @@ class RingFinderSearchMixin:
         self._search_result_limit = max_results
         self._update_results(hotspots)
 
-    def _fill_missing_metadata_edsm(self, hotspots: List[Dict], max_systems: int = None):
+    def _hotspot_missing_metadata(self, hotspot: Dict):
+        """Return (ring type missing, LS distance missing) for a result row."""
+        return (hotspot.get('ring_type') in (None, '', 'No data'),
+                hotspot.get('ls_distance') in (None, '', 'No data'))
+
+    def _start_edsm_metadata_fill(self, generation):
+        """Fill missing LS distance and ring type of the shown rows from EDSM.
+
+        Runs after the rows are displayed; the cells are updated in place when EDSM answers.
         """
-        Automatically fill missing ring metadata using EDSM fallback.
-        
-        This runs silently in background thread before displaying results.
-        Only queries EDSM for systems that have incomplete rings in THIS result set.
-        
-        Args:
-            hotspots: List of hotspot dicts to check and potentially update
-            max_systems: Optional limit on number of systems to query (for large searches)
-        """
+        edsm = getattr(self, 'edsm', None)
+        rows = dict(getattr(self, '_result_row_hotspots', {}))
+        if edsm is None or not rows:
+            return
+        if not hasattr(self, '_edsm_no_data_systems'):
+            self._edsm_no_data_systems = set()
+
+        systems, seen = [], set()
+        for hotspot in rows.values():
+            if not hotspot or not any(self._hotspot_missing_metadata(hotspot)):
+                continue
+            system = hotspot.get('systemName', hotspot.get('system', ''))
+            key = system.lower()
+            if system and key not in seen and key not in self._edsm_no_data_systems:
+                seen.add(key)
+                systems.append(system)
+        if len(rows) >= 100:
+            systems = systems[:30]
+        if not systems:
+            return
+
+        def is_cancelled():
+            return generation != self._results_generation or generation[0] != self._search_generation
+
+        threading.Thread(target=self._edsm_metadata_worker,
+                         args=(generation, rows, systems, is_cancelled), daemon=True).start()
+
+    def _edsm_metadata_worker(self, generation, rows: Dict, systems: List[str], is_cancelled):
+        """Background part of _start_edsm_metadata_fill."""
         try:
-            # Build set of systems with incomplete rings in THIS result set only
-            systems_needing_data = set()
-            for hotspot in hotspots:
-                system_name = hotspot.get('systemName')
-                ring_type = hotspot.get('ring_type')
-                ls_distance = hotspot.get('ls_distance')
-                
-                # Normalize "No data" strings to None for comparison
-                if ring_type == "No data":
-                    ring_type = None
-                if ls_distance == "No data" or ls_distance is None:
-                    ls_distance = None
-                
-                if ring_type is None or ls_distance is None:
-                    if system_name:
-                        systems_needing_data.add(system_name)
-            
-            if not systems_needing_data:
-                # All metadata complete in this result set
-                print(f"[EDSM DEBUG] No systems need EDSM lookup - all metadata complete")
+            stats = self.edsm.fill_missing_metadata_for_systems_direct(systems, is_cancelled=is_cancelled)
+            # EDSM's answer won't change this session, so don't ask again on the next search
+            self._edsm_no_data_systems.update(s.lower() for s in stats.get('no_data_systems', []))
+            if not stats.get('materials_updated') or is_cancelled():
                 return
-            
-            # Apply max_systems limit if specified (for large searches)
-            systems_to_query = list(systems_needing_data)
-            if max_systems and len(systems_to_query) > max_systems:
-                systems_to_query = systems_to_query[:max_systems]
-            
-            print(f"[EDSM DEBUG] Systems to query: {systems_to_query}")
-            
-            # Use modified EDSM query that doesn't rely on get_incomplete_rings() filtering
-            stats = self.edsm.fill_missing_metadata_for_systems_direct(systems_to_query)
-            
-            print(f"[EDSM DEBUG] EDSM query completed, stats: {stats}")
-            
-            if stats.get('materials_updated', 0) > 0:
-                print(f"[EDSM] ✓ Filled {stats['rings_updated']} rings ({stats['materials_updated']} materials)")
-                
-                # Refresh hotspot data from database to get updated metadata
-                print(f"[EDSM DEBUG] Refreshing hotspot metadata from database")
-                self._refresh_hotspot_metadata_from_db(hotspots)
-            else:
-                print(f"[EDSM] ℹ No updates applied (rings may not exist in EDSM)")
-                
+            updates = self._read_filled_ring_metadata(rows)
+            if updates:
+                self.parent.after(0, self._apply_edsm_metadata, generation, updates)
         except Exception as e:
-            # EDSM fallback failure is non-critical - just log and continue
-            log.error(f"[EDSM] ⚠ Fallback failed (non-critical): {e}")
-            log.error(f"[EDSM DEBUG] Exception details: {type(e).__name__}: {str(e)}")
-    
-    def _refresh_hotspot_metadata_from_db(self, hotspots: List[Dict]):
-        """
-        Refresh metadata for hotspots from database after EDSM update.
-        
-        Modifies hotspot dicts in-place to include updated metadata.
-        """
+            log.error(f"[EDSM] Fallback failed (non-critical): {e}")
+
+    def _read_filled_ring_metadata(self, rows: Dict) -> Dict:
+        """Map tree item -> (ring_type, ls_distance) from the database for rows still missing either."""
+        import sqlite3
+        updates = {}
+        conn = sqlite3.connect(self.user_db.db_path)
         try:
-            print(f"[EDSM DEBUG] _refresh_hotspot_metadata_from_db called for {len(hotspots)} hotspots")
-            
-            import sqlite3
-            conn = sqlite3.connect(self.user_db.db_path)
             cursor = conn.cursor()
-            
-            updated_count = 0
-            
-            for hotspot in hotspots:
-                system_name = hotspot.get('systemName')
-                body_name = hotspot.get('bodyName')
-                material_name = hotspot.get('type')
-                
-                if not all([system_name, body_name, material_name]):
+            for item_id, hotspot in rows.items():
+                if not hotspot or not any(self._hotspot_missing_metadata(hotspot)):
                     continue
-                
-                # Query updated metadata for this specific hotspot
-                cursor.execute("""
-                    SELECT ring_type, ls_distance, inner_radius, outer_radius, ring_mass, reserve_level
-                    FROM hotspot_data
-                    WHERE system_name = ? AND body_name = ? AND material_name = ?
-                    LIMIT 1
-                """, (system_name, body_name, material_name))
-                
-                row = cursor.fetchone()
-                if row:
-                    # Store original values for comparison
-                    old_ring_type = hotspot.get('ring_type')
-                    old_ls_distance = hotspot.get('ls_distance')
-                    
-                    # Update hotspot dict with fresh metadata
-                    hotspot['ring_type'] = row[0] if row[0] else hotspot.get('ring_type')
-                    hotspot['ls_distance'] = row[1] if row[1] else hotspot.get('ls_distance')
-                    
-                    # Format LS distance for display (whole numbers with comma separators)
-                    if row[1] is not None:
-                        try:
-                            hotspot['ls'] = f"{int(float(row[1])):,}"
-                        except (ValueError, TypeError):
-                            hotspot['ls'] = row[1]
-                    else:
-                        hotspot['ls'] = hotspot.get('ls')
-                    
-                    hotspot['inner_radius'] = row[2] if row[2] else hotspot.get('inner_radius')
-                    hotspot['outer_radius'] = row[3] if row[3] else hotspot.get('outer_radius')
-                    hotspot['ring_mass'] = row[4] if row[4] else hotspot.get('ring_mass')
-                    hotspot['reserve'] = row[5] if row[5] else hotspot.get('reserve')
-                    
-                    # Check if anything actually changed
-                    if (old_ring_type != hotspot.get('ring_type')) or (old_ls_distance != hotspot.get('ls_distance')):
-                        updated_count += 1
-                        print(f"[EDSM DEBUG] Updated {system_name} {body_name}: LS {old_ls_distance} -> {hotspot.get('ls_distance')}, Type {old_ring_type} -> {hotspot.get('ring_type')}")
-            
+                system = hotspot.get('systemName', hotspot.get('system', ''))
+                body = hotspot.get('bodyName', hotspot.get('ring', ''))
+                if system and body.startswith(system):
+                    body = body[len(system):].strip()
+                cursor.execute(
+                    'SELECT MAX(ring_type), MAX(ls_distance) FROM hotspot_data '
+                    'WHERE system_name = ? AND body_name = ?', (system, body))
+                found = cursor.fetchone()
+                if found and (found[0] or found[1] is not None):
+                    updates[item_id] = found
+        finally:
             conn.close()
-            
-            print(f"[EDSM DEBUG] Metadata refresh completed: {updated_count} hotspots updated")
-            
-        except Exception as e:
-            log.error(f"[EDSM] ⚠ Error refreshing metadata: {e}")
-            log.error(f"[EDSM DEBUG] Refresh exception: {type(e).__name__}: {str(e)}")
-    
+        return updates
+
+    def _apply_edsm_metadata(self, generation, updates: Dict):
+        """Fill the LS and Ring Type cells of the shown rows in place."""
+        if (not self.parent.winfo_exists() or generation != self._results_generation
+                or generation[0] != self._search_generation):
+            return
+        for item_id, (ring_type, ls_distance) in updates.items():
+            hotspot = self._result_row_hotspots.get(item_id)
+            if hotspot is None or not self.results_tree.exists(item_id):
+                continue
+            type_missing, ls_missing = self._hotspot_missing_metadata(hotspot)
+            if type_missing and ring_type:
+                hotspot['ring_type'] = translate_ring_type(ring_type)
+                self.results_tree.set(item_id, 'Ring Type', hotspot['ring_type'])
+            if ls_missing and ls_distance is not None:
+                try:
+                    ls_display = f"{int(float(ls_distance)):,}"
+                except (TypeError, ValueError):
+                    continue
+                hotspot['ls_distance'] = ls_distance
+                hotspot['ls'] = ls_display
+                self.results_tree.set(item_id, 'LS', ls_display)
+
     def _limit_results_by_unique_rings(self, results: List[Dict], max_rings: int) -> List[Dict]:
         """Limit results by counting unique rings (system+body pairs) instead of individual rows.
         

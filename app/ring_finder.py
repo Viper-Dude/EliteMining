@@ -2427,14 +2427,6 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
             # Sort by distance
             overlaps.sort(key=lambda x: x.get('distance', 999.9))
             
-            # Fill missing metadata (LS distance, ring type) using EDSM
-            # Limit to first 30 systems to avoid slow searches
-            if overlaps:
-                try:
-                    self._fill_missing_metadata_edsm(overlaps, max_systems=30)
-                except Exception as e:
-                    log.error(f" DEBUG: EDSM metadata fill failed: {e}")
-            
             return overlaps
             
         except Exception as e:
@@ -2609,13 +2601,6 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
             
             # Sort by distance
             res_sites.sort(key=lambda x: x.get('distance', 999.9))
-            
-            # Fill missing metadata using EDSM
-            if res_sites:
-                try:
-                    self._fill_missing_metadata_edsm(res_sites, max_systems=30)
-                except Exception as e:
-                    log.error(f" DEBUG: EDSM metadata fill failed: {e}")
             
             return res_sites
             
@@ -2868,6 +2853,7 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         # Clear existing results completely
         for item in self.results_tree.get_children():
             self.results_tree.delete(item)
+        self._result_row_hotspots = {}
         
         if hasattr(self, '_first_new_item'):
             delattr(self, '_first_new_item')
@@ -3206,6 +3192,7 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
                 ),
                 'tags': tags,
                 'is_green': is_green,
+                'hotspot': hotspot,
             })
 
         # Batch-insert rows so the event loop breathes between batches.
@@ -3223,14 +3210,15 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         end = min(start + batch_size, len(row_data))
         for entry in row_data[start:end]:
             item_id = self.results_tree.insert("", "end", values=entry['values'], tags=entry['tags'])
+            self._result_row_hotspots[item_id] = entry.get('hotspot')
             if entry['is_green'] and not hasattr(self, '_first_new_item'):
                 self._first_new_item = item_id
         if end < len(row_data):
             self.parent.after(1, self._insert_row_batch, row_data, end, count, search_term, material_filter, green_entries, batch_size, generation)
         else:
-            self._finish_update_results(count, search_term, material_filter, green_entries)
+            self._finish_update_results(count, search_term, material_filter, green_entries, generation)
 
-    def _finish_update_results(self, count, search_term, material_filter, green_entries):
+    def _finish_update_results(self, count, search_term, material_filter, green_entries, generation=None):
         """Finalise results display after all rows are inserted."""
         if search_term:
             if material_filter != 'All':
@@ -3269,6 +3257,9 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
             if self.highlight_timer:
                 self.parent.after_cancel(self.highlight_timer)
             self.highlight_timer = self.parent.after(20000, self._clear_highlights)
+
+        if generation is not None:
+            self._start_edsm_metadata_fill(generation)
 
     def _show_error(self, error_msg: str):
         """Show error message and reset UI"""

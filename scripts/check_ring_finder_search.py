@@ -1,9 +1,11 @@
 import ast
+from contextlib import closing
 import logging
 import math
 import os
 from pathlib import Path
 import re
+import sqlite3
 import sys
 import tempfile
 from types import ModuleType, SimpleNamespace
@@ -36,9 +38,13 @@ Finder = type('RingFinder', (
     }),
     load_methods('app/ring_finder_search.py', 'RingFinderSearchMixin', {
         '_limit_results_by_unique_rings', '_run_search_callback', '_complete_search',
-        '_search_worker',
+        '_search_worker', '_hotspot_missing_metadata', '_start_edsm_metadata_fill',
+        '_edsm_metadata_worker', '_read_filled_ring_metadata', '_apply_edsm_metadata',
     }),
 ), {})
+EDSM_GLOBALS = Finder._start_edsm_metadata_fill.__globals__
+EDSM_GLOBALS.update(log=logging.getLogger('edsm-fill-test'),
+                    translate_ring_type=lambda value: f'{value} (translated)')
 Database = load_methods('app/user_database.py', 'UserDatabase', {'_normalize_body_name'})
 Saves = load_methods('app/ring_finder.py', 'RingFinder', {'_save_filter_settings', '_save_auto_search_state'})
 
@@ -79,8 +85,13 @@ class Tree:
         del self.rows[key]
         self.order.remove(key)
 
-    def set(self, key, column):
-        return self.rows[key][column]
+    def set(self, key, column, value=None):
+        if value is None:
+            return self.rows[key][column]
+        self.rows[key][column] = value
+
+    def exists(self, key):
+        return key in self.rows
 
     def move(self, key, parent, index):
         self.order.remove(key)
@@ -103,6 +114,7 @@ class RingFinderSearchTests(unittest.TestCase):
         self.finder._search_generation = 1
         self.finder.parent = Parent()
         self.finder.results_tree = Tree()
+        self.finder._result_row_hotspots = {}
         self.finder._finish_update_results = Mock()
 
     def test_ring_limit_keeps_both_sources_even_when_separated(self):
@@ -142,21 +154,20 @@ class RingFinderSearchTests(unittest.TestCase):
         f._complete_search(1, [row()], 10)
         f._update_results.assert_not_called()
 
-    def test_new_search_during_metadata_lookup_discards_old_results(self):
+    def test_results_show_without_waiting_for_edsm(self):
         f = self.finder
         f.db_ready = True
         f.systems_data = {}
-        f._get_hotspots = Mock(return_value=[row()])
+        f._get_hotspots = Mock(return_value=[row(ls_distance=None)])
         f._is_all_minerals = Mock(return_value=True)
         f._update_results = Mock()
         f._reset_search_button = Mock()
-        f._fill_missing_metadata_edsm = Mock(
-            side_effect=lambda rows: setattr(f, '_search_generation', 2))
+        f.edsm = Mock()
         f._search_worker('Sol', 'All', 'All Minerals', False, 50,
                          dict(x=0, y=0, z=0), 10, search_generation=1, use_spansh_pp=False)
         f.parent.flush()
-        f._update_results.assert_not_called()
-        f._reset_search_button.assert_not_called()
+        f._update_results.assert_called_once()
+        self.assertEqual(f.edsm.mock_calls, [])
 
     def test_old_row_batches_stop_after_a_new_search_or_refresh(self):
         f = self.finder
@@ -226,6 +237,119 @@ class RingFinderSearchTests(unittest.TestCase):
                 f._sort_column('Visits', reverse)
                 self.assertEqual([f.results_tree.rows[key]['Visits']
                                   for key in f.results_tree.order], expected)
+
+
+class InlineThread:
+    def __init__(self, target, args=(), daemon=None):
+        self.target, self.args = target, args
+
+    def start(self):
+        self.target(*self.args)
+
+
+class EdsmAfterDisplayTests(unittest.TestCase):
+    def setUp(self):
+        f = self.finder = Finder()
+        f.parent = Parent()
+        f.results_tree = Tree()
+        f._search_generation = 1
+        f._results_generation = self.generation = (1, object())
+        f._result_row_hotspots = {}
+        f.edsm = Mock()
+        self.fill = f.edsm.fill_missing_metadata_for_systems_direct
+        self.fill.return_value = {'materials_updated': 0, 'no_data_systems': []}
+
+    def show(self, *hotspots):
+        for hotspot in hotspots:
+            values = {'LS': hotspot.get('ls', 'No data'), 'Ring Type': hotspot.get('ring_type') or 'No data'}
+            key = self.finder.results_tree.insert('', 'end', values, ())
+            self.finder._result_row_hotspots[key] = hotspot
+        return list(self.finder._result_row_hotspots)
+
+    def run_fill(self):
+        with patch.dict(EDSM_GLOBALS, threading=SimpleNamespace(Thread=InlineThread)):
+            self.finder._start_edsm_metadata_fill(self.generation)
+
+    def queried(self):
+        return self.fill.call_args[0][0]
+
+    def use_filled_db(self, folder):
+        path = os.path.join(folder, 'user.db')
+        with closing(sqlite3.connect(path)) as conn:
+            conn.execute('CREATE TABLE hotspot_data (system_name TEXT, body_name TEXT, ring_type TEXT, ls_distance REAL)')
+            conn.executemany('INSERT INTO hotspot_data VALUES (?, ?, ?, ?)',
+                             [('Sol', '1 A Ring', 'Icy', 1234.5), ('Sol', '2 A Ring', 'Metallic', 99.0)])
+            conn.commit()
+        self.finder.user_db = SimpleNamespace(db_path=path)
+        self.fill.return_value = {'materials_updated': 3, 'no_data_systems': []}
+
+    def test_only_shown_rows_missing_data_are_queried_closest_first(self):
+        self.finder._edsm_no_data_systems = {'known miss'}
+        self.show(row('Near', ring_type='Icy', ls_distance=None), row('Complete', ring_type='Icy', ls_distance=5),
+                  row('Known Miss', ls_distance=None), row('Far', ring_type='No data', ls_distance=7),
+                  row('Near', body='2 A Ring', ls_distance=None))
+        self.run_fill()
+        self.assertEqual(self.queried(), ['Near', 'Far'])
+
+    def test_large_result_lists_query_at_most_30_systems(self):
+        self.show(*[row(f'S{i}', ls_distance=None) for i in range(100)])
+        self.run_fill()
+        self.assertEqual(self.queried(), [f'S{i}' for i in range(30)])
+
+    def test_complete_rows_start_no_lookup(self):
+        self.show(row(ring_type='Icy', ls_distance=5))
+        self.run_fill()
+        self.fill.assert_not_called()
+
+    def test_systems_without_edsm_data_are_not_asked_again(self):
+        self.fill.return_value = {'materials_updated': 0, 'no_data_systems': ['Empty']}
+        self.show(row('Empty', ls_distance=None), row('Timed out', ls_distance=None))
+        self.run_fill()
+        self.assertEqual(self.queried(), ['Empty', 'Timed out'])
+        self.fill.return_value = {'materials_updated': 0, 'no_data_systems': []}
+        self.run_fill()
+        self.assertEqual(self.queried(), ['Timed out'])
+
+    def test_lookup_is_cancelled_by_a_new_search_or_redraw(self):
+        self.show(row(ls_distance=None))
+        self.run_fill()
+        is_cancelled = self.fill.call_args[1]['is_cancelled']
+        self.assertFalse(is_cancelled())
+        self.finder._results_generation = (1, object())
+        self.assertTrue(is_cancelled())
+        self.finder._results_generation = self.generation
+        self.finder._search_generation = 2
+        self.assertTrue(is_cancelled())
+
+    def test_filled_values_update_the_shown_rows_in_place(self):
+        missing = row('Sol', '1 A Ring', ring_type='No data', ls_distance=None, ls='No data')
+        partial = row('Sol', 'Sol 2 A Ring', ring_type='Rocky', ls_distance=None, ls='No data')
+        with tempfile.TemporaryDirectory() as folder:
+            self.use_filled_db(folder)
+            first, second = self.show(missing, partial)
+            self.run_fill()
+            self.finder.parent.flush()
+        rows = self.finder.results_tree.rows
+        self.assertEqual(rows[first], {'LS': '1,234', 'Ring Type': 'Icy (translated)'})
+        self.assertEqual(rows[second], {'LS': '99', 'Ring Type': 'Rocky'})
+        self.assertEqual((missing['ring_type'], missing['ls_distance'], missing['ls']),
+                         ('Icy (translated)', 1234.5, '1,234'))
+
+    def test_late_values_cannot_change_a_newer_search_or_redraw(self):
+        for newer_search in (True, False):
+            with self.subTest(newer_search=newer_search), tempfile.TemporaryDirectory() as folder:
+                self.setUp()
+                self.use_filled_db(folder)
+                hotspot = row('Sol', '1 A Ring', ls_distance=None, ls='No data')
+                key, = self.show(hotspot)
+                self.run_fill()
+                if newer_search:
+                    self.finder._search_generation = 2
+                else:
+                    self.finder._results_generation = (1, object())
+                self.finder.parent.flush()
+                self.assertEqual(self.finder.results_tree.rows[key]['LS'], 'No data')
+                self.assertIsNone(hotspot['ls_distance'])
 
 
 SPANSH_CONSTANTS = ('SPANSH_SIGNAL_NAMES', 'APP_SIGNAL_NAMES', 'SPANSH_HOTSPOT_SIGNALS')

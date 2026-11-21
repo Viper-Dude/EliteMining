@@ -51,46 +51,50 @@ class EDSMIntegration:
     def _query_edsm_system(self, system_name: str) -> Optional[Dict]:
         """
         Query EDSM API for system body data.
-        
+
         Args:
             system_name: Star system name
-            
+
         Returns:
             JSON response dict or None if request failed
         """
+        return self._fetch_edsm_bodies(system_name)[0]
+
+    def _fetch_edsm_bodies(self, system_name: str) -> Tuple[Optional[Dict], bool]:
+        """Return (body data or None, whether EDSM answered the request)."""
         try:
             self._rate_limit()
-            
+
             # URL encode system name (handles spaces, special chars)
             encoded_name = urllib.parse.quote(system_name)
             url = f"{self.EDSM_API_BASE}/bodies?systemName={encoded_name}"
-            
+
             print(f"[EDSM] Querying: {system_name}")
-            
+
             response = requests.get(url, timeout=self.TIMEOUT, headers={"User-Agent": "EliteMining/5.1.3 (+https://github.com/Viper-Dude/EliteMining)"})
-            
+
             if response.status_code == 200:
                 data = response.json()
                 if data and "bodies" in data:
                     print(f"[EDSM] ✓ Found {len(data['bodies'])} bodies in {system_name}")
-                    return data
+                    return data, True
                 else:
                     print(f"[EDSM] ✗ No body data for {system_name}")
-                    return None
+                    return None, True
             else:
                 print(f"[EDSM] ✗ HTTP {response.status_code} for {system_name}")
-                return None
-                
+                return None, False
+
         except requests.exceptions.Timeout:
             print(f"[EDSM] ✗ Timeout querying {system_name}")
-            return None
+            return None, False
         except requests.exceptions.RequestException as e:
             print(f"[EDSM] ✗ Error querying {system_name}: {e}")
-            return None
+            return None, False
         except Exception as e:
             print(f"[EDSM] ✗ Unexpected error: {e}")
-            return None
-    
+            return None, False
+
     def _extract_ring_data(self, edsm_data: Dict, ring_name: str) -> Optional[Dict]:
         """
         Extract ring metadata from EDSM response.
@@ -423,56 +427,63 @@ class EDSMIntegration:
         
         return stats
 
-    def fill_missing_metadata_for_systems_direct(self, system_names: List[str]) -> Dict[str, int]:
+    def fill_missing_metadata_for_systems_direct(self, system_names: List[str], is_cancelled=None) -> Dict[str, int]:
         """
         Fill missing ring metadata for specific systems - DIRECT VERSION.
-        
+
         This version bypasses get_incomplete_rings() filtering and queries all requested systems,
         updating any rings found in those systems that have missing metadata.
-        
+
         Args:
             system_names: List of system names to query and update
-            
+            is_cancelled: Optional callable; when it returns True no further systems are queried
+
         Returns:
-            Stats dict with results
+            Stats dict with results. "no_data_systems" lists systems EDSM answered for
+            without anything to fill (timeouts and errors are not included).
         """
         stats = {
             "rings_checked": 0,
             "systems_queried": 0,
             "rings_updated": 0,
-            "materials_updated": 0
+            "materials_updated": 0,
+            "no_data_systems": [],
         }
-        
+
         print(f"[EDSM DEBUG] fill_missing_metadata_for_systems_direct called with: {system_names}")
-        
+
         # Query each system directly
         for system_name in system_names:
+            if is_cancelled and is_cancelled():
+                break
             stats["systems_queried"] += 1
-            print(f"[EDSM] Querying: {system_name}")
-            
+            materials_before = stats["materials_updated"]
+
             try:
-                edsm_data = self._query_edsm_system(system_name)
-                
+                edsm_data, responded = self._fetch_edsm_bodies(system_name)
+
                 if not edsm_data:
                     print(f"[EDSM DEBUG] No EDSM data for {system_name}")
+                    if responded:
+                        stats["no_data_systems"].append(system_name)
                     continue
-                
+
                 # Get all rings in this system that need metadata (regardless of get_incomplete_rings filter)
                 rings_in_system = self._get_rings_needing_metadata_in_system(system_name)
                 print(f"[EDSM DEBUG] Found {len(rings_in_system)} rings needing metadata in {system_name}: {rings_in_system}")
-                
+
                 stats["rings_checked"] += len(rings_in_system)
-                
+
                 for ring_name in rings_in_system:
                     ring_metadata = self._extract_ring_data(edsm_data, ring_name)
-                    
+
                     if ring_metadata:
                         rows_updated = self._update_ring_metadata(
-                            system_name, 
-                            ring_name, 
+                            system_name,
+                            ring_name,
                             ring_metadata
                         )
-                        
+
                         if rows_updated > 0:
                             stats["rings_updated"] += 1
                             stats["materials_updated"] += rows_updated
@@ -480,12 +491,15 @@ class EDSMIntegration:
                             print(f"       Type: {ring_metadata.get('ring_class', 'Unknown')}, LS: {ring_metadata.get('ls_distance', 'Unknown')}")
                     else:
                         print(f"[EDSM DEBUG] No ring metadata found for {ring_name} in {system_name}")
-                        
+
+                if stats["materials_updated"] == materials_before:
+                    stats["no_data_systems"].append(system_name)
+
             except Exception as e:
                 print(f"[EDSM DEBUG] Error processing {system_name}: {e}")
-        
+
         return stats
-    
+
     def _get_rings_needing_metadata_in_system(self, system_name: str) -> List[str]:
         """Get list of ring names in a system that need metadata (ls_distance or ring_type missing)"""
         try:
