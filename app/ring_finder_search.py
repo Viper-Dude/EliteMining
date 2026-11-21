@@ -221,9 +221,6 @@ class RingFinderSearchMixin:
         self.status_var.set(t('ring_finder.searching'))
         self.new_entries_var.set("")
         
-        # Check if Any Ring mode is enabled
-        any_ring_mode = self.any_ring_var.get()
-        
         # Capture Tkinter vars in main thread (Tkinter is not thread-safe)
         overlaps_only = self.overlaps_only_var.get()
         res_only = self.res_only_var.get()
@@ -234,11 +231,7 @@ class RingFinderSearchMixin:
         # The PowerPlay column is hidden for Spansh/Both, so only Local searches fetch it
         use_spansh_pp = data_source == 'database' and self.spansh_pp_var.get()
 
-        # For Any Ring mode, use a large fixed distance (dropdown is disabled)
-        # Some regions of space have limited ring data, so use large radius
-        if any_ring_mode:
-            max_distance = 1000.0  # Fixed 1000 LY for Any Ring mode (covers sparse regions)
-        elif pp_state_filter in ('Exploited', 'Fortified', 'Stronghold', 'Unoccupied', 'Expansion', 'Contested'):
+        if pp_state_filter in ('Exploited', 'Fortified', 'Stronghold', 'Unoccupied', 'Expansion', 'Contested'):
             # Widen to 500 LY for any specific PowerPlay state. For the 4 Spansh-backed states
             # this also widens the Spansh systems-search call; for Expansion/Contested (EDDN
             # cache only, no Spansh support) it only widens the local DB query, which is cheap
@@ -270,10 +263,10 @@ class RingFinderSearchMixin:
 
         # Run search in background - pass reference system coords and max results to worker
         threading.Thread(target=self._search_worker,
-                        args=(reference_system, material_filter, specific_material, confirmed_only, max_distance, self.current_system_coords, max_results, min_hotspots, any_ring_mode, overlaps_only, res_only, data_source, ring_type_only, current_generation, pp_power_filter, pp_state_filter, use_spansh_pp, spansh_stop_at_limit, force_database, cached_spansh),
+                        args=(reference_system, material_filter, specific_material, confirmed_only, max_distance, self.current_system_coords, max_results, min_hotspots, overlaps_only, res_only, data_source, ring_type_only, current_generation, pp_power_filter, pp_state_filter, use_spansh_pp, spansh_stop_at_limit, force_database, cached_spansh),
                         daemon=True).start()
 
-    def _search_worker(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, reference_coords, max_results, min_hotspots: int = 1, any_ring_mode: bool = False, overlaps_only: bool = False, res_only: bool = False, data_source: str = "both", ring_type_only: bool = False, search_generation: int = 0, pp_power: str = 'Any', pp_state: str = 'Any', use_spansh_pp: bool = True, spansh_stop_at_limit: bool = False, force_database: bool = False, cached_spansh=None):
+    def _search_worker(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, reference_coords, max_results, min_hotspots: int = 1, overlaps_only: bool = False, res_only: bool = False, data_source: str = "both", ring_type_only: bool = False, search_generation: int = 0, pp_power: str = 'Any', pp_state: str = 'Any', use_spansh_pp: bool = True, spansh_stop_at_limit: bool = False, force_database: bool = False, cached_spansh=None):
         """Background worker for hotspot search.
 
         Writes no search state on self: coordinates, PowerPlay data and Spansh rows go to
@@ -336,19 +329,8 @@ class RingFinderSearchMixin:
 
             pp_enrichment = {}
             fetched = {}
-            # Any Ring mode: Search Spansh for rings of specific type (ignoring hotspot data)
-            if any_ring_mode:
-                # Use max_results if set, otherwise default to 150 for more results
-                spansh_max = max_results if max_results else 150
-                spansh_rings = self._search_spansh_rings(
-                    reference_system, material_filter, max_distance, spansh_max, reference_coords,
-                    is_cancelled=lambda: search_generation != self._search_generation)
-                print(f" DEBUG: Any Ring mode - found {len(spansh_rings)} rings from Spansh")
-                # Convert Spansh rings to hotspot format using local database lookup
-                hotspots = self._convert_spansh_to_hotspots(spansh_rings, reference_coords)
-                print(f" DEBUG: Any Ring mode - converted to {len(hotspots)} hotspot entries")
             # Overlaps Only mode: Show only overlap entries (only works with database)
-            elif overlaps_only:
+            if overlaps_only:
                 if data_source == "spansh":
                     # Can't filter by overlaps on Spansh - no overlap data
                     self.parent.after(0, lambda: self.status_var.set(t('ring_finder.overlaps_requires_db')))
@@ -1011,291 +993,6 @@ class RingFinderSearchMixin:
                 }
                 hotspots.append(hotspot_entry)
         return hotspots
-
-    def _search_spansh_rings(self, reference_system: str, ring_type: str, max_distance: float, max_results: int, reference_coords, is_cancelled=None) -> List[Dict]:
-        """Search Spansh API for rings of a specific type (Any Ring mode)
-        
-        Args:
-            reference_system: Name of reference system
-            ring_type: Ring type filter (Icy, Rocky, Metallic, Metal Rich)
-            max_distance: Maximum distance in light years
-            max_results: Maximum number of results
-            reference_coords: Reference system coordinates dict
-            
-        Returns:
-            List of hotspot-format dicts for display in results table
-        """
-        import requests
-        
-        print(f"[SPANSH] Searching for {ring_type} rings within {max_distance}ly of {reference_system}")
-        
-        if not reference_coords:
-            print("[SPANSH] No reference coordinates available")
-            return []
-        
-        try:
-            # Build Spansh API request
-            # IMPORTANT: Do NOT use any filters - they all break the API
-            # - 'rings' filter limits to ~25 bodies
-            # - 'ring_type' filter doesn't actually filter
-            # - 'distance' filter also limits to ~25 bodies
-            # Instead: Get ALL bodies sorted by distance, filter client-side
-            request_size = 5000  # Request max for best coverage
-            payload = {
-                'reference_system': reference_system,
-                'size': request_size,
-                'sort': [{'distance': {'direction': 'asc'}}],
-                'filters': {}  # NO FILTERS - all done client-side
-            }
-            
-            # Add full browser-like headers to avoid rate limiting
-            # The sec-* headers are required for Spansh API to return full results
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'application/json, text/plain, */*',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Content-Type': 'application/json',
-                'Origin': 'https://spansh.co.uk',
-                'Referer': 'https://spansh.co.uk/bodies',
-                'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-                'sec-ch-ua-mobile': '?0',
-                'sec-ch-ua-platform': '"Windows"',
-                'sec-fetch-dest': 'empty',
-                'sec-fetch-mode': 'cors',
-                'sec-fetch-site': 'same-origin'
-            }
-            
-            print(f"[SPANSH] Searching for {ring_type} rings within {max_distance}ly of {reference_system}")
-            
-            response = tracked_request('spansh', requests.post,
-                'https://spansh.co.uk/api/bodies/search',
-                json=payload,
-                headers=headers,
-                timeout=60
-            )
-            response.raise_for_status()
-            data = response.json()
-            
-            bodies = data.get('results', [])
-            total_count = data.get('count', 0)
-            print(f"[SPANSH] API returned {len(bodies)} bodies (total available: {total_count})")
-            
-            # Convert to hotspot format, filtering by ring type CLIENT-SIDE
-            # Many bodies won't have rings or won't have the ring type we want
-            results = []
-            seen_rings = set()  # Avoid duplicate rings
-            skipped_type = 0
-            skipped_dup = 0
-            skipped_no_rings = 0
-            
-            for body in bodies:
-                system_name = body.get('system_name', '')
-                body_name = body.get('name', '')
-                distance = body.get('distance', 0)
-                ls_distance = body.get('distance_to_arrival', 0)
-                rings = body.get('rings', [])
-                # Extract actual system coordinates provided by Spansh API
-                sys_x = body.get('system_x')
-                sys_y = body.get('system_y')
-                sys_z = body.get('system_z')
-                body_coords = {'x': sys_x, 'y': sys_y, 'z': sys_z} if sys_x is not None else None
-
-                # Skip bodies beyond max distance (client-side filter)
-                if distance > max_distance:
-                    continue
-                
-                # Skip bodies without rings
-                if not rings:
-                    skipped_no_rings += 1
-                    continue
-                
-                for ring in rings:
-                    ring_type_actual = ring.get('type', '')
-                    ring_name = ring.get('name', '')
-                    
-                    # Filter by ring type (skip if not matching, or if "All" is selected)
-                    if ring_type != 'All' and ring_type_actual != ring_type:
-                        skipped_type += 1
-                        continue
-                    
-                    # Create unique key to avoid duplicates
-                    ring_key = f"{system_name}|{ring_name}"
-                    if ring_key in seen_rings:
-                        skipped_dup += 1
-                        continue
-                    seen_rings.add(ring_key)
-                    
-                    # Get hotspot signals if available
-                    signals = ring.get('signals', [])
-                    hotspot_info = ""
-                    hotspot_count = 0
-                    if signals:
-                        # Format as "Material (count), Material (count)" like normal search
-                        signal_parts = []
-                        for s in signals:
-                            name = s.get('name', '')
-                            count = s.get('count', 1)
-                            hotspot_count += count
-                            if name:
-                                signal_parts.append(f"{name} ({count})")
-                        # Show first 3 materials
-                        hotspot_info = ", ".join(signal_parts[:3])
-                        if len(signal_parts) > 3:
-                            hotspot_info += f" +{len(signal_parts)-3}"
-                    
-                    # Format LS distance for display
-                    ls_display = "No data"
-                    if ls_distance and ls_distance > 0:
-                        try:
-                            ls_display = f"{int(float(ls_distance)):,}"
-                        except (ValueError, TypeError):
-                            ls_display = "No data"
-                    
-                    # Extract reserve level from body data
-                    reserve_level = body.get('reserve_level', '')
-                    
-                    # Format as hotspot result
-                    result = {
-                        'system': system_name,
-                        'systemName': system_name,
-                        'body': body_name,
-                        'bodyName': ring_name,
-                        'ring': ring_name,
-                        'ring_type': translate_ring_type(ring_type_actual),
-                        'distance': f"{distance:.1f}" if distance > 0 else "0.0",
-                        'ls': ls_display,
-                        'ls_distance': round(ls_distance, 2) if ls_distance else None,
-                        'material': hotspot_info if hotspot_info else t('ring_finder.no_hotspot_data'),
-                        'count': hotspot_count if hotspot_count else 0,
-                        'overlap': '',
-                        'res_site': '',
-                        'reserve': translate_reserve_level(reserve_level) if reserve_level else '-',
-                        'source': 'spansh',
-                        'data_source': 'spansh',
-                        'coords': body_coords,
-                    }
-                    results.append(result)
-                    
-                    # Don't break early - collect all results, limit at the end
-            
-            # Sort by distance (use float conversion since distance is stored as string)
-            results.sort(key=lambda x: float(x.get('distance', '9999')))
-            
-            bodies_with_rings = len(bodies) - skipped_no_rings
-            print(f"[SPANSH] {len(bodies)} bodies checked, {bodies_with_rings} have rings, {skipped_no_rings} without rings")
-            print(f"[SPANSH] Found {len(results)} {ring_type} rings (skipped {skipped_type} wrong type, {skipped_dup} duplicates)")
-            print(f"[SPANSH] Found {len(results)} results")
-            
-            # Update status: Spansh search succeeded
-            self.parent.after(0, lambda: self._update_spansh_status("online"))
-            
-            return results
-            
-        except requests.exceptions.Timeout:
-            print("[SPANSH] Request timed out")
-            self.parent.after(0, lambda: self.status_var.set(t('ring_finder.spansh_timeout'))
-                              if not (is_cancelled and is_cancelled()) else None)
-            # Update status: Spansh is offline/timing out
-            self.parent.after(0, lambda: self._update_spansh_status("offline"))
-            return []
-        except requests.exceptions.RequestException as e:
-            log.error(f"[SPANSH] API error: {e}")
-            self.parent.after(0, lambda: self.status_var.set(t('ring_finder.spansh_error'))
-                              if not (is_cancelled and is_cancelled()) else None)
-            # Update status: Spansh has errors
-            self.parent.after(0, lambda: self._update_spansh_status("offline"))
-            return []
-        except Exception as e:
-            log.error(f"[SPANSH] Unexpected error: {e}")
-            return []
-
-    def _convert_spansh_to_hotspots(self, spansh_rings: List[Dict], reference_coords) -> List[Dict]:
-        """Convert Spansh ring results to the standard hotspot format used by user database searches
-        
-        This makes Spansh results go through the same display logic as normal searches,
-        so Hotspots, Overlaps, RES, etc. columns are populated from the local database.
-        
-        Args:
-            spansh_rings: List of ring results from Spansh API
-            reference_coords: Reference system coordinates for distance calculation
-            
-        Returns:
-            List of hotspot-format dicts compatible with _update_results
-        """
-        from material_utils import abbreviate_material
-        
-        results = []
-        
-        for ring in spansh_rings:
-            system_name = ring.get('system', '')
-            body_name = ring.get('body', '')
-            ring_name = ring.get('ring', '')
-            ring_type = ring.get('ring_type', 'No data')
-            distance = ring.get('distance', 0)
-            ls_distance = ring.get('ls_distance')
-            
-            if not system_name or not ring_name:
-                continue
-            
-            # Format LS distance for display
-            ls_display = "No data"
-            if ls_distance is not None and ls_distance != "No data":
-                try:
-                    ls_display = f"{int(float(ls_distance)):,}"
-                except (ValueError, TypeError):
-                    ls_display = "No data"
-            
-            # Look up hotspots from local database for this ring
-            hotspot_display = "-"
-            hotspot_count = 0
-            try:
-                # Strip the system name prefix from ring_name to match database format
-                # Spansh returns: "Antliae Sector IR-W c1-4 A 5 A Ring"
-                # Database stores: "A 5 A Ring"
-                db_ring_name = ring_name
-                if ring_name.lower().startswith(system_name.lower()):
-                    db_ring_name = ring_name[len(system_name):].strip()
-                
-                db_hotspots = self.user_db.get_body_hotspots(system_name, db_ring_name)
-                if db_hotspots:
-                    formatted_parts = []
-                    for h in db_hotspots:
-                        material = h.get('material_name', '')
-                        count = h.get('hotspot_count', 1)
-                        hotspot_count += count
-                        if material:
-                            abbrev = abbreviate_material(material)
-                            formatted_parts.append(f"{abbrev} ({count})")
-                    
-                    if formatted_parts:
-                        hotspot_display = ", ".join(formatted_parts[:4])
-                        if len(formatted_parts) > 4:
-                            hotspot_display += f" +{len(formatted_parts)-4}"
-                        print(f"[SPANSH DB LOOKUP] Formatted: {hotspot_display}")
-            except Exception as e:
-                log.error(f"[SPANSH] Error looking up hotspots for {system_name} {ring_name}: {e}")
-            
-            # Create result in standard format (same as _search_user_database_first)
-            result = {
-                'system': system_name,
-                'systemName': system_name,
-                'body': body_name,
-                'bodyName': ring_name,  # Use ring_name as bodyName for display
-                'ring': ring_name,
-                'ring_type': translate_ring_type(ring_type),
-                'type': hotspot_display,  # This populates Hotspots column
-                'ls': ls_display,
-                'ls_distance': ls_distance,
-                'distance': f"{distance:.1f}" if distance > 0 else "0.0",
-                'reserve': "No data",
-                'has_hotspots': hotspot_count > 0,
-                'count': hotspot_count,
-                'data_source': 'Spansh',
-                'source': 'Spansh',
-            }
-            results.append(result)
-
-        return results
 
     def _apply_powerplay_filter(self, hotspots: List[Dict], pp_power: str, pp_state: str,
                                  reference_system: str, max_distance: float, is_cancelled=None,

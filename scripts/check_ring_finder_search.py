@@ -248,6 +248,11 @@ class RingFinderSearchTests(unittest.TestCase):
         self.assertEqual([values[2] for values in f.results_tree.rows.values()], ['Wanted'])
         db.bulk_get_visit_counts.assert_called_once()
         self.assertEqual(len(f._search_cache), 4)
+        db.bulk_get_visit_counts.assert_called_once()
+        self.assertEqual(sorted(db.bulk_get_visit_counts.call_args[0][0]),
+                         ['Farther', 'Visited', 'Wanted', 'Wrong reserve'])
+        for name in ('bulk_get_ring_comments_for_rings', 'bulk_get_ring_density_for_rings'):
+            getattr(db, name).assert_called_once_with(['Wanted'])
 
     def test_visits_sort_numerically_in_both_directions(self):
         f = self.finder

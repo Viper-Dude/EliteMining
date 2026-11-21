@@ -634,18 +634,6 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         self.reserve_combo.bind('<<ComboboxSelected>>', lambda e: e.widget.selection_clear(), add='+')
         ToolTip(self.reserve_combo, t('ring_finder.tooltip_reserve'))
         
-        # "Any Ring" checkbox - DISABLED (hidden) - searches Spansh for rings without requiring hotspot data
-        self.any_ring_var = tk.BooleanVar(value=False)
-        self.any_ring_cb = ThemedCheckbutton(search_frame, text=t('ring_finder.any_ring'),
-                                          variable=self.any_ring_var,
-                                          command=self._on_any_ring_changed,
-                                          bg=_cb_bg, fg="#e0e0e0",
-                                          activebackground="#2e2e2e", activeforeground="#ffffff",
-                                          selectcolor=_cb_select, relief="flat",
-                                          font=scaled_font(9))
-        # self.any_ring_cb.grid(row=1, column=1, sticky="e", padx=(130, 0), pady=5)  # Hidden - feature disabled
-        # ToolTip(self.any_ring_cb, t('ring_finder.any_ring_tooltip'))
-        
         # Material filter (new - specific materials) - dynamically populated from database
         ttk.Label(search_frame, text=t('ring_finder.mineral')).grid(row=3, column=0, sticky="w", padx=5, pady=5)
         self.specific_material_var = tk.StringVar(value=t('ring_finder.all_minerals'))
@@ -1538,8 +1526,7 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
             self.max_results_combo.configure(state="disabled")
             return
         self.max_results_combo.configure(state="readonly")
-        distance_locked = self.any_ring_var.get() or (
-            self.data_source_var.get() == 'database' and self.pp_state_var.get() != 'Any')
+        distance_locked = self.data_source_var.get() == 'database' and self.pp_state_var.get() != 'Any'
         if not distance_locked:
             self.distance_combo.configure(state="readonly")
 
@@ -1547,34 +1534,6 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         self._update_favourites_only_controls()
         self._save_filter_settings()
 
-    def _on_any_ring_changed(self):
-        """Handle Any Ring checkbox change - enables Spansh search mode"""
-        if self.any_ring_var.get():
-            # Any Ring mode - disable controls that don't apply to Spansh search
-            self.specific_material_combo.configure(state="disabled")
-            self.min_hotspots_spinbox.configure(state="disabled")
-            self.distance_combo.configure(state="disabled")
-            self.overlaps_only_cb.configure(state="disabled")
-            self.res_only_cb.configure(state="disabled")
-            # Uncheck overlaps/res checkboxes since they don't apply
-            self.overlaps_only_var.set(False)
-            self.res_only_var.set(False)
-            # Make sure a specific ring type is selected (not "All")
-            ring_type = self.material_var.get()
-            ring_type_english = self._ring_type_rev_map.get(ring_type, ring_type)
-            if ring_type_english == 'All':
-                # Default to Icy if "All" is selected
-                self.material_var.set(self._ring_type_map.get('Icy', 'Icy'))
-            self.status_var.set(t('ring_finder.any_ring_mode'))
-        else:
-            # Normal mode - restore controls
-            self.specific_material_combo.configure(state="readonly")
-            self.distance_combo.configure(state="readonly")
-            self.overlaps_only_cb.configure(state="normal")
-            self.res_only_cb.configure(state="normal")
-            self._on_material_changed()  # Restore min hotspots state
-            self.status_var.set("")
-    
     def _show_search_overlay(self, system_name: str):
         """Blank the results tree and show a big 'Searching new system...' spinner -
         the small search-button spinner alone was too easy to miss when jumping,
@@ -2776,17 +2735,6 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         # Bulk-prefetch favourite flags for favourite indicator/filter (avoids per-row DB connections)
         _early_favourites = self.user_db.bulk_get_favourites_for_rings(_all_systems_early) if _all_systems_early else {}
 
-        # Bulk-prefetch ring comments (avoids per-row DB connections)
-        _early_comments = self.user_db.bulk_get_ring_comments_for_rings(_all_systems_early) if _all_systems_early else {}
-        _early_density = self.user_db.bulk_get_ring_density_for_rings(_all_systems_early) if _all_systems_early else {}
-
-        # Bulk-prefetch last-mined report dates (avoids per-row CSV scans)
-        _last_mined_lookup = {}
-        if _all_systems_early and self.prospector_panel and hasattr(self.prospector_panel, 'get_last_mined_lookup'):
-            _last_mined_lookup = self.prospector_panel.get_last_mined_lookup(_all_systems_early)
-        self._last_mined_lookup = _last_mined_lookup
-        _last_mined_overrides = self.user_db.bulk_get_ring_last_mined()
-
         # Filter for favourite rings if checkbox is enabled
         if self.favourites_only_var.get():
             def _is_favourite_hotspot(h):
@@ -2885,6 +2833,14 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         # --- Bulk-prefetch DB data to avoid per-row DB connections ---
         all_system_names = list({h.get('system', h.get('systemName', '')) for h in hotspots if h.get('system', h.get('systemName', ''))})
         _visit_counts = _early_visit_counts
+
+        _early_comments = self.user_db.bulk_get_ring_comments_for_rings(all_system_names) if all_system_names else {}
+        _early_density = self.user_db.bulk_get_ring_density_for_rings(all_system_names) if all_system_names else {}
+        _last_mined_lookup = {}
+        if all_system_names and self.prospector_panel and hasattr(self.prospector_panel, 'get_last_mined_lookup'):
+            _last_mined_lookup = self.prospector_panel.get_last_mined_lookup(all_system_names)
+        self._last_mined_lookup = _last_mined_lookup
+        _last_mined_overrides = self.user_db.bulk_get_ring_last_mined() if all_system_names else {}
 
         # Batch-fetch PowerPlay data for all systems from EDDN cache
         from system_finder_api import SystemFinderAPI

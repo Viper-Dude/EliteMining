@@ -42,9 +42,9 @@ Make Ring Finder searches (Local, Spansh, Both, Ring Search, Any Ring) show resu
 | 4 | Cache the Spansh name lookup | Sonnet 5.5, medium | No | Done 21 Nov 2026, user-tested, committed |
 | 5 | Remove shared state from worker threads | Opus 5.5, high | Yes | Done 21 Nov 2026, user-tested, committed |
 | 6 | Local range query rewrite | Opus 5.5, high | Yes | Done 21 Nov 2026, user-tested, committed |
-| 7 | `_update_results`: prefetch after the limit | Sonnet 5.5, medium | No | Next |
-| 8 | Any Ring mode uses the paged Spansh path | Opus 5.5, medium | No | Not started |
-| 9 | Cleanup: debug prints, hardcoded text | Sonnet 5.5, low | No | Not started |
+| 7 | `_update_results`: prefetch after the limit | Sonnet 5.5, medium | No | Done 21 Nov 2026, awaiting user test |
+| 8 | Delete the dead Any Ring mode (changed from: use the paged Spansh path) | Opus 5.5, medium | No | Done 21 Nov 2026, awaiting user test |
+| 9 | Cleanup: debug prints, hardcoded text | Sonnet 5.5, low | No | Next |
 
 Recommended order: 0a, 0b, 1, 2, 3, 4, 5, 6, 7, 8, 9. Steps 1–3 give the biggest time savings.
 
@@ -218,6 +218,10 @@ Fix:
 - Fetch these after `_limit_results_by_unique_rings` instead: comments, density, last mined (CSV and overrides), overlaps, RES, PowerPlay, and the existing-ring check.
 - The existing test `test_display_filters_before_limit_and_visit_lookup_only_once` must still pass.
 - Model: Sonnet 5.5, medium effort.
+- Done 21 Nov 2026, in `ring_finder.py` `_update_results`:
+  - Comments, density, last-mined CSV lookup and last-mined overrides are now fetched after `_limit_results_by_unique_rings`, for the shown systems only. Visit counts and favourites stay before the cut. Overlaps, RES, PowerPlay and the existing-ring check were already after it.
+  - `_last_mined_lookup` (used by the right-click and edit-ring dialog) now covers only the shown systems, which are the only rows those dialogs can open.
+  - Tests: the existing limit test now also checks that comments and density are fetched for the one shown system only. `check_ring_finder_search.py` 44 OK, `check_search_stop.py` 26 OK.
 
 ### 8 — Any Ring mode uses the paged Spansh path
 
@@ -227,6 +231,9 @@ Fix:
 - Also keep Spansh's system coordinates, so the Sol column doesn't need a galaxy lookup on the UI thread for every row.
 - Compare results for 2–3 systems before and after.
 - Model: Opus 5.5, medium effort.
+- Changed 21 Nov 2026 (user decision): the Any Ring checkbox was hidden ("feature disabled") and nothing set `any_ring_var`, so the whole path was dead. Ring Search (Spansh) already uses `_search_spansh_with_filters(ring_type_only=True)` with the step 1 paging, Stop checks and Spansh coordinates.
+- Done: removed `_search_spansh_rings`, `_convert_spansh_to_hotspots`, the `any_ring_mode` worker parameter and branch, the 1,000 LY override, the hidden checkbox, `_on_any_ring_changed` and the `any_ring_var` check in `_update_favourites_only_controls` (about 330 lines). Checks: ring_finder_search 44, search_stop 26, star_systems 19, all OK.
+- Left for step 9: the now-unused string keys `ring_finder.any_ring`, `any_ring_tooltip`, `any_ring_mode`, `spansh_timeout` and `spansh_error` in both string files.
 
 ### 9 — Cleanup
 
@@ -237,6 +244,7 @@ Fix:
   - "Spansh search timed out"
   - "Spansh API error"
   - the `status_label` text at about line 5153
+- Remove the unused string keys left by step 8 (listed there) from `strings_en.json` and `strings_de.json`.
 - D3 (deferred): in `user_database.py`, `idx_system_name` duplicates `idx_hotspot_system` and `idx_body_name` duplicates `idx_hotspot_body`. Both system indexes are also covered by `idx_hotspot_unique_key`.
 - Model: Sonnet 5.5, low effort.
 
