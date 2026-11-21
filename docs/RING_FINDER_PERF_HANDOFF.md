@@ -41,7 +41,7 @@ Make Ring Finder searches (Local, Spansh, Both, Ring Search, Any Ring) show resu
 | 3 | PowerPlay backfill: parallel and cached | Opus 5.5, high | Yes | Done 21 Nov 2026, user-tested, committed |
 | 4 | Cache the Spansh name lookup | Sonnet 5.5, medium | No | Done 21 Nov 2026, user-tested, committed |
 | 5 | Remove shared state from worker threads | Opus 5.5, high | Yes | Done 21 Nov 2026, user-tested, committed |
-| 6 | Local range query rewrite | Opus 5.5, high | Yes | Done 21 Nov 2026, awaiting user test |
+| 6 | Local range query rewrite | Opus 5.5, high | Yes | Done 21 Nov 2026, user-tested, committed |
 | 7 | `_update_results`: prefetch after the limit | Sonnet 5.5, medium | No | Next |
 | 8 | Any Ring mode uses the paged Spansh path | Opus 5.5, medium | No | Not started |
 | 9 | Cleanup: debug prints, hardcoded text | Sonnet 5.5, low | No | Not started |
