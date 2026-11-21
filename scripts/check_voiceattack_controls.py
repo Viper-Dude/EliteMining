@@ -139,7 +139,9 @@ class VoiceAttackChecks(unittest.TestCase):
         self.assertEqual(calls, ['bookmarks', {'system': 'Sol', 'body': 'Sol A 1 A Ring'}])
 
     def test_app_profile_commands_write_matching_actions(self):
-        profile = ET.parse(ROOT / 'Voiceattack Profile/EliteMining v5.6.6-Profile.vap')
+        profiles = list((ROOT / 'Voiceattack Profile').glob('EliteMining v*-Profile.vap'))
+        self.assertEqual(len(profiles), 1, profiles)
+        profile = ET.parse(profiles[0])
         phrases = {
             'SIDEBAR:HIDE': 'Hide sidebar', 'SIDEBAR:SHOW': 'Show sidebar',
             'SIDEBAR:SWAP': 'Swap sidebar panels', 'TAB:REPORTS': 'Show mining reports',
