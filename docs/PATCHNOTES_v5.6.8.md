@@ -6,6 +6,8 @@
 - Hotspots Finder searches should be much faster and show results sooner.
 - Mining Cards have a new slimmer look that follows your app theme and language, with all minerals in one table, the session date, cores found, and the comment you saved with the session filled in for you.
 - Share to Discord now posts your Mining Card, with the system name ready to copy.
+- Auto Switch now opens the Hotspots Finder after every jump, not just the first one after entering supercruise.
+- Auto Prices starts looking up prices while your FSD charges, so they show up sooner when you arrive.
 
 ## Bug Fixes
 - Hotspots Finder now always shows the closest rings, keeps rings already found if Spansh drops out, and no longer searches around the wrong system after a typo.
