@@ -46,7 +46,9 @@ Dropped after review:
 
 ## Next (21 Nov 2026)
 
-Steps 0, 1, 2, 3a, 4 and 5 are committed. Startup stalls are recorded under Measurements. The logger starts during `__init__`, so most of the startup stalls happen behind the splash while tabs are built. The first dev test (18:40) failed: the step 0 logger used `sys` in `cargo_monitor.py` without importing it, so no live journal events were processed. Fixed in `2ad283e`. Ignore that log and use only logs from after the fix. Nothing left can be done without the game: 3b (D2) and step 6 both need the in-game log. Waiting for the user's combined in-game test plus `~\EliteMining.log` (`[UI-STALL]` lines). Then: record the jump/scan/FSS stalls, decide 3b, do 3b if needed, then step 6.
+Steps 0–5 (including 3b) are committed. In-game test passed on all items (user, 21 Nov 2026 19:14). Next: step 6. The user maps one ring with new hotspots in the dev app; check that the 881 ms stall is gone, then remove the logger in its own commit and add the patch note. Earlier notes follow.
+
+Startup stalls are recorded under Measurements. The logger starts during `__init__`, so most of the startup stalls happen behind the splash while tabs are built. The first dev test (18:40) failed: the step 0 logger used `sys` in `cargo_monitor.py` without importing it, so no live journal events were processed. Fixed in `2ad283e`. Ignore that log and use only logs from after the fix. Nothing left can be done without the game: 3b (D2) and step 6 both need the in-game log. Waiting for the user's combined in-game test plus `~\EliteMining.log` (`[UI-STALL]` lines). Then: record the jump/scan/FSS stalls, decide 3b, do 3b if needed, then step 6.
 
 ## Progress
 
@@ -56,7 +58,7 @@ Steps 0, 1, 2, 3a, 4 and 5 are committed. Startup stalls are recorded under Meas
 | 1 | `marketplace_cache.db` to WAL | Opus 5.5, high | No | Done (checks pass; in-game test at the end) |
 | 2 | One route timer, no folder listing, atomic `jumpsleft` | Sonnet 5.5, medium | No | Done (`check_route_status.py` 12/12). Side effect: the old second timer rewrote the FSDTarget count after arrival, so the arrival 0 now sticks |
 | 3a | FSDJump cache upserts off the UI thread | Opus 5.5, high | Yes | Done: one worker (`_queue_cache_upserts`), also used for CarrierJump and Location (same code); `check_journal_reading.py` 47/47 |
-| 3b | Scan / SAA writes off the UI thread (only if step 0 shows stalls) | Opus 5.5, high | Yes | Not started |
+| 3b | Ring-scan EDSM lookup off the UI thread (narrowed from "Scan / SAA writes") | Opus 5.5, high | Yes | Done (`dde292c`): the EDSM lookup in `_on_hotspot_added` runs on the 3a worker (`_queue_background_job`); the auto-refresh is posted after it. Scan/SAA DB writes stay on the UI thread (about 1 ms). `check_journal_reading.py` 51/51 |
 | 4 | Import matplotlib after the splash | Sonnet 5.5, medium | No | Done: numpy deferred too; `import prospector_panel` 1.01 s → 0.21 s; specs already list the hidden imports |
 | 5 | Skip unchanged cargo overlay redraw and cursor changes | Sonnet 5.5, low | No | Done: skip keyed on text + font size + colour; alpha logic untouched |
 | 6 | Remove the stall logger, re-measure, final notes | Sonnet 5.5, low | No | Not started |
@@ -164,7 +166,17 @@ Step 0 log, 21 Nov 2026 18:15 (with WAL, steps 1–5 in place). This session cov
 | Following 4 s of startup | 135, 94, 84, 111, 50, 90 ms | Route poll, sash setup, update check |
 | Idle, 1 minute later | 85 ms | nothing |
 
-Still needed for D2: one short log with 2–3 jumps, a honk and FSS of a ringed system, and Commodity Market results.
+In-game step 0 log, 21 Nov 2026 18:47–19:14 (dev, steps 1–5 in place, `sys` import fixed). "After batch" is the time between the last journal batch and the logged stall; a stall caused by the batch itself shows up within about 1 s.
+
+| Action | Stall | Cause |
+|---|---|---|
+| Startup (behind the splash) | 475, 3,021, 537 ms, then up to 1,097 ms | Tab building during `__init__`; not journal related |
+| FSDJump (3 jumps) | 73, 132, 157 ms, 1.3–2.0 s after the batch | Work scheduled about 1 s after a jump (Hotspots Finder auto-search, Auto Prices); not the jump batch itself |
+| Honk / FSS bursts (FSSDiscoveryScan, 20+ FSSSignalDiscovered) | None within 1 s of a batch; 50–400 ms stalls 2–200 s later | The user was clicking in the app (game focus lost); not the batches |
+| **Ring map with new hotspots** (SAAScanComplete, SAASignalsFound, Scan) | **881 ms**, starting at the batch | `_on_hotspot_added` ran the EDSM fallback (`fill_missing_metadata_for_systems_direct`, a web request with a 15 s timeout) on the UI thread. The DB writes around it took about 1 ms (log timestamps) |
+| Commodity Market results | Nothing over 50 ms tied to the search | |
+
+D2 decision: yes, do 3b. The stall is the EDSM web request, not the DB writes, so 3b was narrowed to moving that lookup (see Progress).
 
 ## Not verified
 
