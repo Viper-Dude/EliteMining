@@ -329,42 +329,54 @@ class CargoMonitor:
                 
             # Ring Finder exists - refresh it now
             main_app._refresh_ring_finder(is_new_discovery=is_new_discovery)
-            
+
             # Auto-search refresh: Only if NEW hotspots were discovered AND not during catchup scan
+            refresh_args = None
             if is_new_discovery and not getattr(self, '_catchup_scan_in_progress', False):
                 # Use normalized system/body names if provided, otherwise fall back to stored values
                 scanned_system = normalized_system or getattr(self, '_current_saa_system', None)
                 scanned_body = normalized_body or getattr(self, '_current_saa_body', None)
                 if scanned_system:
-                    self._check_auto_refresh_ring_finder(scanned_system, scanned_body, hotspots_were_new=True)
-            
+                    refresh_args = (scanned_system, scanned_body, True)
+
             # IMMEDIATE EDSM FALLBACK: Fill missing metadata for newly scanned system
             # This ensures auto-refresh shows complete data after the 5-second delay
+            edsm_system = None
             if hasattr(main_app, 'ring_finder') and main_app.ring_finder and self.current_system:
                 # Check cache to avoid duplicate EDSM queries for same system
                 if self.current_system not in self._edsm_fallback_cache:
-                    print(f"🔧 Running immediate EDSM fallback for newly scanned system: {self.current_system}")
-                    try:
-                        # Add to cache immediately
-                        self._edsm_fallback_cache.add(self.current_system)
-                        
-                        # Schedule cache cleanup after 30 seconds
-                        if self._edsm_cache_clear_timer:
-                            main_app.after_cancel(self._edsm_cache_clear_timer)
-                        self._edsm_cache_clear_timer = main_app.after(30000, lambda: self._edsm_fallback_cache.clear())
-                        
-                        # Run EDSM fallback for the current system immediately
-                        if hasattr(main_app.ring_finder, 'edsm'):
-                            stats = main_app.ring_finder.edsm.fill_missing_metadata_for_systems_direct([self.current_system])
+                    # Add to cache immediately
+                    self._edsm_fallback_cache.add(self.current_system)
+
+                    # Schedule cache cleanup after 30 seconds
+                    if self._edsm_cache_clear_timer:
+                        main_app.after_cancel(self._edsm_cache_clear_timer)
+                    self._edsm_cache_clear_timer = main_app.after(30000, lambda: self._edsm_fallback_cache.clear())
+                    if hasattr(main_app.ring_finder, 'edsm'):
+                        edsm_system = self.current_system
+                else:
+                    print(f"⚡ EDSM fallback skipped for {self.current_system} (already processed)")
+
+            if edsm_system or refresh_args:
+                # The EDSM lookup is a web request (up to 15 s), so it runs on the background worker.
+                # The auto-refresh waits behind it, and behind any earlier lookup, so it shows the filled data.
+                edsm = main_app.ring_finder.edsm if edsm_system else None
+
+                def lookup_then_refresh():
+                    if edsm_system:
+                        try:
+                            stats = edsm.fill_missing_metadata_for_systems_direct([edsm_system])
                             if stats.get('materials_updated', 0) > 0:
                                 print(f"[OK] EDSM immediate fallback: Updated {stats['rings_updated']} rings, {stats['materials_updated']} materials")
                             else:
-                                print(f"ℹ EDSM immediate fallback: No updates needed for {self.current_system}")
-                    except Exception as e:
-                        log.error(f"⚠ EDSM immediate fallback failed: {e}")
-                else:
-                    print(f"⚡ EDSM fallback skipped for {self.current_system} (already processed)")
-                    
+                                print(f"ℹ EDSM immediate fallback: No updates needed for {edsm_system}")
+                        except Exception as e:
+                            log.error(f"⚠ EDSM immediate fallback failed: {e}")
+                    if refresh_args:
+                        main_app.after(0, self._check_auto_refresh_ring_finder, *refresh_args)
+
+                self._queue_background_job(lookup_then_refresh)
+
         except Exception as e:
             # Log error but don't break other functionality
             log.warning(f"Warning: Failed to refresh Ring Finder after hotspot add: {e}")
@@ -1303,18 +1315,25 @@ class CargoMonitor:
         One worker keeps the writes in journal order."""
         if not self.journal_parser.eddn_cache_path:
             return
+        self._queue_background_job(event)
+
+    def _queue_background_job(self, job):
+        """Queue a jump/location event to store, or a callable to run, on the one background worker"""
         if getattr(self, '_cache_jobs', None) is None:
             self._cache_jobs = queue.Queue()
             threading.Thread(target=self._run_cache_jobs, name="JournalCacheWrites", daemon=True).start()
-        self._cache_jobs.put(event)
+        self._cache_jobs.put(job)
 
     def _run_cache_jobs(self):
         while True:
-            event = self._cache_jobs.get()
+            job = self._cache_jobs.get()
             try:
-                self._store_cache_event(event)
+                if callable(job):
+                    job()
+                else:
+                    self._store_cache_event(job)
             except Exception:
-                log.exception("Journal cache write failed")
+                log.exception("Journal background job failed")
 
     def _store_cache_event(self, event):
         main_app = getattr(self, 'main_app_ref', None)

@@ -511,7 +511,8 @@ class JournalOffsetChecks(unittest.TestCase):
 
 
 CacheMonitor = load_methods('app/cargo_monitor.py', 'CargoMonitor', {
-    '_queue_cache_upserts', '_run_cache_jobs', '_store_cache_event',
+    '_queue_cache_upserts', '_queue_background_job', '_run_cache_jobs', '_store_cache_event',
+    '_on_hotspot_added',
 })
 import queue as _queue
 CacheMonitor._queue_cache_upserts.__globals__['queue'] = _queue
@@ -609,6 +610,74 @@ class JumpCacheWriteChecks(unittest.TestCase):
         self.assertNotIn('_upsert_pp_from_event', called)
         self.assertNotIn('_upsert_system_info_from_event', called)
         self.assertEqual(called.count('_queue_cache_upserts'), 3)
+
+
+class HotspotLookupChecks(unittest.TestCase):
+    def setUp(self):
+        self.ui_thread = threading.current_thread()
+        self.gate = threading.Event()
+        self.fail = False
+        self.order = []
+        self.refreshes = []
+        self.refreshed = threading.Condition()
+        app = SimpleNamespace(ring_finder=SimpleNamespace(_update_database_info=Mock(),
+                                                          edsm=SimpleNamespace(fill_missing_metadata_for_systems_direct=self.lookup)),
+                              _refresh_ring_finder=Mock(), after_cancel=Mock(), after=self.after)
+        self.monitor = CacheMonitor()
+        self.monitor.main_app_ref = app
+        self.monitor.current_system = 'Sol'
+        self.monitor._edsm_fallback_cache = set()
+        self.monitor._edsm_cache_clear_timer = None
+        self.monitor._check_auto_refresh_ring_finder = Mock()
+        logging.disable(logging.CRITICAL)
+        self.addCleanup(logging.disable, logging.NOTSET)
+        self.addCleanup(self.gate.set)
+
+    def lookup(self, systems):
+        self.gate.wait(5)
+        self.order.append(('lookup', tuple(systems), threading.current_thread() is self.ui_thread))
+        if self.fail:
+            raise RuntimeError('EDSM down')
+        return {'materials_updated': 0}
+
+    def after(self, ms, fn, *args):
+        if ms == 0:
+            with self.refreshed:
+                self.order.append(('refresh', threading.current_thread() is self.ui_thread))
+                self.refreshes.append((fn, args))
+                self.refreshed.notify_all()
+        return 'timer'
+
+    def wait_for_refreshes(self, count):
+        with self.refreshed:
+            self.assertTrue(self.refreshed.wait_for(lambda: len(self.refreshes) >= count, 5), self.order)
+
+    def test_lookup_runs_off_the_ui_thread_and_the_refresh_waits_for_it(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.monitor._on_hotspot_added(True, 'Sol', '1 A Ring')
+        self.assertEqual(self.order, [])
+        self.monitor._check_auto_refresh_ring_finder.assert_not_called()
+        self.gate.set()
+        self.wait_for_refreshes(1)
+        self.assertEqual(self.order, [('lookup', ('Sol',), False), ('refresh', False)])
+        self.assertEqual(self.refreshes, [(self.monitor._check_auto_refresh_ring_finder, ('Sol', '1 A Ring', True))])
+
+    def test_second_scan_skips_the_lookup_but_refreshes_after_the_first_lookup(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.monitor._on_hotspot_added(True, 'Sol', '1 A Ring')
+            self.monitor._on_hotspot_added(True, 'Sol', '2 A Ring')
+        self.gate.set()
+        self.wait_for_refreshes(2)
+        self.assertEqual([entry[0] for entry in self.order], ['lookup', 'refresh', 'refresh'])
+        self.assertEqual([args[1] for _, args in self.refreshes], ['1 A Ring', '2 A Ring'])
+
+    def test_failed_lookup_still_refreshes(self):
+        self.fail = True
+        self.gate.set()
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.monitor._on_hotspot_added(True, 'Sol', '1 A Ring')
+        self.wait_for_refreshes(1)
+        self.assertEqual([entry[0] for entry in self.order], ['lookup', 'refresh'])
 
 
 class ModuleImportChecks(unittest.TestCase):
