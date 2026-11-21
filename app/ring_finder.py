@@ -472,14 +472,19 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
                                 font=scaled_font(9), foreground=rf_value_fg, bg=rf_bg)
         distance_info_label.pack(side="left")
         
-        # Database info on same line, right-aligned
+        # Database info on same line, right-aligned, with the unsaved-hotspots hint to its left
         self.db_info_var = tk.StringVar(value=t('ring_finder.total_hotspots_in_systems').format(hotspots="...", systems="..."))
         db_info_label = tk.Label(distance_header, textvariable=self.db_info_var,
                                 font=scaled_font(8, "italic"), foreground="#888888", bg=rf_bg)
+        _new_entries_fg = "#ff8c00" if rf_theme == "elite_orange" else "#e8b84b"
+        self.new_entries_var = tk.StringVar(value="")
+        new_entries_label = tk.Label(distance_header, textvariable=self.new_entries_var,
+                                     font=scaled_font(8, "bold"), foreground=_new_entries_fg, bg=rf_bg)
         if _sh_theme in ("modern", "modern_slate", "modern_orange"):
             create_help_link(distance_header, "hotspot-finder", t('ring_finder.help_tooltip'), ToolTip).pack(
                 side="right", padx=(8, 0))
         db_info_label.pack(side="right")
+        new_entries_label.pack(side="right", padx=(0, 12))
 
         search_frame = ttk.Frame(self.scrollable_frame)
         search_frame.pack(fill="x", padx=10, pady=0)
@@ -956,14 +961,8 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
             self._more_btn.pack(side="right", padx=(0, 8))
             self._refresh_more_btn()
             ttk.Label(results_header, textvariable=self.status_var, font=scaled_font(9, "bold"),
-                      foreground=modern_color("#E6EAF0")).pack(side="right", padx=(0, 12))
+                      foreground=modern_color("#E6EAF0")).pack(side="left", padx=(6, 0))
 
-        from config import load_theme as _load_theme_for_new_entries
-        _new_entries_fg = "#ff8c00" if _load_theme_for_new_entries() == "elite_orange" else "#e8b84b"
-        self.new_entries_var = tk.StringVar(value="")
-        ttk.Label(results_header, textvariable=self.new_entries_var,
-                 font=scaled_font(8, "bold"), foreground=_new_entries_fg).pack(side="right")
-        
         results_frame = ttk.Frame(self.scrollable_frame)
         results_frame.pack(fill="both", expand=True, padx=10, pady=(2, 2))
         
@@ -2741,6 +2740,8 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
             self._stopped_generation = self._search_generation  # Marks this as a user Stop, not a superseding search
             self._search_generation += 1  # Any in-flight worker's generation check now fails
             self._reset_search_button()
+            # Search cleared the hint; the previous rows stay until partial results arrive
+            self._update_new_entries_label()
         else:
             self.search_hotspots()
 

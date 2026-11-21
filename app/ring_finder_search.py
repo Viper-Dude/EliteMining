@@ -222,6 +222,7 @@ class RingFinderSearchMixin:
         self._search_in_progress = True
         self.search_btn.configure(text=t('ring_finder.stop'))
         self.status_var.set(t('ring_finder.searching'))
+        self.new_entries_var.set("")
         
         # Check if Any Ring mode is enabled
         any_ring_mode = self.any_ring_var.get()

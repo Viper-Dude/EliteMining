@@ -201,7 +201,7 @@
     "no_rings_found": "Keine Ringe innerhalb der aktuellen Suchparameter gefunden",
     "no_material_rings_found": "Keine {material} Ringe innerhalb der aktuellen Suchparameter gefunden",
     "total_hotspots_in_systems": "Gesamt: {hotspots} Hotspots in {systems} Systemen",
-    "new_entries_hint": "{hotspots} neue Hotspots · {systems} Systeme nicht in Datenbank",
+    "new_entries_hint": "{hotspots} neue Hotspots · {systems} Systeme nicht gespeichert",
     "loading_database": "Lade Systemdatenbank...",
     "database_ready": "Bereit - Community-Datenbank geladen",
     "search_failed": "Suche fehlgeschlagen - überprüfen Sie Ihre Suchkriterien",
