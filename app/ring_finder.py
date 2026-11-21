@@ -7275,6 +7275,13 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
                 if getattr(self, '_prices_overlay_active', False):
                     self._hide_prices_overlay()
 
+            # Price lookups are the slow part of Auto Prices, so start them while the FSD charges;
+            # a cancelled jump only wastes one lookup
+            if event_type == "StartJump" and event.get("JumpType") == "Hyperspace":
+                destination = event.get("StarSystem")
+                if destination and destination != self.last_monitored_system and self.prefetch_prices_var.get():
+                    self._prefetch_prices_new_system(destination)
+
             # ONLY trigger on FSDJump (jump events), NOT on Scan/SAASignalsFound!
             if event_type == "FSDJump":
                 current_system = event.get("StarSystem")
@@ -7290,8 +7297,14 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
                     # Schedule auto-search in main thread
                     if self.auto_search_var.get():
                         self.parent.after(1000, lambda: self._auto_search_new_system(current_system))
+                    pending = getattr(self, '_pending_auto_prices', None)
+                    self._pending_auto_prices = None
                     if self.prefetch_prices_var.get():
-                        self.parent.after(1000, lambda: self._prefetch_prices_new_system(current_system))
+                        if pending and pending[0] == current_system:
+                            self.parent.after(1000, lambda: self._present_auto_prices(*pending))
+                        else:
+                            # Still fetching from StartJump: the debounce skips this and the worker presents on finish
+                            self.parent.after(1000, lambda: self._prefetch_prices_new_system(current_system))
                 else:
                     print(f"[AUTO-SEARCH] ✗ SAME SYSTEM: already in {current_system}")
 
@@ -7416,7 +7429,14 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
             self._prefetched_prices = {}
         self._prefetched_prices[system_name] = results
 
-        self.parent.after(0, lambda: self._present_auto_prices(system_name, results, extra_candidates, mineral_ring_types))
+        self.parent.after(0, lambda: self._on_auto_prices_ready(system_name, results, extra_candidates, mineral_ring_types))
+
+    def _on_auto_prices_ready(self, system_name: str, results: list, extra_candidates, mineral_ring_types):
+        # A fetch started at StartJump can finish mid-jump; hold it until FSDJump arrives there
+        if self.last_monitored_system == system_name:
+            self._present_auto_prices(system_name, results, extra_candidates, mineral_ring_types)
+        else:
+            self._pending_auto_prices = (system_name, results, extra_candidates, mineral_ring_types)
 
     def _present_auto_prices(self, system_name: str, results: list, extra_candidates, mineral_ring_types):
         """Show prefetched prices on the text overlay if chosen and available, else in the popup"""
