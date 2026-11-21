@@ -21,7 +21,8 @@ from mining_statistics import (SessionAnalytics, session_date, read_session_repo
 from prospector_panel import ProspectorPanel
 from mining_missions_tab import MiningMissionsTab
 from ring_guide_tab import RingGuideTab
-from mining_charts import MiningChartsPanel, MATPLOTLIB_AVAILABLE
+from mining_charts import MiningChartsPanel, _load_matplotlib
+MATPLOTLIB_AVAILABLE = _load_matplotlib()
 
 
 def bind_methods(obj, *names):

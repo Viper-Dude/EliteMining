@@ -17,45 +17,39 @@ except ImportError:
     def t(key, **kwargs):
         return key  # Fallback to key if localization not available
 
-# Import matplotlib with error handling for PyInstaller compatibility
-try:
-    import matplotlib
-    matplotlib.use('TkAgg')  # Set backend before importing pyplot
-    import matplotlib.pyplot as plt
-    import matplotlib.dates as mdates
-    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-    from matplotlib.figure import Figure
-    MATPLOTLIB_AVAILABLE = True
-except ImportError as e:
-    print(f"Warning: matplotlib not available: {e}")
-    MATPLOTLIB_AVAILABLE = False
-    # Create dummy classes to prevent errors
-    class Figure:
+# matplotlib and numpy (about 0.5 s) load when the first panel is built, not at import,
+# so importing this module before the splash stays cheap. See _load_matplotlib().
+MATPLOTLIB_AVAILABLE = False
+_matplotlib_loaded = False
+plt = None
+mdates = None
+np = None
+
+# Dummy classes in case matplotlib is missing
+class Figure:
+    pass
+class FigureCanvasTkAgg:
+    def __init__(self, *args, **kwargs):
         pass
-    class FigureCanvasTkAgg:
-        def __init__(self, *args, **kwargs):
-            pass
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from datetime import datetime, timedelta
-try:
-    import numpy as np
-except ImportError:
-    # Create a minimal numpy substitute for basic operations
-    class MockNumpy:
-        @staticmethod
-        def array(data):
-            return data
-        @staticmethod
-        def arange(*args):
-            if len(args) == 1:
-                return list(range(args[0]))
-            elif len(args) == 2:
-                return list(range(args[0], args[1]))
-            else:
-                return list(range(args[0], args[1], args[2]))
-    np = MockNumpy()
+
+
+# Minimal numpy substitute for basic operations
+class MockNumpy:
+    @staticmethod
+    def array(data):
+        return data
+    @staticmethod
+    def arange(*args):
+        if len(args) == 1:
+            return list(range(args[0]))
+        elif len(args) == 2:
+            return list(range(args[0], args[1]))
+        else:
+            return list(range(args[0], args[1], args[2]))
 import csv
 import os
 from typing import Dict, List, Any, Optional
@@ -69,10 +63,38 @@ except Exception:
     def t(key, **kwargs):
         return key
 
+
+def _load_matplotlib():
+    """Import matplotlib (TkAgg) and numpy once; returns MATPLOTLIB_AVAILABLE."""
+    global MATPLOTLIB_AVAILABLE, _matplotlib_loaded, plt, mdates, np, Figure, FigureCanvasTkAgg
+    if _matplotlib_loaded:
+        return MATPLOTLIB_AVAILABLE
+    _matplotlib_loaded = True
+    try:
+        import matplotlib
+        matplotlib.use('TkAgg')  # Set backend before importing pyplot
+        import matplotlib.pyplot as _plt
+        import matplotlib.dates as _mdates
+        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg as _FigureCanvasTkAgg
+        from matplotlib.figure import Figure as _Figure
+        plt, mdates, Figure, FigureCanvasTkAgg = _plt, _mdates, _Figure, _FigureCanvasTkAgg
+        MATPLOTLIB_AVAILABLE = True
+    except ImportError as e:
+        print(f"Warning: matplotlib not available: {e}")
+        MATPLOTLIB_AVAILABLE = False
+    try:
+        import numpy as _np
+        np = _np
+    except ImportError:
+        np = MockNumpy()
+    return MATPLOTLIB_AVAILABLE
+
+
 class MiningChartsPanel:
     """Panel containing live mining analytics charts"""
     
     def __init__(self, parent: tk.Widget, session_analytics: SessionAnalytics, main_app=None):
+        _load_matplotlib()
         self.parent = parent
         self.session_analytics = session_analytics
         self.main_app = main_app

@@ -53,7 +53,7 @@ Dropped after review:
 | 2 | One route timer, no folder listing, atomic `jumpsleft` | Sonnet 5.5, medium | No | Done (`check_route_status.py` 12/12). Side effect: the old second timer rewrote the FSDTarget count after arrival, so the arrival 0 now sticks |
 | 3a | FSDJump cache upserts off the UI thread | Opus 5.5, high | Yes | Done: one worker (`_queue_cache_upserts`), also used for CarrierJump and Location (same code); `check_journal_reading.py` 47/47 |
 | 3b | Scan / SAA writes off the UI thread (only if step 0 shows stalls) | Opus 5.5, high | Yes | Not started |
-| 4 | Import matplotlib after the splash | Sonnet 5.5, medium | No | Not started |
+| 4 | Import matplotlib after the splash | Sonnet 5.5, medium | No | Done: numpy deferred too; `import prospector_panel` 1.01 s → 0.21 s; specs already list the hidden imports |
 | 5 | Skip unchanged cargo overlay redraw and cursor changes | Sonnet 5.5, low | No | Not started |
 | 6 | Remove the stall logger, re-measure, final notes | Sonnet 5.5, low | No | Not started |
 
