@@ -939,13 +939,6 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         
         # Add tooltip for distance limitation
         ToolTip(self.distance_combo, t('tooltips.max_distance'))
-        
-        # Search limitations info text (bottom of search controls)
-        info_text = tk.Label(search_frame, 
-                            text=f"ℹ {t('ring_finder.search_help')}  |  {t('ring_finder.no_data_help')}",
-                            fg="#cccccc", bg=_cb_bg, font=scaled_font(8, "italic"),
-                            justify="left")
-        info_text.grid(row=6, column=0, columnspan=4, sticky="w", padx=5, pady=(5, 5))
 
         if _modern_form:
             self._build_modern_search_layout(
@@ -955,7 +948,7 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
                 mineral_lbl=search_frame.grid_slaves(row=3, column=0)[0],
                 power_lbl=search_frame.grid_slaves(row=4, column=0)[0],
                 row3=row3_container, rf1=right_filters_frame_row1, rf2=right_filters_frame_row2,
-                misc=misc_inner_row, info=info_text)
+                misc=misc_inner_row)
         
         # Results section with help text in header
         results_header = ttk.Frame(self.scrollable_frame)
@@ -2626,12 +2619,12 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         self._hide_search_overlay()
 
     def _build_modern_search_layout(self, sf, ring_lbl, reserve_lbl, mineral_lbl, power_lbl,
-                                    row3, rf1, rf2, misc, info):
+                                    row3, rf1, rf2, misc):
         """Modern theme: primary filters on one row, secondary filters in a collapsible 'More filters' panel.
         Re-grids the widgets built by setup_ui; variables, callbacks and values are untouched."""
         from config import scaled_px
         for w in (ring_lbl, self.material_combo, mineral_lbl, self.specific_material_combo, reserve_lbl,
-                  self.reserve_combo, power_lbl, self.pp_power_combo, row3, rf1, rf2, misc, info):
+                  self.reserve_combo, power_lbl, self.pp_power_combo, row3, rf1, rf2, misc):
             w.grid_forget()
         pr = self._rf_primary
         pr.grid(row=1, column=0, columnspan=7, sticky="ew", padx=5, pady=(4, 2))
@@ -2655,7 +2648,6 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         self._rf_flags.grid(in_=more, row=1, column=0, columnspan=2, sticky="w", pady=3)
         rf1.grid(in_=more, row=1, column=2, columnspan=3, sticky="w", pady=3)
         rf2.grid(in_=more, row=2, column=0, columnspan=5, sticky="w", pady=3)
-        info.grid(row=4, column=0, columnspan=7, sticky="w", padx=5, pady=(5, 5))
 
         for var in (self.reserve_var, self.pp_power_var, self.pp_state_var, self.unvisited_only_var,
                     self.favourites_only_var, self.overlaps_only_var, self.res_only_var,
