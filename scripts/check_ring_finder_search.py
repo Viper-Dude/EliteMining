@@ -248,6 +248,7 @@ class RingFinderSearchTests(unittest.TestCase):
         self.assertEqual([values[2] for values in f.results_tree.rows.values()], ['Wanted'])
         db.bulk_get_visit_counts.assert_called_once()
         self.assertEqual(len(f._search_cache), 4)
+        self.assertEqual(f._finish_update_results.call_args[0][0], 1)
         db.bulk_get_visit_counts.assert_called_once()
         self.assertEqual(sorted(db.bulk_get_visit_counts.call_args[0][0]),
                          ['Farther', 'Visited', 'Wanted', 'Wrong reserve'])
@@ -633,6 +634,19 @@ class SpanshPagingTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual((rows[0]['type'], rows[0]['count']), ('Void Opals (2)', 2))
 
+    def test_failed_later_page_keeps_the_rings_already_fetched(self):
+        import requests
+        self.serve()
+        served = self.finder._search_spansh_with_filters.__globals__['tracked_request']
+
+        def request(service, method, url, json=None, **kwargs):
+            if json['page'] == 1:
+                raise requests.exceptions.Timeout()
+            return served(service, method, url, json=json, **kwargs)
+        self.finder._search_spansh_with_filters.__globals__['tracked_request'] = request
+        rows = self.search(stop_at_limit=False)
+        self.assertEqual(len(rows), 500)
+
 
 NameLookup = load_methods('app/ring_finder_search.py', 'RingFinderSearchMixin', {'_resolve_spansh_system_name'})
 
@@ -675,6 +689,10 @@ class SpanshNameLookupTests(unittest.TestCase):
         self.answer = SimpleNamespace(status_code=200, json=lambda: dict(values=['Sol']))
         self.assertEqual(self.finder._resolve_spansh_system_name('sol'), 'Sol')
         self.assertEqual(len(self.calls), 3)
+
+    def test_suggestion_without_exact_match_is_not_used(self):
+        self.answer = SimpleNamespace(status_code=200, json=lambda: dict(values=['HIP 21750', 'HIP 21751']))
+        self.assertIsNone(self.finder._resolve_spansh_system_name('HIP 2175'))
 
 
 class LocalRangeQueryTests(unittest.TestCase):
@@ -787,6 +805,71 @@ class LocalRangeQueryTests(unittest.TestCase):
         self.hotspots(('Far Favourite', '1 A Ring', 'Platinum', 1, (5000, 0, 0), 1),
                       ('Near Plain', '1 A Ring', 'Platinum', 1, (1, 0, 0), 0))
         self.assertEqual(set(self.search(distance=200000.0)), {('Far Favourite', '1 A Ring')})
+
+    def test_specific_mineral_rows_come_closest_first_not_richest_first(self):
+        self.hotspots(('Far Rich', '1 A Ring', 'Platinum', 3, (0, 0, 40)),
+                      ('Near Poor', '1 A Ring', 'Platinum', 1, (0, 0, 5)))
+        rows = self.finder._get_user_database_hotspots('Home', 'All', 'Platinum', 50,
+                                                       reference_coords={'x': 0, 'y': 0, 'z': 0})
+        self.assertEqual([h['systemName'] for h in rows], ['Near Poor', 'Far Rich'])
+
+    def test_favourites_without_coordinates_use_one_galaxy_lookup(self):
+        self.finder._favourites_search = True
+        self.hotspots(('Fav A', '1 A Ring', 'Platinum', 1, None, 1),
+                      ('Fav B', '1 A Ring', 'Platinum', 1, None, 1))
+        self.galaxy(('Fav A', 3, 4, 0), ('Fav B', 6, 8, 0))
+        single = Mock(side_effect=self.finder._get_system_coords_from_galaxy_db)
+        self.finder._get_system_coords_from_galaxy_db = single
+        found = self.search(distance=200000.0)
+        self.assertEqual({k: h['distance'] for k, h in found.items()},
+                         {('Fav A', '1 A Ring'): 5.0, ('Fav B', '1 A Ring'): 10.0})
+        single.assert_not_called()
+        self.finder._get_system_coords_from_edsm.assert_not_called()
+
+
+Display = load_methods('app/ring_finder.py', 'RingFinder', {'_finish_update_results', '_auto_search_new_system'})
+Display._auto_search_new_system.__globals__['log'] = logging.getLogger('auto-search-test')
+
+
+class StatusAndAutoSearchTests(unittest.TestCase):
+    def setUp(self):
+        f = self.finder = Display()
+        f.status_var = Mock()
+        f._update_new_entries_label = Mock()
+        f.auto_save_var = variable(False)
+        f.data_source_var = variable('database')
+        f.highlight_timer = None
+        f._ring_type_rev_map = {'Alle': 'All', 'Eisig': 'Icy'}
+
+    def test_translated_all_ring_types_use_the_plain_found_message(self):
+        self.finder._finish_update_results(3, 'Sol', 'Alle', set())
+        self.assertEqual(self.finder.status_var.set.call_args[0][0], 'ring_finder.found_locations_near')
+        self.finder._finish_update_results(3, 'Sol', 'Eisig', set())
+        self.assertEqual(self.finder.status_var.set.call_args[0][0], 'ring_finder.found_material_locations_near')
+
+    def test_auto_search_leaves_name_and_filters_alone_while_a_search_runs(self):
+        f = self.finder
+        f._search_in_progress = True
+        f.system_var = Mock()
+        f._reset_filters = Mock()
+        f.search_hotspots = Mock()
+        f._auto_search_new_system('New System')
+        f.system_var.set.assert_not_called()
+        f._reset_filters.assert_not_called()
+        f.search_hotspots.assert_not_called()
+
+    def test_auto_search_runs_a_local_search_when_idle(self):
+        f = self.finder
+        f._search_in_progress = False
+        f.system_var = Mock()
+        f._system_ac = Mock()
+        f.prospector_panel = None
+        f._reset_filters = Mock()
+        f._show_search_overlay = Mock()
+        f.search_hotspots = Mock()
+        f._auto_search_new_system('New System')
+        f.system_var.set.assert_called_once_with('New System')
+        f.search_hotspots.assert_called_once_with(force_database=True)
 
 
 class RingFinderSaveFailureTests(unittest.TestCase):

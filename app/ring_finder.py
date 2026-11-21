@@ -3155,7 +3155,10 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
 
         # Batch-insert rows so the event loop breathes between batches.
         # This prevents the cargo overlay from losing transparency during long inserts.
-        count = len(hotspots)
+        count = len({(h.get('systemName', h.get('system', '')).lower(),
+                      self.user_db._normalize_body_name(h.get('bodyName', h.get('ring', '')),
+                                                        h.get('systemName', h.get('system', ''))))
+                     for h in hotspots})
         search_term = self.system_var.get().strip()
         material_filter = self.material_var.get()
         self._insert_row_batch(_pending_row_data, 0, count, search_term, material_filter, green_entries, generation=generation)
@@ -3178,8 +3181,9 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
 
     def _finish_update_results(self, count, search_term, material_filter, green_entries, generation=None):
         """Finalise results display after all rows are inserted."""
+        all_types = self._ring_type_rev_map.get(material_filter, material_filter) == 'All'
         if search_term:
-            if material_filter != 'All':
+            if not all_types:
                 if count > 0:
                     status_msg = t('ring_finder.found_material_locations_near').format(count=count, material=material_filter, system=search_term)
                 else:
@@ -3190,7 +3194,7 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
                 else:
                     status_msg = t('ring_finder.no_rings_found_near').format(system=search_term)
         else:
-            if material_filter != 'All':
+            if not all_types:
                 if count > 0:
                     status_msg = t('ring_finder.found_material_rings').format(count=count, material=material_filter)
                 else:
@@ -7296,6 +7300,10 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
 
     def _auto_search_new_system(self, system_name: str):
         """Auto-populate reference system and trigger search silently"""
+        if self._search_in_progress:
+            # Changing the name or filters now would show the running search under the new system
+            log.info(f"[AUTO-SEARCH] Skipped {system_name}: a search is already running")
+            return
         try:
             import time
             self._system_jump_time = time.time()  # Track when we jumped
@@ -7316,13 +7324,12 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
             self._reset_filters()
 
             # Trigger search with database only (don't query Spansh on auto-search)
-            if not self._search_in_progress:
-                self._show_search_overlay(system_name)
-                self.search_hotspots(force_database=True)
+            self._show_search_overlay(system_name)
+            self.search_hotspots(force_database=True)
                 
-        except Exception as e:
-            # Silent fail - let user search manually if auto-search fails
-            pass
+        except Exception:
+            # Let the user search manually if auto-search fails
+            log.exception("Ring Finder auto-search failed")
 
     def _prefetch_prices_new_system(self, system_name: str):
         """On jump, prefetch live sell prices for the new system's own hotspot minerals

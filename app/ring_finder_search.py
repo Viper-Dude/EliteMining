@@ -310,7 +310,8 @@ class RingFinderSearchMixin:
                     
                     if not reference_coords:
                         # Use EDSM as final fallback
-                        edsm_coords = self._get_system_coords_from_edsm(reference_system)
+                        edsm_coords = self._get_system_coords_from_edsm(
+                            reference_system, is_cancelled=lambda: search_generation != self._search_generation)
                         if edsm_coords:
                             reference_coords = edsm_coords
                 
@@ -657,9 +658,8 @@ class RingFinderSearchMixin:
 
             values = [value.strip() for value in response.json().get('values', [])
                       if isinstance(value, str) and value.strip()]
-            # Exact match (case-insensitive) first, otherwise Spansh's first suggestion
-            resolved = next((value for value in values if value.lower() == key),
-                            values[0] if values else None)
+            # Exact match only (case-insensitive): a suggestion would centre the search on another system
+            resolved = next((value for value in values if value.lower() == key), None)
             self._spansh_name_cache[key] = resolved
             return resolved
 
@@ -694,6 +694,8 @@ class RingFinderSearchMixin:
         self.parent.after(0, lambda: self.status_var.set(t('ring_finder.spansh_querying'))
                           if self.parent.winfo_exists() and not (is_cancelled and is_cancelled()) else None)
         
+        # Rows from pages already fetched are kept if a later page fails
+        hotspots = []
         try:
             # Throttle API calls (1.5 second minimum between requests)
             if not hasattr(self, '_last_spansh_call'):
@@ -770,7 +772,6 @@ class RingFinderSearchMixin:
             }
             
             # Fetch pages until we reach max_distance or run out of pages
-            hotspots = []
             for page_num in range(max_pages):
                 if is_cancelled and is_cancelled():
                     print(f"[SPANSH PAGINATION] Cancelled before page {page_num}, stopping")
@@ -843,19 +844,19 @@ class RingFinderSearchMixin:
                               if not (is_cancelled and is_cancelled()) else None)
             # Update status: Spansh is offline/timing out
             self.parent.after(0, lambda: self._update_spansh_status("offline"))
-            return []
+            return hotspots
         except requests.exceptions.RequestException as e:
             log.error(f"[SPANSH] API error: {e}")
             self.parent.after(0, lambda: self.status_var.set(t('ring_finder.spansh_error'))
                               if not (is_cancelled and is_cancelled()) else None)
             # Update status: Spansh has errors
             self.parent.after(0, lambda: self._update_spansh_status("offline"))
-            return []
+            return hotspots
         except Exception as e:
             log.error(f"[SPANSH] Unexpected error: {e}")
             import traceback
             traceback.print_exc()
-            return []
+            return hotspots
     
     def _spansh_bodies_to_hotspots(self, results, ring_type_english, ring_type_only, specific_material, reference_coords):
         """Convert one page of Spansh body results to hotspot rows, one per matching ring."""
@@ -1427,7 +1428,7 @@ class RingFinderSearchMixin:
                     else:
                         # Final fallback: Try EDSM API (for systems not in galaxy DB, e.g., after carrier jump while offline)
                         print(f" DEBUG: Reference system {reference_system} not in galaxy database, trying EDSM API...")
-                        reference_coords = self._get_system_coords_from_edsm(reference_system)
+                        reference_coords = self._get_system_coords_from_edsm(reference_system, is_cancelled=is_cancelled)
                         if reference_coords:
                             print(f" DEBUG: Found reference system {reference_system} coordinates from EDSM API")
                         else:
@@ -1537,6 +1538,14 @@ class RingFinderSearchMixin:
                 systems_with_coords = 0
                 systems_without_coords = 0
 
+                # One galaxy lookup for systems whose rows still have no coordinates
+                missing_coords = sorted({r[0] for r in results if None in (r[4], r[5], r[6])} - set(coord_cache))
+                if missing_coords:
+                    batch_coords = self._get_galaxy_coords_batch(missing_coords)
+                    for name in missing_coords:
+                        if name.lower() in batch_coords:
+                            coord_cache[name] = batch_coords[name.lower()]
+
                 # Specific mineral: every mineral on each ring, for the Hotspots column
                 ring_minerals = {}
                 if not self._is_all_minerals(specific_material) and results:
@@ -1597,7 +1606,7 @@ class RingFinderSearchMixin:
                                 
                                 # If not in galaxy DB, try EDSM as final fallback
                                 if not galaxy_coords:
-                                    edsm_coords = self._get_system_coords_from_edsm(system_name)
+                                    edsm_coords = self._get_system_coords_from_edsm(system_name, is_cancelled=is_cancelled)
                                     if edsm_coords:
                                         galaxy_coords = edsm_coords
                                         print(f" DEBUG: Used EDSM coords for {system_name}")
@@ -1694,13 +1703,8 @@ class RingFinderSearchMixin:
                 except Exception:
                     pass
                 
-                # Sort by distance first, then LS distance for practical mining workflow
-                if not self._is_all_minerals(material_filter):
-                    # For specific materials, prioritize by hotspot count, then distance, then LS
-                    user_hotspots.sort(key=lambda x: (-x.get('count', 0), x.get('distance') or 999.9, x.get('ls_distance') or 999999))
-                else:
-                    # For All Minerals, sort by distance, then LS distance (closest arrival points first)
-                    user_hotspots.sort(key=lambda x: (x.get('distance') or 999.9, x.get('ls_distance') or 999999))
+                # Closest first, then nearest arrival point, so the Max Results cut keeps the nearest rings
+                user_hotspots.sort(key=lambda x: (x.get('distance') or 999.9, x.get('ls_distance') or 999999))
                 
                 # Batch-update database with fetched coordinates (save for future searches)
                 if coords_to_update:
@@ -1849,8 +1853,10 @@ class RingFinderSearchMixin:
             log.exception("Galaxy coordinate lookup failed")
         return found
 
-    def _get_system_coords_from_edsm(self, system_name: str) -> Optional[Dict]:
-        """Get system coordinates from EDSM API as fallback"""
+    def _get_system_coords_from_edsm(self, system_name: str, is_cancelled=None) -> Optional[Dict]:
+        """Get system coordinates from EDSM API as fallback (no request once is_cancelled returns True)"""
+        if is_cancelled and is_cancelled():
+            return None
         try:
             # Use ChatGPT's recommended endpoint - api-v1/systems (plural)
             url = "https://www.edsm.net/api-v1/systems"
@@ -1859,7 +1865,8 @@ class RingFinderSearchMixin:
                 "showCoordinates": 1
             }
 
-            response = requests.get(url, params=params, timeout=15, headers={"User-Agent": "EliteMining/5.1.3"})
+            response = tracked_request('edsm', requests.get, url, params=params, timeout=10,
+                                       headers={"User-Agent": "EliteMining/5.1.3"})
             
             if response.status_code == 200:
                 data = response.json()

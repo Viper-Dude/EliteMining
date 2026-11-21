@@ -249,6 +249,24 @@ Fix:
 - D3 (deferred): in `user_database.py`, `idx_system_name` duplicates `idx_hotspot_system` and `idx_body_name` duplicates `idx_hotspot_body`. Both system indexes are also covered by `idx_hotspot_unique_key`.
 - Model: Sonnet 5.5, low effort.
 
+## Review follow-ups (21 Nov 2026)
+
+A full review after step 9 found these. Fixed, awaiting user test, not committed:
+
+- A failed later Spansh page no longer throws away the pages already fetched.
+- German "found" status no longer shows "Alle" as a mineral (compares the English ring type).
+- Spansh name lookup uses an exact match only; it no longer centres the search on Spansh's first suggestion.
+- Auto-search on a jump leaves the system name and filters alone when a search is already running (it used to change them and then skip); its errors are now logged.
+- The EDSM coordinates fallback goes through `tracked_request`, has a 10 s timeout and sends nothing after Stop.
+- Rows with no stored coordinates (Favourites Only, name search) get one batched galaxy lookup.
+- The status count is unique rings, not rows (Both lists a ring once per source).
+- Local searches for a specific mineral now keep the nearest rings at the Max Results cut, like Both and Spansh (user decision). They used to keep the rings with the most hotspots; the old check also tested the ring type instead of the mineral.
+- Tests: 7 new in `check_ring_finder_search.py` (51 OK); search_stop 26, star_systems 19, session_statistics 17 OK.
+
+Open:
+
+- Overlaps Only and RES Only ignore Max Distance and Ring Type (by design per docstring) and open one connection per ring. Left as is.
+
 ## Measurements (21 Nov 2026, user's DBs, read-only, reference Sol)
 
 | Radius | Current local path | Direct `hotspot_data` box query | Rings | Galaxy query truncated |
