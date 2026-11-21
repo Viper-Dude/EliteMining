@@ -6,7 +6,6 @@ import logging
 import os
 import queue
 import re
-import sys
 import threading
 import time
 import tkinter as tk
@@ -1351,13 +1350,6 @@ class CargoMonitor:
             log.exception("[SYSTEM_INFO] Journal cache write failed")
 
     def _deliver_journal_events(self, events):
-        if not getattr(sys, 'frozen', False):
-            # TEMP dev-only UI stall logging (GUI_PERF_HANDOFF step 0)
-            try:
-                self.last_batch_info = (time.time(), ",".join(
-                    str(e.get("event")) for e in events[:8] if isinstance(e, dict)) + (f"+{len(events) - 8}" if len(events) > 8 else ""))
-            except Exception:
-                pass
         # Cargo handles the whole batch before listeners, so they see up-to-date cargo totals
         for event in events:
             try:
