@@ -2,12 +2,13 @@
 **Release Date:** 2026-November-21
 
 ## New Features & Improvements
+- Hotspots Finder searches should be much faster and show results sooner.
 
 - Mining Cards have a new slimmer look that follows your app theme and language, with all minerals in one table, the session date, cores found, and the comment you saved with the session filled in for you.
 - Share to Discord now posts your Mining Card, with the system name ready to copy.
 
-## Bug Fixes
 
+## Bug Fixes
 - Session reports no longer show an impossible prospecting speed when the session's active time wasn't tracked.
 
 
