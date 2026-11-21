@@ -30,7 +30,7 @@ def load_methods(filename, class_name, names):
         name=class_name, bases=[], keywords=[], decorator_list=[],
         body=[n for n in original.body if isinstance(n, ast.FunctionDef) and n.name in names],
     )], type_ignores=[]))
-    namespace = dict(os=os, glob=glob, json=json, time=time, threading=threading, Optional=Optional, MISSIONS_AVAILABLE=False,
+    namespace = dict(os=os, sys=sys, glob=glob, json=json, time=time, threading=threading, Optional=Optional, MISSIONS_AVAILABLE=False,
                      logging=logging, log=logging.getLogger('journal-check'),
                      t=lambda key: key,
                      journal_resume_offset=journal_resume_offset,
@@ -508,6 +508,107 @@ class JournalOffsetChecks(unittest.TestCase):
                 with self.subTest(size=len(data)):
                     path.write_bytes(data)
                     self.assertEqual(journal_resume_offset(path), expected)
+
+
+CacheMonitor = load_methods('app/cargo_monitor.py', 'CargoMonitor', {
+    '_queue_cache_upserts', '_run_cache_jobs', '_store_cache_event',
+})
+import queue as _queue
+CacheMonitor._queue_cache_upserts.__globals__['queue'] = _queue
+
+
+class JumpCacheWriteChecks(unittest.TestCase):
+    def setUp(self):
+        self.calls = []
+        self.done = threading.Event()
+        self.expected = 0
+        self.posted = []
+        self.ui_thread = threading.current_thread()
+
+        def pp(event):
+            self.calls.append(('pp', event['StarSystem'], threading.current_thread() is self.ui_thread))
+            if event.get('fail_pp'):
+                raise RuntimeError('pp write failed')
+            return dict(system_name=event['StarSystem'], controlling_power='P', power_state='S')
+
+        def info(event):
+            self.calls.append(('info', event['StarSystem'], threading.current_thread() is self.ui_thread))
+            if event.get('fail_info'):
+                raise RuntimeError('info write failed')
+            return dict(system_name=event['StarSystem'])
+
+        self.monitor = CacheMonitor()
+        self.monitor.journal_parser = SimpleNamespace(eddn_cache_path='cache.db',
+                                                      _upsert_pp_from_event=pp,
+                                                      _upsert_system_info_from_event=info)
+        app = SimpleNamespace(sysfinder_tree=object(),
+                              _fetch_sysfinder_pp_complete=Mock(), _sysfinder_apply_system_info=Mock())
+        app.after = lambda ms, fn, *args: self.posted.append((ms, fn, args))
+        self.app = app
+        self.monitor.main_app_ref = app
+        store = self.monitor._store_cache_event
+        stored = []
+
+        def counted(event):
+            store(event)
+            stored.append(event)
+            if len(stored) >= self.expected:
+                self.done.set()
+
+        self.monitor._store_cache_event = counted
+        logging.disable(logging.CRITICAL)
+        self.addCleanup(logging.disable, logging.NOTSET)
+
+    def run_events(self, *events):
+        self.expected = len(events)
+        for event in events:
+            self.monitor._queue_cache_upserts(event)
+        self.assertTrue(self.done.wait(5), self.calls)
+
+    def test_queue_returns_without_touching_the_cache(self):
+        gate = threading.Event()
+        original = self.monitor.journal_parser._upsert_pp_from_event
+        self.monitor.journal_parser._upsert_pp_from_event = lambda e: (gate.wait(5), original(e))[1]
+        self.expected = 1
+        self.monitor._queue_cache_upserts(dict(StarSystem='Sol'))
+        self.assertEqual(self.calls, [])
+        gate.set()
+        self.assertTrue(self.done.wait(5))
+        self.assertTrue(all(not on_ui for _, _, on_ui in self.calls))
+
+    def test_writes_run_in_journal_order_and_ui_updates_are_posted(self):
+        self.run_events(dict(StarSystem='A'), dict(StarSystem='B'), dict(StarSystem='C'))
+        self.assertEqual([c[:2] for c in self.calls],
+                         [('pp', 'A'), ('info', 'A'), ('pp', 'B'), ('info', 'B'), ('pp', 'C'), ('info', 'C')])
+        self.app._fetch_sysfinder_pp_complete.assert_not_called()
+        self.assertEqual([(ms, fn) for ms, fn, _ in self.posted],
+                         [(0, self.app._fetch_sysfinder_pp_complete), (0, self.app._sysfinder_apply_system_info)] * 3)
+        self.assertEqual(self.posted[0][2][0], 'A')
+        self.assertIs(self.posted[0][2][2], True, 'PowerPlay update must stay quiet')
+
+    def test_failing_write_does_not_stop_the_next_one(self):
+        self.run_events(dict(StarSystem='A', fail_pp=True), dict(StarSystem='B', fail_info=True),
+                        dict(StarSystem='C'))
+        self.assertEqual([c[:2] for c in self.calls],
+                         [('pp', 'A'), ('info', 'A'), ('pp', 'B'), ('info', 'B'), ('pp', 'C'), ('info', 'C')])
+        self.assertEqual([(fn, args[0]) for _, fn, args in self.posted],
+                         [(self.app._sysfinder_apply_system_info, 'A'), (self.app._fetch_sysfinder_pp_complete, 'B'),
+                          (self.app._fetch_sysfinder_pp_complete, 'C'), (self.app._sysfinder_apply_system_info, 'C')])
+
+    def test_no_cache_path_queues_nothing(self):
+        self.monitor.journal_parser.eddn_cache_path = None
+        self.monitor._queue_cache_upserts(dict(StarSystem='Sol'))
+        self.assertIsNone(getattr(self.monitor, '_cache_jobs', None))
+
+    def test_live_jump_branches_queue_instead_of_writing(self):
+        tree = ast.parse((ROOT / 'app/cargo_monitor.py').read_text(encoding='utf-8-sig'))
+        impl = next(n for n in ast.walk(tree)
+                    if isinstance(n, ast.FunctionDef) and n.name == '_process_journal_event_impl')
+        called = [n.func.attr for n in ast.walk(impl)
+                  if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)]
+        self.assertNotIn('_upsert_pp_from_event', called)
+        self.assertNotIn('_upsert_system_info_from_event', called)
+        self.assertEqual(called.count('_queue_cache_upserts'), 3)
 
 
 if __name__ == '__main__':

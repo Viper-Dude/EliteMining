@@ -4,6 +4,7 @@ import glob
 import json
 import logging
 import os
+import queue
 import re
 import threading
 import time
@@ -1296,6 +1297,39 @@ class CargoMonitor:
             return
         self._deliver_journal_events(events)
 
+    def _queue_cache_upserts(self, event):
+        """Store PowerPlay and system status from a jump/location event off the UI thread.
+        One worker keeps the writes in journal order."""
+        if not self.journal_parser.eddn_cache_path:
+            return
+        if getattr(self, '_cache_jobs', None) is None:
+            self._cache_jobs = queue.Queue()
+            threading.Thread(target=self._run_cache_jobs, name="JournalCacheWrites", daemon=True).start()
+        self._cache_jobs.put(event)
+
+    def _run_cache_jobs(self):
+        while True:
+            event = self._cache_jobs.get()
+            try:
+                self._store_cache_event(event)
+            except Exception:
+                log.exception("Journal cache write failed")
+
+    def _store_cache_event(self, event):
+        main_app = getattr(self, 'main_app_ref', None)
+        try:
+            pp_result = self.journal_parser._upsert_pp_from_event(event)
+            if pp_result and main_app is not None and hasattr(main_app, 'sysfinder_tree'):
+                main_app.after(0, main_app._fetch_sysfinder_pp_complete, pp_result['system_name'], pp_result, True)
+        except Exception:
+            log.exception("[PP] Journal cache write failed")
+        try:
+            info = self.journal_parser._upsert_system_info_from_event(event)
+            if info and main_app is not None and hasattr(main_app, 'sysfinder_tree'):
+                main_app.after(0, main_app._sysfinder_apply_system_info, info['system_name'], info)
+        except Exception:
+            log.exception("[SYSTEM_INFO] Journal cache write failed")
+
     def _deliver_journal_events(self, events):
         if not getattr(sys, 'frozen', False):
             # TEMP dev-only UI stall logging (GUI_PERF_HANDOFF step 0)
@@ -1683,25 +1717,7 @@ class CargoMonitor:
                     print(f"[JUMP] FSDJump: Arrived at {system_name}")
                     if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'eddn_sender'):
                         self.main_app_ref.eddn_sender.send_journal_event("FSDJump", event, background=True)
-                    try:
-                        if self.journal_parser.eddn_cache_path:
-                            pp_result = self.journal_parser._upsert_pp_from_event(event)
-                            if pp_result and hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'sysfinder_tree'):
-                                self.main_app_ref._fetch_sysfinder_pp_complete(pp_result['system_name'], pp_result, quiet=True)
-                    except Exception as pp_exc:
-                        import traceback
-                        print(f"[PP] live-write block raised: {pp_exc}")
-                        traceback.print_exc()
-                    try:
-                        if self.journal_parser.eddn_cache_path:
-                            info = self.journal_parser._upsert_system_info_from_event(event)
-                            if info and hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'sysfinder_tree'):
-                                self.main_app_ref.after(0, self.main_app_ref._sysfinder_apply_system_info,
-                                                        info['system_name'], info)
-                    except Exception as info_exc:
-                        import traceback
-                        print(f"[SYSTEM_INFO] live-write block raised: {info_exc}")
-                        traceback.print_exc()
+                    self._queue_cache_upserts(event)
 
             elif event_type == "CarrierJump":
                 # Player is docked on Fleet Carrier that jumped - player arrived at new system
@@ -1725,25 +1741,7 @@ class CargoMonitor:
                     print(f"[CARRIER] CarrierJump: Now at {system_name}")
                     if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'eddn_sender'):
                         self.main_app_ref.eddn_sender.send_journal_event("CarrierJump", event, background=True)
-                    try:
-                        if self.journal_parser.eddn_cache_path:
-                            pp_result = self.journal_parser._upsert_pp_from_event(event)
-                            if pp_result and hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'sysfinder_tree'):
-                                self.main_app_ref._fetch_sysfinder_pp_complete(pp_result['system_name'], pp_result, quiet=True)
-                    except Exception as pp_exc:
-                        import traceback
-                        print(f"[PP] live-write block raised: {pp_exc}")
-                        traceback.print_exc()
-                    try:
-                        if self.journal_parser.eddn_cache_path:
-                            info = self.journal_parser._upsert_system_info_from_event(event)
-                            if info and hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'sysfinder_tree'):
-                                self.main_app_ref.after(0, self.main_app_ref._sysfinder_apply_system_info,
-                                                        info['system_name'], info)
-                    except Exception as info_exc:
-                        import traceback
-                        print(f"[SYSTEM_INFO] live-write block raised: {info_exc}")
-                        traceback.print_exc()
+                    self._queue_cache_upserts(event)
             
             elif event_type == "Location":
                 # Game loaded - check if this is offline carrier jump or normal login
@@ -1778,25 +1776,7 @@ class CargoMonitor:
                         self.current_system = system_name
                     if hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'eddn_sender'):
                         self.main_app_ref.eddn_sender.send_journal_event("Location", event, background=True)
-                    try:
-                        if self.journal_parser.eddn_cache_path:
-                            pp_result = self.journal_parser._upsert_pp_from_event(event)
-                            if pp_result and hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'sysfinder_tree'):
-                                self.main_app_ref._fetch_sysfinder_pp_complete(pp_result['system_name'], pp_result, quiet=True)
-                    except Exception as pp_exc:
-                        import traceback
-                        print(f"[PP] live-write block raised: {pp_exc}")
-                        traceback.print_exc()
-                    try:
-                        if self.journal_parser.eddn_cache_path:
-                            info = self.journal_parser._upsert_system_info_from_event(event)
-                            if info and hasattr(self, 'main_app_ref') and hasattr(self.main_app_ref, 'sysfinder_tree'):
-                                self.main_app_ref.after(0, self.main_app_ref._sysfinder_apply_system_info,
-                                                        info['system_name'], info)
-                    except Exception as info_exc:
-                        import traceback
-                        print(f"[SYSTEM_INFO] live-write block raised: {info_exc}")
-                        traceback.print_exc()
+                    self._queue_cache_upserts(event)
 
             elif event_type == "Scan":
                 # Process Scan events through JournalParser to store ring info
