@@ -952,7 +952,7 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         
         # Results section with help text in header
         results_header = ttk.Frame(self.scrollable_frame)
-        results_header.pack(fill="x", padx=(10, 15), pady=(2, 0))
+        results_header.pack(fill="x", padx=(10, 15), pady=(10, 0))
         
         ttk.Label(results_header, text=t('ring_finder.search_results'), font=scaled_font(9, "bold")).pack(side="left")
         results_info = ttk.Label(results_header, text="\u24d8", foreground=modern_color("#8A94A3"),
@@ -2637,7 +2637,7 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         for b in self._rf_actions.winfo_children():
             b.pack(side="left", padx=(0, 8))
 
-        misc.grid(row=2, column=0, columnspan=7, sticky="ew", padx=5, pady=(2, 2))
+        misc.grid(row=2, column=0, columnspan=7, sticky="ew", padx=5, pady=(8, 2))
 
         more = self._rf_more
         reserve_lbl.grid(in_=more, row=0, column=0, sticky="w", padx=(0, 5), pady=3)
