@@ -174,7 +174,7 @@ In-game step 0 log, 21 Nov 2026 18:47–19:14 (dev, steps 1–5 in place, `sys` 
 | FSDJump (3 jumps) | 73, 132, 157 ms, 1.3–2.0 s after the batch | Work scheduled about 1 s after a jump (Hotspots Finder auto-search, Auto Prices); not the jump batch itself |
 | Honk / FSS bursts (FSSDiscoveryScan, 20+ FSSSignalDiscovered) | None within 1 s of a batch; 50–400 ms stalls 2–200 s later | The user was clicking in the app (game focus lost); not the batches |
 | **Ring map with new hotspots** (SAAScanComplete, SAASignalsFound, Scan) | **881 ms**, starting at the batch | `_on_hotspot_added` ran the EDSM fallback (`fill_missing_metadata_for_systems_direct`, a web request with a 15 s timeout) on the UI thread. The DB writes around it took about 1 ms (log timestamps) |
-| Commodity Market results | Nothing over 50 ms tied to the search | |
+| Commodity Market results | Unknown | Searches aren't logged, so no stall can be tied to one. Stalls of 100–350 ms happened while the user was in the app, cause not identified |
 
 D2 decision: yes, do 3b. The stall is the EDSM web request, not the DB writes, so 3b was narrowed to moving that lookup (see Progress).
 
