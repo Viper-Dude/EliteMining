@@ -8,6 +8,8 @@ import json
 import logging
 from typing import Optional
 
+from config import _atomic_write_text
+
 log = logging.getLogger(__name__)
 
 
@@ -36,8 +38,7 @@ class VAVariablesManager:
         """
         try:
             file_path = os.path.join(self.vars_dir, f"{var_name}.txt")
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(value)
+            _atomic_write_text(file_path, value)
             log.debug(f"VA Variable written: {var_name} = {value}")
         except Exception as e:
             log.error(f"Error writing VA variable {var_name}: {e}")
@@ -124,65 +125,3 @@ class VAVariablesManager:
         except Exception as e:
             log.error(f"Error initializing jumpsleft: {e}")
             self.update_jumps_left(0)
-    
-    def poll_route_status(self) -> None:
-        """Poll journal and NavRoute for route changes"""
-        try:
-            if not self.journal_dir or not os.path.exists(self.journal_dir):
-                return
-            
-            # Check NavRoute.json for cleared route
-            navroute_path = os.path.join(self.journal_dir, "NavRoute.json")
-            if os.path.exists(navroute_path):
-                try:
-                    with open(navroute_path, 'r', encoding='utf-8') as f:
-                        navroute_data = json.load(f)
-                        route = navroute_data.get('Route', [])
-                        if len(route) == 0:
-                            current_value = self.read_variable("jumpsleft")
-                            if current_value != "0":
-                                self.update_jumps_left(0)
-                                log.debug("Route cleared via NavRoute.json")
-                except Exception:
-                    pass
-            
-            # Check latest journal for FSDTarget
-            journal_files = [f for f in os.listdir(self.journal_dir) 
-                           if f.startswith('Journal.') and f.endswith('.log')]
-            if journal_files:
-                journal_files.sort(reverse=True)
-                latest_journal = os.path.join(self.journal_dir, journal_files[0])
-                
-                try:
-                    with open(latest_journal, 'r', encoding='utf-8') as f:
-                        f.seek(0, 2)
-                        file_size = f.tell()
-                        f.seek(max(0, file_size - 5120))  # Last 5KB
-                        lines = f.readlines()
-                        
-                        for line in reversed(lines):
-                            if not line.strip():
-                                continue
-                            try:
-                                event = json.loads(line)
-                                event_type = event.get('event')
-                                
-                                if event_type == 'FSDTarget':
-                                    jumps = event.get('RemainingJumpsInRoute')
-                                    if jumps is not None:
-                                        current_value = self.read_variable("jumpsleft")
-                                        if current_value != str(jumps):
-                                            self.update_jumps_left(jumps)
-                                    break
-                                elif event_type in ['NavRouteClear', 'Docked', 'Touchdown']:
-                                    current_value = self.read_variable("jumpsleft")
-                                    if current_value != "0":
-                                        self.update_jumps_left(0)
-                                    break
-                            except json.JSONDecodeError:
-                                continue
-                except Exception:
-                    pass
-        
-        except Exception as e:
-            log.error(f"Error polling route status: {e}")

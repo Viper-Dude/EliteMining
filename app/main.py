@@ -6435,23 +6435,10 @@ class App(tk.Tk, ColumnVisibilityMixin):
             self.va_variables.initialize_jumps_left()
             print("✅ Initialized VoiceAttack variables (jumpsleft.txt)")
             
-            # Start polling for VA variables
-            self.after(2000, self._poll_va_variables)
-            
             # Start polling for route status (CMDR/system display updates)
             self.after(2000, self._poll_route_status)
         except Exception as e:
             log.error(f"Error initializing VA variables: {e}")
-    
-    def _poll_va_variables(self) -> None:
-        """Poll for VoiceAttack variable updates"""
-        try:
-            if self.va_variables:
-                self.va_variables.poll_route_status()
-        except Exception as e:
-            log.error(f"Error polling VA variables: {e}")
-        finally:
-            self.after(2000, self._poll_va_variables)
     
     def _start_ui_stall_logger(self) -> None:
         # TEMP dev-only (GUI_PERF_HANDOFF step 0): logs when the UI thread runs a 100 ms timer >50 ms late
@@ -6469,6 +6456,15 @@ class App(tk.Tk, ColumnVisibilityMixin):
             except Exception:
                 pass
         self.after(100, beat)
+
+    def _latest_journal_for_route(self, journal_dir: str):
+        # CargoMonitor already tracks the newest journal; list the folder only when it can't help
+        monitor = getattr(self, 'cargo_monitor', None)
+        current = getattr(monitor, 'last_journal_file', None)
+        if current and os.path.exists(current) and                 os.path.normcase(os.path.abspath(os.path.dirname(current))) == os.path.normcase(os.path.abspath(journal_dir)):
+            return current
+        journal_files = [f for f in os.listdir(journal_dir) if f.startswith('Journal.') and f.endswith('.log')]
+        return os.path.join(journal_dir, max(journal_files)) if journal_files else None
 
     def _poll_route_status(self) -> None:
         """Poll journal and NavRoute for changes (runs every 2 seconds)"""
@@ -6494,15 +6490,22 @@ class App(tk.Tk, ColumnVisibilityMixin):
                         navroute_file_changed = True
                 except Exception as e:
                     log.error(f"[ROUTE] Error checking NavRoute: {e}")
+                if navroute_file_changed:
+                    try:
+                        with open(navroute_path, 'r', encoding='utf-8') as nf:
+                            if not json.load(nf).get('Route', []):
+                                if getattr(self, '_cached_route_jumps', None) != 0:
+                                    self._cached_route_jumps = 0
+                                    self._write_jumps_left(0)
+                                    route_changed = True
+                    except Exception:
+                        pass
             
             # Always scan journal for FSDTarget (authoritative source)
             if True:
                 # Check latest journal for FSDTarget
-                journal_files = [f for f in os.listdir(journal_dir) if f.startswith('Journal.') and f.endswith('.log')]
-                if journal_files:
-                    journal_files.sort(reverse=True)
-                    latest_journal = os.path.join(journal_dir, journal_files[0])
-                    
+                latest_journal = self._latest_journal_for_route(journal_dir)
+                if latest_journal:
                     try:
                         with open(latest_journal, 'r', encoding='utf-8') as f:
                             f.seek(0, 2)
