@@ -9,6 +9,7 @@
 - Auto Switch now opens the Hotspots Finder after every jump, not just the first one after entering supercruise.
 - Auto Prices starts looking up prices while your FSD charges, so they show up sooner when you arrive.
 - The long help text under the Hotspots Finder search options is gone; the same hints are still in the tooltips.
+- The "Prompt when full" question now appears after 15 seconds instead of a full minute, so it shows up before you leave for supercruise.
 
 ## Bug Fixes
 - Hotspots Finder now always shows the closest rings, keeps rings already found if Spansh drops out, and no longer searches around the wrong system after a typo.

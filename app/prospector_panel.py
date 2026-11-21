@@ -122,6 +122,8 @@ ANNOUNCEMENT_TOGGLES = {
 log = logging.getLogger(__name__)
 
 RING_FINDER_SWITCH_DELAY_MS = 3000
+# Short enough to appear before a typical supercruise exit, which triggers Auto-end
+CARGO_FULL_IDLE_SECS = 15
 
 # ToolTip class will be provided by main application to ensure consistency
 
@@ -7787,7 +7789,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin, MiningCardMixin):
                 
                 # Check if 60 seconds have passed
                 elapsed = current_time - self.cargo_full_start_time
-                if elapsed >= 60 and not self.cargo_full_prompted:
+                if elapsed >= CARGO_FULL_IDLE_SECS and not self.cargo_full_prompted:
                     # Set prompted flag BEFORE showing dialog to prevent re-entry race condition
                     self.cargo_full_prompted = True
                     # Show prompt (but don't auto-end in multi-session mode)
@@ -7872,7 +7874,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin, MiningCardMixin):
         msg_frame.pack(fill="both", expand=True)
         
         # Message text with localization
-        msg_line1 = t('tooltips.cargo_full_message').format(percent=100, minutes=1)
+        msg_line1 = t('tooltips.cargo_full_message').format(percent=100, seconds=CARGO_FULL_IDLE_SECS)
         msg_line2 = "\n" + t('tooltips.cargo_full_question')
         msg_line3 = "\n\n" + t('tooltips.cargo_full_warning')
         msg = msg_line1 + msg_line2 + msg_line3
