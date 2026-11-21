@@ -611,5 +611,13 @@ class JumpCacheWriteChecks(unittest.TestCase):
         self.assertEqual(called.count('_queue_cache_upserts'), 3)
 
 
+class ModuleImportChecks(unittest.TestCase):
+    def test_cargo_monitor_imports_what_the_loader_supplies(self):
+        # load_methods injects these modules, so a missing import in the real file would pass unnoticed
+        tree = ast.parse((ROOT / 'app/cargo_monitor.py').read_text(encoding='utf-8-sig'))
+        imported = {alias.name for node in tree.body if isinstance(node, ast.Import) for alias in node.names}
+        self.assertLessEqual({'os', 'sys', 'glob', 'json', 'time', 'threading', 'logging'}, imported)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
