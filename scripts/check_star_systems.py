@@ -3,6 +3,7 @@ import json
 import logging
 from pathlib import Path
 import sys
+import tempfile
 import threading
 import tkinter as tk
 from tkinter import ttk
@@ -35,6 +36,21 @@ Methods = load_methods('app/main.py', 'App', {
 })
 Methods._create_sysfinder_results_table.__globals__.update(ttk=ttk, threading=threading, logging=logging, SearchControl=SearchControl,
                                                           StripedTreeview=StripedTreeview)
+
+
+def setUpModule():
+    # Some code paths save through the real config module; keep them off app/config.json
+    import config
+    global _real_config_file, _config_dir
+    _config_dir = tempfile.TemporaryDirectory()
+    _real_config_file = config.CONFIG_FILE
+    config.CONFIG_FILE = str(Path(_config_dir.name) / 'config.json')
+
+
+def tearDownModule():
+    import config
+    config.CONFIG_FILE = _real_config_file
+    _config_dir.cleanup()
 
 
 class App(Methods, ColumnVisibilityMixin):
