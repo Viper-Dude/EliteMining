@@ -39,8 +39,8 @@ Make Ring Finder searches (Local, Spansh, Both, Ring Search, Any Ring) show resu
 | 1 | Stop Spansh paging at the result limit, plus the D2 test | Opus 5.5, medium | No | Done 21 Nov 2026, user-tested, committed |
 | 2 | EDSM fallback after display | Opus 5.5, high | Yes | Done 21 Nov 2026, user-tested |
 | 3 | PowerPlay backfill: parallel and cached | Opus 5.5, high | Yes | Done 21 Nov 2026, user-tested, committed |
-| 4 | Cache the Spansh name lookup | Sonnet 5.5, medium | No | Next |
-| 5 | Remove shared state from worker threads | Opus 5.5, high | Yes | Not started |
+| 4 | Cache the Spansh name lookup | Sonnet 5.5, medium | No | Done 21 Nov 2026, user-tested, committed |
+| 5 | Remove shared state from worker threads | Opus 5.5, high | Yes | Next |
 | 6 | Local range query rewrite | Opus 5.5, high | Yes | Not started |
 | 7 | `_update_results`: prefetch after the limit | Sonnet 5.5, medium | No | Not started |
 | 8 | Any Ring mode uses the paged Spansh path | Opus 5.5, medium | No | Not started |
@@ -154,6 +154,11 @@ Recommended order: 0a, 0b, 1, 2, 3, 4, 5, 6, 7, 8, 9. Steps 1–3 give the bigge
 - It has a 30 s timeout, doesn't go through `tracked_request`, and Stop can't interrupt it.
 - Fix: cache by lowercase name for the session, skip the call when the name came from the journal (exact case already known), use `tracked_request`, a shorter timeout and an `is_cancelled` check.
 - Model: Sonnet 5.5, medium effort.
+- Done 21 Nov 2026, in `ring_finder_search.py`:
+  - A name matching (case-insensitively) `last_monitored_system`, `prospector_panel.last_system` or `main_app.current_system` returns the journal spelling with no request.
+  - Spansh answers (status 200, including "no match") are cached in `_spansh_name_cache` by lowercase name for the session. Errors and non-200 answers are not cached.
+  - The request goes through `tracked_request` with a 10 s timeout. `_search_spansh_with_filters` passes `is_cancelled`, and no request is sent once Stop is pressed.
+  - Tests: `SpanshNameLookupTests` (4) in `check_ring_finder_search.py`, 33 OK. `check_search_stop.py` 26 OK.
 
 ### 5 — Remove shared state from worker threads
 

@@ -544,6 +544,49 @@ class SpanshPagingTests(unittest.TestCase):
         self.assertEqual((rows[0]['type'], rows[0]['count']), ('Void Opals (2)', 2))
 
 
+NameLookup = load_methods('app/ring_finder_search.py', 'RingFinderSearchMixin', {'_resolve_spansh_system_name'})
+
+
+class SpanshNameLookupTests(unittest.TestCase):
+    def setUp(self):
+        self.finder = NameLookup()
+        self.calls = []
+        self.answer = SimpleNamespace(status_code=200, json=lambda: dict(values=['HIP 21750', 'HIP 21750 A']))
+
+        def request(service, method, url, **kwargs):
+            self.calls.append((service, kwargs['params']['q'], kwargs['timeout']))
+            if isinstance(self.answer, Exception):
+                raise self.answer
+            return self.answer
+        NameLookup._resolve_spansh_system_name.__globals__.update(
+            tracked_request=request, log=logging.getLogger('name-lookup-test'))
+
+    def test_answer_is_reused_for_any_capitalization(self):
+        self.assertEqual(self.finder._resolve_spansh_system_name('hip 21750'), 'HIP 21750')
+        self.assertEqual(self.finder._resolve_spansh_system_name('Hip 21750 '), 'HIP 21750')
+        self.assertEqual(self.calls, [('spansh', 'hip 21750', 10)])
+
+    def test_journal_name_needs_no_request(self):
+        self.finder.prospector_panel = SimpleNamespace(last_system='Col 285 Sector AB-C d1-2',
+                                                       main_app=SimpleNamespace(current_system=None))
+        self.assertEqual(self.finder._resolve_spansh_system_name('col 285 sector ab-c d1-2'),
+                         'Col 285 Sector AB-C d1-2')
+        self.assertEqual(self.calls, [])
+
+    def test_stop_sends_no_request(self):
+        self.assertIsNone(self.finder._resolve_spansh_system_name('Sol', is_cancelled=lambda: True))
+        self.assertEqual(self.calls, [])
+
+    def test_failed_lookup_is_asked_again(self):
+        self.answer = OSError('offline')
+        self.assertIsNone(self.finder._resolve_spansh_system_name('Sol'))
+        self.answer = SimpleNamespace(status_code=500, json=lambda: {})
+        self.assertIsNone(self.finder._resolve_spansh_system_name('Sol'))
+        self.answer = SimpleNamespace(status_code=200, json=lambda: dict(values=['Sol']))
+        self.assertEqual(self.finder._resolve_spansh_system_name('sol'), 'Sol')
+        self.assertEqual(len(self.calls), 3)
+
+
 class RingFinderSaveFailureTests(unittest.TestCase):
     def setUp(self):
         Saves._save_filter_settings.__globals__.update(os=os, log=logging.getLogger('ring-save-test'))

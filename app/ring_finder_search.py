@@ -618,45 +618,57 @@ class RingFinderSearchMixin:
         
         return limited_results
     
-    def _resolve_spansh_system_name(self, system_name: str) -> Optional[str]:
+    def _resolve_spansh_system_name(self, system_name: str, is_cancelled=None) -> Optional[str]:
         """Resolve system name to correct capitalization using Spansh API (case-insensitive)
-        
+
+        Names known from the journal, or answered by Spansh earlier this session, need no request.
+
         Args:
             system_name: System name to resolve (e.g., "sol" or "Sol")
-            
+            is_cancelled: optional zero-arg callable; no request is sent once it returns True
+
         Returns:
             Correctly capitalized system name, or None if resolution fails
         """
         import requests
-        
+
         candidate = system_name.strip()
         if not candidate:
             return None
-        
+        key = candidate.lower()
+
+        panel = getattr(self, 'prospector_panel', None)
+        journal_names = (getattr(self, 'last_monitored_system', None),
+                         getattr(panel, 'last_system', None),
+                         getattr(getattr(panel, 'main_app', None), 'current_system', None))
+        for name in journal_names:
+            if isinstance(name, str) and name.strip().lower() == key:
+                return name.strip()
+
+        if not hasattr(self, '_spansh_name_cache'):
+            self._spansh_name_cache = {}
+        if key in self._spansh_name_cache:
+            return self._spansh_name_cache[key]
+        if is_cancelled and is_cancelled():
+            return None
+
         try:
             url = 'https://spansh.co.uk/api/systems/field_values/system_names'
             params = {'q': candidate}
             headers = {'User-Agent': 'EliteMining/4.79', 'Accept': 'application/json'}
-            
-            response = requests.get(url, params=params, headers=headers, timeout=30)
+
+            response = tracked_request('spansh', requests.get, url, params=params, headers=headers, timeout=10)
             if response.status_code != 200:
                 return None
-            
-            data = response.json()
-            values = data.get('values', [])
-            
-            if not values:
-                return None
-            
-            # Find exact match (case-insensitive)
-            candidate_lower = candidate.lower()
-            for value in values:
-                if isinstance(value, str) and value.strip().lower() == candidate_lower:
-                    return value.strip()
-            
-            # If no exact match, return first result
-            return values[0].strip() if values else None
-            
+
+            values = [value.strip() for value in response.json().get('values', [])
+                      if isinstance(value, str) and value.strip()]
+            # Exact match (case-insensitive) first, otherwise Spansh's first suggestion
+            resolved = next((value for value in values if value.lower() == key),
+                            values[0] if values else None)
+            self._spansh_name_cache[key] = resolved
+            return resolved
+
         except Exception as e:
             log.error(f"[SPANSH] System name resolution failed: {e}")
             return None
@@ -700,7 +712,7 @@ class RingFinderSearchMixin:
                 time.sleep(sleep_time)
             
             # Resolve reference system name to correct capitalization (case-insensitive)
-            resolved_system = self._resolve_spansh_system_name(reference_system.strip())
+            resolved_system = self._resolve_spansh_system_name(reference_system.strip(), is_cancelled)
             if resolved_system:
                 reference_system = resolved_system
             
