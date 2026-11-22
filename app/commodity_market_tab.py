@@ -1585,6 +1585,7 @@ class CommodityMarketTabMixin:
                 self.trade_total_label.config(text=t('marketplace.searching_buying'))
             else:
                 self.trade_total_label.config(text=t('marketplace.searching_selling'))
+            self._next_commodity_pp_generation(self.trade_tree)
             control.start()
             
             # Run search in background thread to prevent UI freeze
@@ -1927,8 +1928,7 @@ class CommodityMarketTabMixin:
         # so a stale cached entry gets replaced whenever Spansh's is newer (mirrors Ring
         # Finder/Star Systems' updated_at comparison).
         if _trade_pp_names and enrich_powerplay:
-            threading.Thread(target=self._backfill_commodity_pp_worker,
-                              args=(_trade_pp_names, _trade_pp_data, self.trade_tree), daemon=True).start()
+            self._start_commodity_pp_backfill(self.trade_tree, _trade_pp_names, _trade_pp_data)
 
     def _clear_trade_results(self):
         """Clear trade results table"""
@@ -1995,6 +1995,7 @@ class CommodityMarketTabMixin:
                 self.marketplace_total_label.config(text=t('marketplace.searching_buying'))
             else:
                 self.marketplace_total_label.config(text=t('marketplace.searching_selling'))
+            self._next_commodity_pp_generation(self.marketplace_tree)
             control.start()
             
             # Run search in background thread to prevent UI freeze
@@ -2129,13 +2130,30 @@ class CommodityMarketTabMixin:
         else:
             label.config(text=t('ring_finder.pp_fetch_none').format(system=system_name))
 
-    def _backfill_commodity_pp_worker(self, system_names, cached_pp_data, tree):
+    def _next_commodity_pp_generation(self, tree):
+        """Advance the Powerplay fill-in generation for tree; older fill-ins on it then stop."""
+        generations = self.__dict__.setdefault('_commodity_pp_generations', {})
+        key = str(tree)
+        generations[key] = generations.get(key, 0) + 1
+        return generations[key]
+
+    def _commodity_pp_generation_current(self, tree, generation):
+        return self.__dict__.get('_commodity_pp_generations', {}).get(str(tree)) == generation
+
+    def _start_commodity_pp_backfill(self, tree, system_names, cached_pp_data):
+        generation = self._next_commodity_pp_generation(tree)
+        threading.Thread(target=self._backfill_commodity_pp_worker,
+                         args=(system_names, cached_pp_data, tree, generation), daemon=True).start()
+
+    def _backfill_commodity_pp_worker(self, system_names, cached_pp_data, tree, generation):
         """Background lookup of Spansh's own Exploited/Fortified/Stronghold/Unoccupied
         PowerPlay data for every result system, then update rows on the main thread wherever
         Spansh's data should replace what the EDDN cache already had (same comparison Ring
         Finder/Star Systems use - newer updated_at, or filling a blank controlling_power)."""
         from system_finder_api import SystemFinderAPI
-        spansh_pp = SystemFinderAPI._fetch_spansh_powerplay_for_named_systems(system_names)
+        is_cancelled = lambda: not self._commodity_pp_generation_current(tree, generation)
+        spansh_pp = SystemFinderAPI._fetch_spansh_powerplay_for_named_systems(
+            system_names, is_cancelled=is_cancelled)
         newer_pp = {}
         for sys_name, entry in spansh_pp.items():
             cached = cached_pp_data.get(sys_name)
@@ -2143,11 +2161,14 @@ class CommodityMarketTabMixin:
                 newer_pp[sys_name] = entry
         if newer_pp:
             SystemFinderAPI._store_powerplay_batch(newer_pp)
-        self.after(0, lambda: self._backfill_commodity_pp_complete(newer_pp, tree))
+        if is_cancelled():
+            log.info("[POWERPLAY] Commodity Market Powerplay fill-in stopped: a newer search started")
+            return
+        self.after(0, lambda: self._backfill_commodity_pp_complete(newer_pp, tree, generation))
 
-    def _backfill_commodity_pp_complete(self, pp_data, tree):
+    def _backfill_commodity_pp_complete(self, pp_data, tree, generation):
         """Update Powerplay cell(s) for every system in pp_data with Spansh-backfilled data."""
-        if not pp_data:
+        if not pp_data or not self._commodity_pp_generation_current(tree, generation):
             return
         columns = tree['columns']
         pp_col_index = columns.index('powerstate')
@@ -2283,8 +2304,7 @@ class CommodityMarketTabMixin:
             # the EDDN cache, so a stale cached entry gets replaced whenever Spansh's is newer
             # (mirrors Ring Finder/Star Systems' updated_at comparison).
             if _pp_system_names and enrich_powerplay:
-                threading.Thread(target=self._backfill_commodity_pp_worker,
-                                  args=(_pp_system_names, _pp_data, self.marketplace_tree), daemon=True).start()
+                self._start_commodity_pp_backfill(self.marketplace_tree, _pp_system_names, _pp_data)
             
         except Exception as e:
             self.marketplace_total_label.config(text=t('marketplace.display_error').format(error=e))

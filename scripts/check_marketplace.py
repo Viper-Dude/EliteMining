@@ -230,6 +230,7 @@ class SearchTests(unittest.TestCase):
             setattr(app, prefix + '_' + key, SimpleNamespace(get=lambda value=value: value))
         setattr(app, prefix + '_search_btn', Widget())
         setattr(app, prefix + '_total_label', Widget())
+        setattr(app, prefix + '_tree', Mock())
         for key in ('commodity', 'age', 'station_type', 'sort'):
             setattr(app, '_' + ('trade_' if trade and key != 'commodity' else '') + key + '_rev_map', {})
         app._convert_age_to_days = lambda value: 30

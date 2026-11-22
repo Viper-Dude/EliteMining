@@ -270,6 +270,11 @@ class SystemFinderAPI:
         except Exception as e:
             log.debug(f"[POWERPLAY] Failed to persist Spansh PowerPlay batch: {e}")
 
+    # Per-system Spansh answers (entry, or None for "no PowerPlay data"), so repeat
+    # Commodity Market searches over the same systems skip the request
+    NAMED_PP_CACHE_SECS = 300
+    _named_pp_cache: Dict[str, tuple] = {}
+
     @classmethod
     def _fetch_spansh_powerplay_for_named_systems(cls, system_names: List[str], is_cancelled=None) -> Dict[str, Dict]:
         """
@@ -285,16 +290,29 @@ class SystemFinderAPI:
         is_cancelled: optional zero-arg callable checked before each request — lets the
         caller (e.g. the user clicking Stop) abort this loop early instead of waiting for
         up to 50 sequential requests to finish before the cancellation takes effect.
+
+        Answers (including "no PowerPlay data") are reused for NAMED_PP_CACHE_SECS; failed
+        requests are not, so they are retried on the next call.
         """
         import time
         pp_data = {}
         last_call = 0.0
         truncated = system_names[:50]
+        now = time.monotonic()
+        for old_name, (stamp, _entry) in list(cls._named_pp_cache.items()):
+            if now - stamp >= cls.NAMED_PP_CACHE_SECS:
+                cls._named_pp_cache.pop(old_name, None)
         log.debug(f"[SYSTEM_FINDER] Spansh per-system PowerPlay lookup: {len(truncated)} systems to query (of {len(system_names)} total)")
         for i, system_name in enumerate(truncated):
             if is_cancelled and is_cancelled():
                 log.debug(f"[SYSTEM_FINDER] Spansh per-system PowerPlay lookup cancelled at {i}/{len(truncated)}")
                 break
+
+            cached = cls._named_pp_cache.get(system_name)
+            if cached and time.monotonic() - cached[0] < cls.NAMED_PP_CACHE_SECS:
+                if cached[1]:
+                    pp_data[system_name] = dict(cached[1])
+                continue
 
             elapsed = time.time() - last_call
             if elapsed < 0.5:
@@ -312,10 +330,12 @@ class SystemFinderAPI:
                 results = response.json().get('results', [])
                 if not results:
                     log.debug(f"[SYSTEM_FINDER]   -> no results for {system_name!r}")
+                    cls._named_pp_cache[system_name] = (time.monotonic(), None)
                     continue
                 system = results[0]
                 if system.get('name', '') != system_name:
                     log.debug(f"[SYSTEM_FINDER]   -> name mismatch: asked {system_name!r}, got {system.get('name', '')!r}, skipping")
+                    cls._named_pp_cache[system_name] = (time.monotonic(), None)
                     continue
                 # Unoccupied systems have no 'controlling_power' (there is no controller) but
                 # Spansh still reports the nearby/contesting power in the 'power' list - fall
@@ -325,6 +345,7 @@ class SystemFinderAPI:
                 power_state = system.get('power_state', '')
                 if not controlling_power and power_state not in cls.SPANSH_BACKED_PP_STATES:
                     log.debug(f"[SYSTEM_FINDER]   -> {system_name!r}: no usable PowerPlay data")
+                    cls._named_pp_cache[system_name] = (time.monotonic(), None)
                     continue
                 # Still no power at all (e.g. genuinely no PowerPlay activity nearby) — store
                 # the sentinel like every other PP write path (Inara fetch, EDDN cache).
@@ -336,6 +357,7 @@ class SystemFinderAPI:
                     'power_state': power_state,
                     'updated_at': system.get('updated_at', ''),
                 }
+                cls._named_pp_cache[system_name] = (time.monotonic(), dict(pp_data[system_name]))
             except Exception as e:
                 log.debug(f"[SYSTEM_FINDER]   -> {system_name!r}: request failed: {e}")
                 continue

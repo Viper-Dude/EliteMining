@@ -268,7 +268,7 @@ Measured on a copy of the dev cache:
 | 3 Parallel reference-system lookup | Done, dev tested (checks pass; Near Sol searches 2-3x faster, rows unchanged apart from live data) | see git log |
 | 4 Carrier page sharing | Done, dev tested (checks pass; real carriers still appear with Station = Fleet Carrier). Found a separate bug: settlements labelled as carriers, see "Carrier Label Fix" | see git log |
 | Carrier Label Fix (found in step 4) | Done, dev tested (checks pass incl. new settlement check; near Wregoe MD-K d8-38 carrier-labelled rows 349 -> 168, all real carriers) | — |
-| 5 Powerplay fill-in | Not started | — |
+| 5 Powerplay fill-in | Done, dev tested (log showed 4 older fill-ins stopping, no errors; per-table generation stops older fill-ins at the next search and skips their row update; Spansh answers reused for 5 min, failures retried; only Commodity Market calls this helper now, Ring Finder uses its own backfill; check_search_stop 32 incl. 6 new, check_marketplace 28, check_ring_finder_search 51 pass) | see git log |
 | 6 Hardcoded text | Done, dev tested in German (checks pass; removed dead status text, banner and unused `_open_edtools_market`; follow-up: Mining and Trade price columns show "Price (CR)" in the header and plain numbers in rows, Multiple Prices unchanged) | see git log |
 | 7 Trade parity | Done, dev tested (py_compile, check_marketplace 28 pass) | see git log |
 | 7b Station Type in Multiple Prices | Done (checks pass; Type column shown in the dev app; saved column orders without it get Type inserted after Station) | see git log |

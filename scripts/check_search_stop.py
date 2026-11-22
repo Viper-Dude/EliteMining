@@ -7,7 +7,7 @@ import sys
 import threading
 from types import SimpleNamespace
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'app'))
@@ -227,7 +227,7 @@ App = type('App', (
     load_methods('app/commodity_market_tab.py', 'CommodityMarketTabMixin', {
         '_search_marketplace', '_search_trade_market',
         '_display_marketplace_search_results', '_display_trade_search_results',
-        '_galaxy_market_limit',
+        '_galaxy_market_limit', '_next_commodity_pp_generation',
     }),
     load_methods('app/main.py', 'App', {'_search_systems', '_search_material_traders'}),
 ), {})
@@ -238,13 +238,14 @@ for _method in (App._search_marketplace, App._search_systems):
 
 class SearchScreenTests(unittest.TestCase):
     def test_marketplace_renderer_receives_enrichment_setting(self):
-        cls = load_methods('app/commodity_market_tab.py', 'CommodityMarketTabMixin', {'_display_marketplace_results', '_populate_marketplace_results'})
+        cls = load_methods('app/commodity_market_tab.py', 'CommodityMarketTabMixin', {'_display_marketplace_results', '_populate_marketplace_results',
+                                                                                    '_start_commodity_pp_backfill', '_next_commodity_pp_generation'})
         cls._populate_marketplace_results.__globals__.update(threading=threading)
         app = cls()
         app._clear_marketplace_results = Mock()
         app.marketplace_buy_mode = SimpleNamespace(get=lambda: False)
         app.marketplace_commodity = SimpleNamespace(get=lambda: 'Platinum')
-        app.marketplace_tree = Mock()
+        app.marketplace_tree = MagicMock()
         app.marketplace_tree.get_children.return_value = ()
         app.marketplace_total_label = Widget()
         app._backfill_commodity_pp_worker = Mock()
@@ -270,6 +271,7 @@ class SearchScreenTests(unittest.TestCase):
                     setattr(app, prefix + '_' + key, SimpleNamespace(get=lambda value=value: value))
                 setattr(app, prefix + '_search_btn', Widget())
                 setattr(app, prefix + '_total_label', Widget())
+                setattr(app, prefix + '_tree', Mock())
                 for key in ('commodity', 'age', 'station_type', 'sort'):
                     setattr(app, '_' + ('trade_' if trade and key != 'commodity' else '') + key + '_rev_map', {})
                 app._convert_age_to_days = lambda value: 7
@@ -485,6 +487,97 @@ class PowerPlayBackfillTests(unittest.TestCase):
             self.backfill(is_cancelled=lambda: next(checks, True))
         self.assertEqual(post.call_count, 0)
         self.assertEqual(SystemFinderAPI._pp_backfill_cache, {})
+
+
+class CommodityPowerplayFillInTests(unittest.TestCase):
+    def setUp(self):
+        cls = load_methods('app/commodity_market_tab.py', 'CommodityMarketTabMixin', {
+            '_next_commodity_pp_generation', '_commodity_pp_generation_current',
+            '_start_commodity_pp_backfill', '_backfill_commodity_pp_worker',
+            '_backfill_commodity_pp_complete'})
+        cls._backfill_commodity_pp_worker.__globals__.update(threading=threading, log=Mock())
+        self.app = cls()
+        self.parent = Widget()
+        self.app.after = self.parent.after
+        self.tree = Mock()
+        self.tree.__getitem__ = Mock(return_value=('location', 'powerstate'))
+        self.tree.get_children.return_value = ('row',)
+        self.tree.item.return_value = (' Sol / Station ', ' ? ')
+        self.entry = dict(controlling_power='Aisling Duval', power_state='Fortified', updated_at='2026-11-22')
+
+    def run_fill_in(self, during_lookup=None):
+        def lookup(names, is_cancelled=None):
+            self.is_cancelled = is_cancelled
+            if during_lookup:
+                during_lookup()
+            return {'Sol': dict(self.entry)}
+        with patch.object(SystemFinderAPI, '_fetch_spansh_powerplay_for_named_systems', side_effect=lookup),                 patch.object(SystemFinderAPI, '_spansh_pp_should_replace_cache', return_value=True),                 patch.object(SystemFinderAPI, '_store_powerplay_batch') as store,                 patch('threading.Thread', ImmediateThread):
+            self.app._start_commodity_pp_backfill(self.tree, ['Sol'], {})
+        self.parent.flush()
+        return store
+
+    def updated_rows(self):
+        return [c for c in self.tree.item.call_args_list if 'values' in c.kwargs]
+
+    def test_current_search_fills_the_powerplay_column(self):
+        store = self.run_fill_in()
+        store.assert_called_once()
+        self.assertFalse(self.is_cancelled())
+        self.assertEqual(len(self.updated_rows()), 1)
+
+    def test_newer_search_stops_the_older_fill_in(self):
+        store = self.run_fill_in(during_lookup=lambda: self.app._next_commodity_pp_generation(self.tree))
+        self.assertTrue(self.is_cancelled())
+        store.assert_called_once()  # answers already received are still kept for later searches
+        self.assertEqual(self.updated_rows(), [])
+
+    def test_other_table_search_does_not_stop_the_fill_in(self):
+        self.run_fill_in(during_lookup=lambda: self.app._next_commodity_pp_generation(Mock()))
+        self.assertEqual(len(self.updated_rows()), 1)
+
+
+class NamedSystemPowerplayTests(unittest.TestCase):
+    def setUp(self):
+        SystemFinderAPI._named_pp_cache.clear()
+        self.addCleanup(SystemFinderAPI._named_pp_cache.clear)
+        self.asked = []
+        self.fail = set()
+
+    def post(self, url, json=None, **kwargs):
+        name = json['reference_system']
+        self.asked.append(name)
+        if name in self.fail:
+            raise OSError('offline')
+        response = Mock()
+        results = [dict(name=name, controlling_power='Aisling Duval', power_state='Fortified',
+                        updated_at='2026-11-22')] if name == 'Sol' else []
+        response.json.return_value = dict(results=results)
+        return response
+
+    def lookup(self, names, **kwargs):
+        with patch('requests.post', side_effect=self.post), patch('time.sleep'):
+            return SystemFinderAPI._fetch_spansh_powerplay_for_named_systems(names, **kwargs)
+
+    def test_repeat_lookup_reuses_answers_until_they_expire(self):
+        first = self.lookup(['Sol', 'Lave'])
+        self.assertEqual(set(first), {'Sol'})
+        self.assertEqual(self.lookup(['Sol', 'Lave']), first)
+        self.assertEqual(self.asked, ['Sol', 'Lave'])
+        with patch('time.monotonic', return_value=10 ** 9):
+            self.lookup(['Sol'])
+        self.assertEqual(self.asked, ['Sol', 'Lave', 'Sol'])
+
+    def test_failed_requests_are_retried(self):
+        self.fail = {'Sol'}
+        self.assertEqual(self.lookup(['Sol']), {})
+        self.fail = set()
+        self.assertEqual(set(self.lookup(['Sol'])), {'Sol'})
+        self.assertEqual(self.asked, ['Sol', 'Sol'])
+
+    def test_stop_skips_the_remaining_systems(self):
+        checks = iter([False])
+        self.lookup(['Sol', 'Lave'], is_cancelled=lambda: next(checks, True))
+        self.assertEqual(self.asked, ['Sol'])
 
 
 class SyntaxTests(unittest.TestCase):
