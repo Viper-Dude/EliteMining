@@ -1090,8 +1090,16 @@ class MarketplaceAPI:
 
             print(f"[BUYERS] nearby path: {nearby_path} params: {nearby_params}")
 
-            # Run Ardent, Spansh stations, Spansh carriers, and EDDN cache in parallel
-            with ThreadPoolExecutor(max_workers=4) as _pool:
+            local_path = f"/system/name/{system_encoded}/commodities/imports"
+            local_params = {"minVolume": 1, "maxDaysAgo": max_days_ago}
+
+            # Run Ardent, Spansh stations, Spansh carriers, EDDN cache and the reference-system list in parallel
+            with ThreadPoolExecutor(max_workers=5) as _pool:
+                # Same response for every commodity in this system - fetch once, filter per commodity
+                _fut_local = _pool.submit(
+                    _short_cached,
+                    ("ardent_local", reference_system, max_days_ago),
+                    lambda: MarketplaceAPI._fetch_ardent(local_path, local_params, is_cancelled=is_cancelled), is_cancelled)
                 _fut_both   = _pool.submit(MarketplaceAPI._fetch_ardent, nearby_path, nearby_params, is_cancelled=is_cancelled)
                 _fut_spansh = _pool.submit(
                     MarketplaceAPI._fetch_spansh_nearby,
@@ -1112,20 +1120,13 @@ class MarketplaceAPI:
                 spansh_rows  = _fut_spansh.result()
                 carrier_rows = _fut_carriers.result()
                 eddn_rows    = _fut_eddn.result()
+                local_rows_raw = _fut_local.result()
             nearby_rows = nearby_rows + spansh_rows + carrier_rows + eddn_rows
 
             if is_cancelled and is_cancelled():
                 return MarketplaceAPI._merge_by_freshness(nearby_rows)
 
-            # --- Local system imports (both APIs in parallel) ---
-            local_path = f"/system/name/{system_encoded}/commodities/imports"
-            local_params = {"minVolume": 1, "maxDaysAgo": max_days_ago}
-
             print(f"[BUYERS] local path: {local_path}")
-            # Same response for every commodity in this system - fetch once, filter per commodity
-            local_rows_raw = _short_cached(
-                ("ardent_local", reference_system, max_days_ago),
-                lambda: MarketplaceAPI._fetch_ardent(local_path, local_params, is_cancelled=is_cancelled), is_cancelled)
             local_rows = [r for r in local_rows_raw if r.get("commodityName", "").lower() == commodity_normalized]
             for r in local_rows:
                 r["distance"] = 0
@@ -1185,8 +1186,16 @@ class MarketplaceAPI:
 
             print(f"[SELLERS] nearby path: {nearby_path} params: {nearby_params}")
 
-            # Run Ardent, Spansh stations, Spansh carriers, and EDDN cache in parallel
-            with ThreadPoolExecutor(max_workers=4) as _pool:
+            local_path = f"/system/name/{system_encoded}/commodities/exports"
+            local_params = {"minVolume": 1, "maxDaysAgo": max_days_ago}
+
+            # Run Ardent, Spansh stations, Spansh carriers, EDDN cache and the reference-system list in parallel
+            with ThreadPoolExecutor(max_workers=5) as _pool:
+                # Same response for every commodity in this system - fetch once, filter per commodity
+                _fut_local = _pool.submit(
+                    _short_cached,
+                    ("ardent_local_exports", reference_system, max_days_ago),
+                    lambda: MarketplaceAPI._fetch_ardent(local_path, local_params, is_cancelled=is_cancelled), is_cancelled)
                 _fut_both   = _pool.submit(MarketplaceAPI._fetch_ardent, nearby_path, nearby_params, is_cancelled=is_cancelled)
                 _fut_spansh = _pool.submit(
                     MarketplaceAPI._fetch_spansh_nearby,
@@ -1207,17 +1216,13 @@ class MarketplaceAPI:
                 spansh_rows  = _fut_spansh.result()
                 carrier_rows = _fut_carriers.result()
                 eddn_rows    = _fut_eddn.result()
+                local_rows_raw = _fut_local.result()
             nearby_rows = nearby_rows + spansh_rows + carrier_rows + eddn_rows
 
             if is_cancelled and is_cancelled():
                 return MarketplaceAPI._merge_by_freshness(nearby_rows)
 
-            # --- Local system exports (both APIs in parallel) ---
-            local_path = f"/system/name/{system_encoded}/commodities/exports"
-            local_params = {"minVolume": 1, "maxDaysAgo": max_days_ago}
-
             print(f"[SELLERS] local path: {local_path}")
-            local_rows_raw = MarketplaceAPI._fetch_ardent(local_path, local_params, is_cancelled=is_cancelled)
             local_rows = [r for r in local_rows_raw if r.get("commodityName", "").lower() == commodity_normalized]
             for r in local_rows:
                 r["distance"] = 0

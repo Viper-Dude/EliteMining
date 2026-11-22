@@ -251,7 +251,7 @@ Measured on a copy of the dev cache:
 | 0 Comparison script | Done (`--quick` smoke run on Painite: identical rows between two runs apart from live changes) | see git log |
 | 1 Move to module | Postponed | — |
 | 2 Age window | Done, dev tested (checks pass; comparison: Sol 8 h Painite sell 314 -> 819 rows, Platinum 355 -> 778, buy and Colonia unchanged) | see git log |
-| 3 Parallel reference-system lookup | Not started | — |
+| 3 Parallel reference-system lookup | Done, dev tested (checks pass; Near Sol searches 2-3x faster, rows unchanged apart from live data) | see git log |
 | 4 Carrier page sharing | Not started | — |
 | 5 Powerplay fill-in | Not started | — |
 | 6 Hardcoded text | Not started | — |

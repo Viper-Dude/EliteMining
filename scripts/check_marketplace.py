@@ -145,7 +145,8 @@ class MarketTests(unittest.TestCase):
                            for name in ('_fetch_spansh_nearby', '_fetch_spansh_carriers', '_fetch_eddn_cache')]
                 stack.enter_context(patch.object(MarketplaceAPI, '_backfill_eddn_cache'))
                 self.assertEqual([r['marketId'] for r in search('Platinum', 'Sol', 50)], [1])
-                self.assertEqual(ardent.call_args_list[0].args[1]['maxDistance'], 50)
+                nearby = [c for c in ardent.call_args_list if 'nearby' in c.args[0]]
+                self.assertEqual(nearby[0].args[1]['maxDistance'], 50)
                 for source in sources:
                     self.assertEqual(source.call_args.args[3], 50)
 
