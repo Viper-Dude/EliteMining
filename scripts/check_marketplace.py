@@ -343,7 +343,7 @@ class SearchTests(unittest.TestCase):
 
 class GalaxyOptionsTests(unittest.TestCase):
     def test_age_preferences_visibility_and_limits_are_isolated_and_restored(self):
-        methods = load_methods('app/main.py', 'App', {
+        methods = load_methods('app/commodity_market_tab.py', 'CommodityMarketTabMixin', {
             '_setup_galaxy_market_options', '_market_age_preferences', '_galaxy_market_limit'})
         for language in ('en', 'de'):
             strings = json.loads((ROOT / f'app/localization/strings_{language}.json').read_text(encoding='utf-8-sig'))

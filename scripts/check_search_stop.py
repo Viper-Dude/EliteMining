@@ -223,18 +223,22 @@ class BackendStopTests(unittest.TestCase):
         self.assertEqual(post.call_count, 1)
 
 
-App = load_methods('app/main.py', 'App', {
-    '_search_marketplace', '_search_trade_market', '_search_systems', '_search_material_traders',
-    '_display_marketplace_search_results', '_display_trade_search_results',
-    '_galaxy_market_limit',
-})
-App._search_marketplace.__globals__.update(SearchControl=SearchControl, MarketplaceAPI=MarketplaceAPI,
-                                          threading=threading, log=Mock())
+App = type('App', (
+    load_methods('app/commodity_market_tab.py', 'CommodityMarketTabMixin', {
+        '_search_marketplace', '_search_trade_market',
+        '_display_marketplace_search_results', '_display_trade_search_results',
+        '_galaxy_market_limit',
+    }),
+    load_methods('app/main.py', 'App', {'_search_systems', '_search_material_traders'}),
+), {})
+for _method in (App._search_marketplace, App._search_systems):
+    _method.__globals__.update(SearchControl=SearchControl, MarketplaceAPI=MarketplaceAPI,
+                               threading=threading, log=Mock())
 
 
 class SearchScreenTests(unittest.TestCase):
     def test_marketplace_renderer_receives_enrichment_setting(self):
-        cls = load_methods('app/main.py', 'App', {'_display_marketplace_results', '_populate_marketplace_results'})
+        cls = load_methods('app/commodity_market_tab.py', 'CommodityMarketTabMixin', {'_display_marketplace_results', '_populate_marketplace_results'})
         cls._populate_marketplace_results.__globals__.update(threading=threading)
         app = cls()
         app._clear_marketplace_results = Mock()
@@ -485,7 +489,7 @@ class PowerPlayBackfillTests(unittest.TestCase):
 
 class SyntaxTests(unittest.TestCase):
     def test_changed_modules_parse(self):
-        for name in ('main.py', 'ring_finder.py', 'ring_finder_search.py', 'marketplace_api.py', 'system_finder_api.py',
+        for name in ('main.py', 'commodity_market_tab.py', 'ring_finder.py', 'ring_finder_search.py', 'marketplace_api.py', 'system_finder_api.py',
                      'edsm_integration.py', 'multi_mineral_tab.py', 'cargo_sell_planner.py', 'ui/search_control.py'):
             with self.subTest(name=name):
                 ast.parse((ROOT / 'app' / name).read_text(encoding='utf-8-sig'))

@@ -26,6 +26,7 @@ Make `app/main.py` (and later `prospector_panel.py` and `ring_finder.py`) smalle
 | 2 | `CargoMonitor` into `cargo_monitor.py` | Done and committed 20 Nov 2026; app start and cargo list OK, in-game test pending | 17,833 (−2,682) |
 | 3 | Tabs and dialogs, when they're touched | In progress (only alongside other work) | — |
 | 3a | VoiceAttack Controls tab into `voiceattack_controls_tab.py` | Done 22 Nov 2026; checks OK, app test pending | 16,734 (−1,116) |
+| 3b | Commodity Market tab into `commodity_market_tab.py` | Done 22 Nov 2026; checks OK, user-tested | 14,275 (−2,363) |
 | 4 | `prospector_panel.py`, `ring_finder.py` | Later | — |
 
 Line counts are physical lines, including blank lines.
@@ -53,6 +54,8 @@ Line counts are physical lines, including blank lines.
 ## Step 3 — Candidates in App (move when touched)
 
 The largest builder methods, by size: `_build_interface_options_tab` (710), `_build_announcements_tab` (530), `_create_main_sidebar` (450), `_build_system_finder_tab` (375), `_build_mining_commodities_tab` (305), `_build_trade_commodities_tab` (285), and backup/restore (`_create_backup`, `_show_restore_options_dialog`, about 500 together).
+
+Step 3b: `CommodityMarketTabMixin` holds the Mining and Trade Commodities builders, tables, context menus, preferences, searches, display, Powerplay fill-in and sorting (55 methods). Star Systems and `_check_market_api_status` stay in `main.py`; Multiple Prices and Sell My Hold were already separate modules. `check_marketplace.py` and `check_search_stop.py` load these methods from the new module. It imports `localization.t` directly, like step 3a, instead of `main.py`'s error-swallowing wrapper.
 
 Step 3a: `VoiceAttackControlsTabMixin` holds `_build_voiceattack_controls_tab`, `_build_voice_feedback_tab`, `_build_fg_tab` and `_build_timers_tab` unchanged; the helpers they call (`_save_toggle`, `_update_*_dependencies`, sound-event methods) stay in `main.py`. `check_voiceattack_controls.py` reads `_build_timers_tab` from the new module.
 

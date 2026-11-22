@@ -4,6 +4,8 @@ Start each new chat with: "Read docs/COMMODITY_MARKET_HANDOFF.md and continue wi
 
 Review date: 22 Nov 2026, at commit `cd40897`. Line numbers refer to that commit and move after step 1.
 
+Since step 1, the `main.py` methods in the code map live unchanged in `app/commodity_market_tab.py` (`CommodityMarketTabMixin`). Search there by name.
+
 ## Recommended Order
 
 The user's requirement: today's search works and must not break. Each step must show that it only changes what it is meant to change.
@@ -261,7 +263,7 @@ Measured on a copy of the dev cache:
 | Step | Status | Commit |
 |---|---|---|
 | 0 Comparison script | Done (`--quick` smoke run on Painite: identical rows between two runs apart from live changes) | see git log |
-| 1 Move to module | Postponed | — |
+| 1 Move to module | Done (55 methods moved unchanged into `commodity_market_tab.py`, main.py 16,638 -> 14,275 lines; py_compile, standalone import and scope-aware scan clean; check_marketplace 28, check_cargo_sell_planner 13, check_marketplace_indexes 14 pass; check_search_stop 25/26, the one error also fails before the move (test mock lacks `tree['columns']` for the sort-arrow reset); dev tested) | see git log |
 | 2 Age window | Done, dev tested (checks pass; comparison: Sol 8 h Painite sell 314 -> 819 rows, Platinum 355 -> 778, buy and Colonia unchanged) | see git log |
 | 3 Parallel reference-system lookup | Done, dev tested (checks pass; Near Sol searches 2-3x faster, rows unchanged apart from live data) | see git log |
 | 4 Carrier page sharing | Done, dev tested (checks pass; real carriers still appear with Station = Fleet Carrier). Found a separate bug: settlements labelled as carriers, see "Carrier Label Fix" | see git log |
