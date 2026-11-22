@@ -84,7 +84,6 @@ class VoiceAttackControlsTabMixin:
         scrollable_frame.columnconfigure(0, weight=1)
         _toggle_bg = "#000000" if self.current_theme == "elite_orange" else "#1e1e1e"
         _toggle_fg = "#ff8c00" if self.current_theme == "elite_orange" else "#ffffff"
-        _help_fg = "#888888" if self.current_theme == "elite_orange" else "gray"
         toggle_help_translations = {
             "Voice Feedback": "voiceattack.help_voice_feedback",
         }
@@ -119,8 +118,6 @@ class VoiceAttackControlsTabMixin:
             display_help = t(toggle_help_translations[name])
             ToolTip(checkbox, display_help)
 
-            tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
-                     font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
 
         self._vf_controls = []
@@ -524,8 +521,6 @@ class VoiceAttackControlsTabMixin:
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
             ToolTip(checkbox, display_help)
 
-            tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
-                     font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
 
         # ============================================================
@@ -580,8 +575,6 @@ class VoiceAttackControlsTabMixin:
                 self.toggle_vars[osm_name].trace_add("write", lambda *args: self._update_fsdjump_dependencies())
                 ToolTip(osm_checkbox, osm_display_help)
 
-            tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
-                     font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
 
             # FSD Jump Sequence timers (indented, part of ship presets - matches its toggle)
@@ -616,8 +609,6 @@ class VoiceAttackControlsTabMixin:
 
                     fsdjump_help = t(timer_help_translations.get(fsdjump_timer_name, fsdjump_timer_name))
                     ToolTip(fsdjump_label, fsdjump_help)
-                    tk.Label(fsdjump_frame, text=fsdjump_help, fg=_help_fg, bg=_toggle_bg,
-                             font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
                     r += 1
 
                 # Auto Honk (independent of FSD Jump Sequence)
@@ -641,8 +632,6 @@ class VoiceAttackControlsTabMixin:
                     honk_display_help = t(toggle_help_translations.get(honk_name, honk_name)) if honk_name in toggle_help_translations else honk_helptext
                     ToolTip(honk_checkbox, honk_display_help)
 
-                    tk.Label(honk_rowf, text=honk_display_help, fg=_help_fg, bg=_toggle_bg,
-                             font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
                     r += 1
 
         # ============================================================
@@ -703,8 +692,6 @@ class VoiceAttackControlsTabMixin:
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
             ToolTip(checkbox, display_help)
             
-            tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
-                     font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
             
             # Repeat count spinbox (indented)
@@ -750,8 +737,6 @@ class VoiceAttackControlsTabMixin:
             
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
             ToolTip(checkbox, display_help)
-            tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
-                     font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
 
             # Continuous Pulsewave checkbox on the same row
             if "Continuous Pulsewave" in TOGGLES:
@@ -767,8 +752,6 @@ class VoiceAttackControlsTabMixin:
                 self.toggle_checkboxes[cp_name] = cp_checkbox
                 self.toggle_vars[cp_name].trace_add("write", lambda *args, n=cp_name: self._save_toggle(n))
                 ToolTip(cp_checkbox, cp_display_help)
-                tk.Label(rowf, text=cp_display_help, fg=_help_fg, bg=_toggle_bg,
-                         font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
 
             r += 1
         
@@ -792,8 +775,6 @@ class VoiceAttackControlsTabMixin:
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
             ToolTip(checkbox, display_help)
             
-            tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
-                     font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
             
             # Cargo scoop delay spinbox (indented)
@@ -846,8 +827,6 @@ class VoiceAttackControlsTabMixin:
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
             ToolTip(checkbox, display_help)
             
-            tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
-                     font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
         
         # ============================================================
@@ -894,8 +873,6 @@ class VoiceAttackControlsTabMixin:
                 self.toggle_vars[cps_name].trace_add("write", lambda *args: self._update_prospector_dependencies())
                 ToolTip(cps_checkbox, cps_display_help)
 
-            tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
-                     font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
 
             # Continuous Prospector Sequence timer (indented, under Continuous Seq. checkbox)
@@ -927,8 +904,6 @@ class VoiceAttackControlsTabMixin:
 
                 cpst_help = t(timer_help_translations.get(cpst_timer_name, cpst_timer_name))
                 ToolTip(cpst_label, cpst_help)
-                tk.Label(cpst_frame, text=cpst_help, fg=_help_fg, bg=_toggle_bg,
-                         font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
                 r += 1
 
             # Prospector cooldown time (indented)
@@ -948,8 +923,7 @@ class VoiceAttackControlsTabMixin:
             self.prospector_cooldown_spinbox = prospector_spinbox
             self.prospector_cooldown_label = prospector_label
 
-            tk.Label(prospector_frame, text=t('voiceattack.help_prospector_delay_short'), 
-                    fg=_help_fg, bg=_toggle_bg, font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
+            ToolTip(prospector_label, t('voiceattack.help_prospector_delay_short'))
             
             # NOTE: Values loaded by _import_all_from_txt at startup
             r += 1
@@ -985,8 +959,6 @@ class VoiceAttackControlsTabMixin:
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
             ToolTip(checkbox, display_help)
             
-            tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
-                     font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
             
             # Thrust Up timing controls
@@ -1001,10 +973,10 @@ class VoiceAttackControlsTabMixin:
                                                    increment=0.1, command=self._save_thrust_upduration)
                 thrust_upduration_spinbox.pack(side="left", padx=(4, 6))
 
-                tk.Label(thrust_upduration_frame, text=f"{t('voiceattack.thrust_upduration_label')} [0.5..3.5] seconds",
-                         bg=_toggle_bg, fg=_toggle_fg, font=self._scaled_font(9)).pack(side="left")
-                tk.Label(thrust_upduration_frame, text=t('voiceattack.help_thrust_upduration'),
-                         fg=_help_fg, bg=_toggle_bg, font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
+                thrust_upduration_label = tk.Label(thrust_upduration_frame, text=f"{t('voiceattack.thrust_upduration_label')} [0.5..3.5] seconds",
+                                                   bg=_toggle_bg, fg=_toggle_fg, font=self._scaled_font(9))
+                thrust_upduration_label.pack(side="left")
+                ToolTip(thrust_upduration_label, t('voiceattack.help_thrust_upduration'))
 
                 r += 1
 
@@ -1024,8 +996,7 @@ class VoiceAttackControlsTabMixin:
                                               bg=_toggle_bg, fg=_toggle_fg, font=self._scaled_font(9))
                 thrust_closed_label.pack(side="left")
                 
-                tk.Label(thrust_closed_frame, text=t('voiceattack.help_thrust_closed'), 
-                        fg=_help_fg, bg=_toggle_bg, font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
+                ToolTip(thrust_closed_label, t('voiceattack.help_thrust_closed'))
                 
                 # NOTE: Values loaded by _import_all_from_txt at startup
                 r += 1
@@ -1046,8 +1017,7 @@ class VoiceAttackControlsTabMixin:
                                             bg=_toggle_bg, fg=_toggle_fg, font=self._scaled_font(9))
                 thrust_open_label.pack(side="left")
                 
-                tk.Label(thrust_open_frame, text=t('voiceattack.help_thrust_open'), 
-                        fg=_help_fg, bg=_toggle_bg, font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
+                ToolTip(thrust_open_label, t('voiceattack.help_thrust_open'))
                 
                 # NOTE: Values loaded by _import_all_from_txt at startup
                 r += 1
@@ -1072,8 +1042,6 @@ class VoiceAttackControlsTabMixin:
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
             ToolTip(checkbox, display_help)
             
-            tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
-                     font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
             
             # Delay before targeting the prospector after launching (indented under Target Prospector)
@@ -1124,8 +1092,6 @@ class VoiceAttackControlsTabMixin:
             display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
             ToolTip(checkbox, display_help)
             
-            tk.Label(rowf, text=display_help, fg=_help_fg, bg=_toggle_bg,
-                     font=self._scaled_font(8, "italic")).pack(side="left", padx=(10, 0))
             r += 1
         
         # Initialize dependent toggle states AFTER import has a chance to load values

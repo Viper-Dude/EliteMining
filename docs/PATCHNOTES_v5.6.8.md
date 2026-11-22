@@ -9,7 +9,8 @@
 - Auto Switch now opens the Hotspots Finder after every jump, not just the first one after entering supercruise.
 - Auto Prices starts looking up prices while your FSD charges, so they show up sooner when you arrive.
 - The long help text under the Hotspots Finder search options is gone; the same hints are still in the tooltips.
-- The "Prompt when full" question now appears after 15 seconds instead of a full minute. 
+- VoiceAttack Controls has a cleaner look; the help text beside each setting is now in its tooltip.
+- Mining session - The "Prompt when full" question now appears after 15 seconds instead of a full minute. 
 
 ## Bug Fixes
 - Hotspots Finder now always shows the closest rings, keeps rings already found if Spansh drops out, and no longer searches around the wrong system after a typo.
