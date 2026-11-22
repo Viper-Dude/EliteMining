@@ -11781,6 +11781,9 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
             english_val = self._trade_station_type_rev_map.get(selected, selected)
             if english_val == "Fleet Carrier":
                 self.trade_exclude_carriers.set(False)
+                self.trade_exclude_cb.config(state="disabled")
+            else:
+                self.trade_exclude_cb.config(state="normal")
             self._save_trade_preferences()
         self.trade_station_type.trace_add("write", on_trade_station_type_change)
 
@@ -11789,13 +11792,16 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
         row2_checks_frame.grid(row=1, column=2, sticky="w", padx=(15, 25), pady=(0, 8))
 
         self.trade_exclude_carriers = tk.BooleanVar(value=cfg.get('trade_exclude_carriers', True))
-        exclude_cb = ThemedCheckbutton(row2_checks_frame, text=t('marketplace.exclude_carriers'), variable=self.trade_exclude_carriers,
+        self.trade_exclude_cb = ThemedCheckbutton(row2_checks_frame, text=t('marketplace.exclude_carriers'), variable=self.trade_exclude_carriers,
                       command=self._save_trade_preferences,
                       bg=_trade_cb_bg, fg="#e0e0e0", selectcolor=_trade_cb_select,
                       activebackground=_trade_cb_bg, activeforeground="#ffffff",
                       highlightthickness=0, bd=0, relief="flat", font=self._scaled_font(9))
-        exclude_cb.pack(side="left", padx=(0, 10))
-        ToolTip(exclude_cb, t('tooltips.exclude_carriers'))
+        self.trade_exclude_cb.pack(side="left", padx=(0, 10))
+        ToolTip(self.trade_exclude_cb, t('tooltips.exclude_carriers'))
+        if self._trade_station_type_rev_map.get(self.trade_station_type.get(), '') == 'Fleet Carrier':
+            self.trade_exclude_carriers.set(False)
+            self.trade_exclude_cb.config(state="disabled")
 
         self.trade_large_pad_only = tk.BooleanVar(value=cfg.get('trade_large_pad_only', False))
         large_pad_cb = ThemedCheckbutton(row2_checks_frame, text=t('marketplace.large_pads'), variable=self.trade_large_pad_only,
@@ -13878,6 +13884,11 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
         else:
             sort_order = ['Best price (lowest)', 'Distance', 'Best supply', 'Last update']
         self.trade_order_combo['values'] = [self._trade_sort_options_map.get(k, k) for k in sort_order]
+        current = self._trade_sort_rev_map.get(self.trade_order_by.get(), self.trade_order_by.get())
+        if 'price' in current.lower():
+            self.trade_order_by.set(self.trade_order_combo['values'][0])
+        elif 'supply' in current.lower() or 'demand' in current.lower():
+            self.trade_order_by.set(self.trade_order_combo['values'][2])
     
     def _use_current_system_trade(self):
         """Fill trade reference system with current system"""
@@ -13887,6 +13898,8 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
             self._ac_trade_ref.unsuppress()
             self._ac_trade_ref.hide()
             self._save_trade_preferences()
+        else:
+            self._show_notice(self.trade_total_label, t('ring_finder.could_not_detect_system'))
     
     def _load_trade_preferences(self):
         """Load all trade preferences from config and apply them"""

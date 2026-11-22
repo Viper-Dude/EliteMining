@@ -268,7 +268,7 @@ Measured on a copy of the dev cache:
 | Carrier Label Fix (found in step 4) | Done, dev tested (checks pass incl. new settlement check; near Wregoe MD-K d8-38 carrier-labelled rows 349 -> 168, all real carriers) | — |
 | 5 Powerplay fill-in | Not started | — |
 | 6 Hardcoded text | Done, dev tested in German (checks pass; removed dead status text, banner and unused `_open_edtools_market`; follow-up: Mining and Trade price columns show "Price (CR)" in the header and plain numbers in rows, Multiple Prices unchanged) | see git log |
-| 7 Trade parity | Not started | — |
+| 7 Trade parity | Done (py_compile, check_marketplace 28 pass; dev test pending) | see git log |
 | 7b Station Type in Multiple Prices | Done (checks pass; Type column shown in the dev app; saved column orders without it get Type inserted after Station) | see git log |
 | 8 Sort and refresh | Not started | — |
 | 9 Spansh nearby | Not started | — |
