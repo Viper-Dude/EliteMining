@@ -495,7 +495,8 @@ class MarketplaceAPI:
                            c.station_name, c.commodity_name,
                            c.sell_price, c.buy_price, c.demand, c.stock,
                            c.market_id, c.updated_at, c.source,
-                           COALESCE(NULLIF(c.station_type, 'Unknown'), m.station_type, 'Unknown') AS station_type,
+                           c.station_type                                                     AS cached_type,
+                           m.station_type                                                     AS meta_type,
                            COALESCE(c.distance_to_arrival, m.distance_to_arrival)             AS distance_to_arrival,
                            COALESCE(m.max_landing_pad_size, 0)                                AS meta_pad_size
                     FROM commodity_prices_data c
@@ -557,13 +558,13 @@ class MarketplaceAPI:
                 else:
                     dist = None
 
-                stype = row["station_type"] or "Unknown"
-                # Detect carriers by market_id range (3.7 billion+)
                 mid = row["market_id"] or 0
+                stype = MarketplaceAPI._resolve_cached_station_type(
+                    row["cached_type"], row["meta_type"], mid)
                 is_stronghold = "Stronghold" in stype
                 is_carrier = (not is_stronghold) and (
-                    "Carrier" in stype or "FleetCarrier" in stype or "Drake" in stype
-                    or (mid >= 3700000000 and mid < 4000000000))
+                    "Carrier" in stype or "Drake" in stype
+                    or (stype == "Unknown" and MarketplaceAPI._is_carrier_market_id(mid)))
                 if exclude_carriers and is_carrier:
                     continue
 
@@ -899,6 +900,24 @@ class MarketplaceAPI:
         except Exception as e:
             print(f"[ARDENT] {MarketplaceAPI.ARDENT_URL} failed: {e}")
             return []
+
+    @staticmethod
+    def _is_carrier_market_id(mid) -> bool:
+        # Drake carriers seen so far are 3,700-3,717 million; colony settlements and
+        # outposts start around 3,789 million, so the split sits between the two.
+        return 3700000000 <= (mid or 0) < 3750000000
+
+    @staticmethod
+    def _resolve_cached_station_type(cached_type, meta_type, mid) -> str:
+        """Station type for a cached price row. Older builds guessed 'FleetCarrier' for any
+        market ID from 3.7 to 4 billion and saved it, which mislabelled colony settlements;
+        that saved label is ignored above the carrier range."""
+        cached = cached_type or "Unknown"
+        if cached == "FleetCarrier" and 3750000000 <= (mid or 0) < 4000000000:
+            cached = "Unknown"
+        if cached != "Unknown":
+            return cached
+        return meta_type or "Unknown"
 
     @staticmethod
     def _merge_by_freshness(rows: List[Dict]) -> List[Dict]:

@@ -7,6 +7,7 @@
 
 ## Bug Fixes
 
+- Commodity Market no longer mistakes newly built colony settlements for fleet carriers, so they no longer appear in Fleet Carrier searches or vanish when Exclude Carriers is ticked.
 
 
 ### Voiceattack Profile

@@ -147,6 +147,43 @@ class CacheIndexChecks(unittest.TestCase):
         EDDNListener(self.path)
         self.assertEqual([search(*args) for args in choices], before)
 
+    def test_colony_settlements_are_not_labelled_as_carriers(self):
+        cases = (
+            (3863986688, 'FleetCarrier', 'OnFootSettlement'),  # old wrong guess, details known
+            (3877460224, 'FleetCarrier', None),                # old wrong guess, no details
+            (3863979264, 'Unknown', None),                     # new settlement, no details
+            (3790455808, 'FleetCarrier', None),                # settlement in the 37xx range
+            (3791197696, 'Unknown', None),
+            (3712345678, 'Unknown', None),                     # real carrier ID, type missing
+            (3712345679, 'FleetCarrier', None),                # real carrier
+            (3912345678, 'StrongholdCarrier', None),
+        )
+        with closing(sqlite3.connect(self.path)) as conn:
+            for market_id, station_type, meta_type in cases:
+                conn.execute('''INSERT INTO commodity_prices_data
+                    (system_name,system_x,system_y,system_z,station_name,station_type,
+                     commodity_name,sell_price,buy_price,demand,stock,market_id,updated_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+                    ('Sol', 0, 0, 0, f'Station {market_id}', station_type, 'platinum',
+                     100, 50, 1000, 2000, market_id, self.now))
+                if meta_type:
+                    conn.execute('INSERT INTO station_metadata VALUES (?,?,?,?,?,?,?)',
+                                 (market_id, f'Station {market_id}', 'Sol', meta_type, 1, 10, self.now))
+            conn.commit()
+        rows = {r['marketId']: r for r in MarketplaceAPI._fetch_eddn_cache('platinum', 'Sol', 'buy', max_days_ago=7)}
+        self.assertEqual(rows[3863986688]['stationType'], 'OnFootSettlement')
+        self.assertEqual(rows[3877460224]['stationType'], 'Unknown')
+        self.assertEqual(rows[3863979264]['stationType'], 'Unknown')
+        self.assertEqual(rows[3712345678]['stationType'], 'FleetCarrier')
+        self.assertEqual(rows[3712345679]['stationType'], 'FleetCarrier')
+        self.assertEqual(rows[3912345678]['stationType'], 'StrongholdCarrier')
+        kept = {r['marketId'] for r in MarketplaceAPI._fetch_eddn_cache(
+            'platinum', 'Sol', 'buy', max_days_ago=7, exclude_carriers=True)}
+        self.assertEqual(rows[3790455808]['stationType'], 'Unknown')
+        self.assertEqual(rows[3791197696]['stationType'], 'Unknown')
+        self.assertTrue({3863986688, 3877460224, 3863979264, 3790455808, 3791197696, 3912345678} <= kept)
+        self.assertFalse({3712345678, 3712345679, 4} & kept)
+
     def test_incoming_prices_and_powerplay_replace_existing_records(self):
         self.listener._update_commodity_prices('Sol', 'Station 1', 'Coriolis', 1, [
             dict(name='platinum', sellPrice=250000, buyPrice=200000, demand=500, stock=25),
