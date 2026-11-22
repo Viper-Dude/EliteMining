@@ -250,7 +250,6 @@ class SearchScreenTests(unittest.TestCase):
             app._display_marketplace_results(rows, enrich_powerplay=False)
             app.marketplace_tree.insert.assert_called_once()
             app._backfill_commodity_pp_worker.assert_not_called()
-            self.assertIn('Found 1 stations', app.marketplace_total_label.cget('text'))
             app._display_marketplace_results(rows, enrich_powerplay=True)
             app._backfill_commodity_pp_worker.assert_called_once()
 

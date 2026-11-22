@@ -571,6 +571,11 @@
     "limpets_used": "Limpets"
   },
   "marketplace": {
+    "avg_price": "Avg: {price} CR",
+    "best_buy_price": "Best Buy: {price} CR",
+    "best_sell_price": "Best Sell: {price} CR",
+    "display_error": "Error displaying results: {error}",
+    "sort_error": "Sort error: {error}",
     "source_local": "Not recorded",
     "multi_title": "Sell Several Minerals",
     "multi_hint": "Pick minerals, then click Search",

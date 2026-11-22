@@ -567,6 +567,11 @@
     "limpets_used": "Drohnen"
   },
   "marketplace": {
+    "avg_price": "Durchschnitt: {price} CR",
+    "best_buy_price": "Bester Kauf: {price} CR",
+    "best_sell_price": "Bester Verkauf: {price} CR",
+    "display_error": "Fehler beim Anzeigen der Ergebnisse: {error}",
+    "sort_error": "Sortierfehler: {error}",
     "source_local": "Nicht gespeichert",
     "multi_title": "Mehrere Mineralien verkaufen",
     "multi_hint": "Mineralien wählen, dann Suchen klicken",

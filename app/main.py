@@ -13765,72 +13765,6 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
     
     # Removed _toggle_search_mode() - reference system now always visible for both modes
     
-    def _open_edtools_market(self):
-        """Open edtools.cc commodity search in browser with pre-selected commodity"""
-        import webbrowser
-        import urllib.parse
-        
-        commodity = self.marketplace_commodity.get()
-        system = self.marketplace_reference_system.get().strip()
-        
-        # edtools.cc commodity ID mapping (format: c_ID=on)
-        # IDs verified from edtools.cc multi-commodity page
-        edtools_commodity_ids = {
-            "Platinum": "46",
-            "Painite": "83",
-            "Osmium": "97",
-            "Low Temperature Diamonds": "276",
-            "Rhodplumsite": "343",
-            "Serendibite": "344",
-            "Monazite": "345",
-            "Musgravite": "346",
-            "Benitoite": "347",
-            "Grandidierite": "348",
-            "Alexandrite": "349",
-            "Void Opals": "350",
-            # Additional common mining commodities (IDs to be verified if needed)
-            "Bauxite": "396",
-            "Bertrandite": "371",
-            "Bromellite": "352",
-            "Cobalt": "397",
-            "Coltan": "398",
-            "Gallite": "372",
-            "Gold": "399",
-            "Indite": "373",
-            "Lepidolite": "354",
-            "Palladium": "401",
-            "Praseodymium": "374",
-            "Rutile": "375",
-            "Samarium": "376",
-            "Silver": "402",
-            "Tritium": "403",
-            "Uraninite": "377"
-        }
-        
-        # Build URL with system and commodity
-        url = "https://edtools.cc/multi"
-        params = []
-        
-        if system:
-            params.append(f"s={urllib.parse.quote(system)}")
-        
-        # Map abbreviated commodity names back to full names for API
-        commodity_mapping = {
-            "LTD": "Low Temperature Diamonds"
-        }
-        commodity_full = commodity_mapping.get(commodity, commodity)
-        
-        # Add commodity using c_ID=on format
-        if commodity_full and commodity_full in edtools_commodity_ids:
-            commodity_id = edtools_commodity_ids[commodity_full]
-            params.append(f"c_{commodity_id}=on")
-        
-        if params:
-            url += "?" + "&".join(params)
-        
-        webbrowser.open(url)
-        self._set_status(f"Opening edtools.cc for {commodity} near {system if system else 'Sol'}...")
-
     def _load_marketplace_preferences(self):
         """Load all marketplace preferences from config and apply them"""
         from config import _load_cfg
@@ -14341,10 +14275,10 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
             prices = [r.get(price_field, 0) for r in results if r.get(price_field, 0) > 0]
             if prices:
                 avg = sum(prices) // len(prices)
-                self.trade_avg_label.config(text=f"Avg: {avg:,} CR")
+                self.trade_avg_label.config(text=t('marketplace.avg_price').format(price=f'{avg:,}'))
                 best = min(prices) if is_buy_mode else max(prices)
-                label = "Best Buy" if is_buy_mode else "Best Sell"
-                self.trade_best_label.config(text=f"{label}: {best:,} CR")
+                key = 'marketplace.best_buy_price' if is_buy_mode else 'marketplace.best_sell_price'
+                self.trade_best_label.config(text=t(key).format(price=f'{best:,}'))
 
         # Determine mode for correct field handling
         is_buy_mode = self.trade_buy_mode.get()
@@ -14427,10 +14361,6 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
             self.trade_avg_label.config(text="")
         if hasattr(self, 'trade_best_label'):
             self.trade_best_label.config(text="")
-    
-    # ==================== UNUSED MARKETPLACE SEARCH METHODS (Kept for reference) ====================
-    # These methods are no longer used - marketplace now uses external websites (Inara, edtools.cc)
-    # Kept here temporarily in case rollback is needed
     
     def _search_marketplace(self):
         """Search for commodity prices using Ardent API (threaded to prevent UI freeze)"""
@@ -14681,10 +14611,10 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
             prices = [r.get(price_field, 0) for r in results if r.get(price_field, 0) > 0]
             if prices:
                 avg = sum(prices) // len(prices)
-                self.marketplace_avg_label.config(text=f"Avg: {avg:,} CR")
+                self.marketplace_avg_label.config(text=t('marketplace.avg_price').format(price=f'{avg:,}'))
                 best = min(prices) if is_buy_mode else max(prices)
-                label = "Best Buy" if is_buy_mode else "Best Sell"
-                self.marketplace_best_label.config(text=f"{label}: {best:,} CR")
+                key = 'marketplace.best_buy_price' if is_buy_mode else 'marketplace.best_sell_price'
+                self.marketplace_best_label.config(text=t(key).format(price=f'{best:,}'))
             else:
                 self.marketplace_avg_label.config(text="")
                 self.marketplace_best_label.config(text="")
@@ -14741,7 +14671,7 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
                 if is_buy_mode:
                     # Buy mode (exports endpoint): Use 'buyPrice' (what YOU pay to buy FROM them)
                     # API has backwards field naming - sellPrice is 0, actual price is in buyPrice
-                    price = f"{result.get('buyPrice', 0):,}"
+                    price = f"{result.get('buyPrice', 0):,} CR"
                 else:
                     # Sell mode (imports endpoint): Use 'sellPrice' (what YOU get when selling TO them)
                     price = f"{result.get('sellPrice', 0):,} CR"
@@ -14774,35 +14704,9 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
             if _pp_system_names and enrich_powerplay:
                 threading.Thread(target=self._backfill_commodity_pp_worker,
                                   args=(_pp_system_names, _pp_data, self.marketplace_tree), daemon=True).start()
-
-            # Update status (like hotspots finder format)
-            if results:
-                if is_buy_mode:
-                    best_price = min(results, key=lambda x: x.get('buyPrice', float('inf')))
-                    price_value = best_price.get('buyPrice', 0)
-                    mode_text = "to buy from"
-                else:
-                    # Sell mode: find highest sellPrice (best to sell to)
-                    best_price = max(results, key=lambda x: x.get('sellPrice', 0))
-                    price_value = best_price.get('sellPrice', 0)
-                    mode_text = "to sell to"
-                
-                # Different message for galaxy-wide vs near system
-                if best_price.get('distance') is not None:
-                    self.marketplace_total_label.config(
-                        text=f"Found {len(results)} stations {mode_text}. "
-                             f"Best price: {price_value:,} CR/t at {best_price['stationName']} "
-                             f"({best_price['distance']:.1f} LY)"
-                    )
-                else:
-                    self.marketplace_total_label.config(
-                        text=f"Found {len(results)} stations {mode_text}. "
-                             f"Best price: {price_value:,} CR/t at {best_price['stationName']} "
-                             f"in {best_price.get('systemName', 'Unknown')}"
-                    )
             
         except Exception as e:
-            self.marketplace_total_label.config(text=f"❌ Error displaying results: {str(e)}")
+            self.marketplace_total_label.config(text=t('marketplace.display_error').format(error=e))
             log.error(f"Error populating results: {e}")
 
     def _show_marketplace_context_menu(self, event):
@@ -14909,7 +14813,7 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
 
         except Exception as e:
             log.error(f"Error sorting marketplace column: {e}")
-            self.marketplace_total_label.config(text=f"❌ Sort error: {str(e)}")
+            self.marketplace_total_label.config(text=t('marketplace.sort_error').format(error=e))
     
     
     
