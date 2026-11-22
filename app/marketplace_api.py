@@ -353,13 +353,17 @@ class MarketplaceAPI:
                     page_errors[0] += 1
                     return []
 
-            with ThreadPoolExecutor(max_workers=2) as pool:
-                futures = [pool.submit(_fetch_page, p) for p in range(2)]
-                raw = []
-                for f in futures:
-                    raw.extend(f.result())
+            def _fetch_all_pages():
+                with ThreadPoolExecutor(max_workers=2) as pool:
+                    futures = [pool.submit(_fetch_page, p) for p in range(2)]
+                    pages = []
+                    for f in futures:
+                        pages.extend(f.result())
+                MarketplaceAPI._spansh_record_result(success=page_errors[0] < 2)
+                return pages
 
-            MarketplaceAPI._spansh_record_result(success=page_errors[0] < 2)
+            # Carrier list doesn't depend on the commodity, so minerals share one download
+            raw = _short_cached(("spansh_carriers",), _fetch_all_pages, is_cancelled)
 
             cutoff = datetime.now(timezone.utc) - timedelta(days=max_days_ago + 0.5)
 

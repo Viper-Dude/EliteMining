@@ -252,7 +252,7 @@ Measured on a copy of the dev cache:
 | 1 Move to module | Postponed | — |
 | 2 Age window | Done, dev tested (checks pass; comparison: Sol 8 h Painite sell 314 -> 819 rows, Platinum 355 -> 778, buy and Colonia unchanged) | see git log |
 | 3 Parallel reference-system lookup | Done, dev tested (checks pass; Near Sol searches 2-3x faster, rows unchanged apart from live data) | see git log |
-| 4 Carrier page sharing | Not started | — |
+| 4 Carrier page sharing | Done, dev tested (checks pass; real carriers still appear with Station = Fleet Carrier). Found a separate bug: settlements labelled as carriers, see "Carrier Label Fix" | see git log |
 | 5 Powerplay fill-in | Not started | — |
 | 6 Hardcoded text | Not started | — |
 | 7 Trade parity | Not started | — |
