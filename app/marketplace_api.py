@@ -514,6 +514,7 @@ class MarketplaceAPI:
                                if row["system_x"] is None and row["system_name"]]
             if missing_systems:
                 _CHUNK = 500
+                unique_missing = list(set(missing_systems))
                 try:
                     from local_database import LocalSystemsDatabase
                     galaxy_db = LocalSystemsDatabase()
@@ -522,7 +523,6 @@ class MarketplaceAPI:
                         with _sqlite3.connect(str(galaxy_db.db_path)) as _gconn:
                             _gconn.row_factory = _sqlite3.Row
                             _gcur = _gconn.cursor()
-                            unique_missing = list(set(missing_systems))
                             for i in range(0, len(unique_missing), _CHUNK):
                                 chunk = unique_missing[i:i + _CHUNK]
                                 placeholders = ",".join("?" for _ in chunk)
@@ -534,6 +534,8 @@ class MarketplaceAPI:
                                     coords_cache[gr["name"]] = (gr["x"], gr["y"], gr["z"])
                 except Exception as _ce:
                     print(f"[EDDN CACHE] Batch coord lookup failed: {_ce}")
+                still_missing = [name for name in unique_missing if name not in coords_cache]
+                coords_cache.update(MarketplaceAPI._cached_system_coords(still_missing))
 
             normalized: List[Dict] = []
             for row in rows:
@@ -1395,6 +1397,36 @@ class MarketplaceAPI:
             return []
     
     @staticmethod
+    def _cached_system_coords(system_names) -> Dict[str, tuple]:
+        """Coordinates from the market cache: other price records, then EDDN jump and docking reports."""
+        coord_lookup = {}
+        if not MarketplaceAPI.EDDN_CACHE_PATH or not system_names:
+            return coord_lookup
+        try:
+            import sqlite3
+            from contextlib import closing
+            system_names = list(system_names)
+            with closing(sqlite3.connect(MarketplaceAPI.EDDN_CACHE_PATH)) as conn:
+                for start in range(0, len(system_names), 500):
+                    names = system_names[start:start + 500]
+                    placeholders = ','.join('?' for _ in names)
+                    rows = conn.execute(
+                        f"SELECT system_name, system_x, system_y, system_z FROM commodity_prices_data "
+                        f"WHERE system_name IN ({placeholders}) "
+                        "AND system_x IS NOT NULL AND system_y IS NOT NULL AND system_z IS NOT NULL "
+                        "ORDER BY updated_at", names)
+                    for name, x, y, z in rows:
+                        coord_lookup[name] = (x, y, z)
+                    rows = conn.execute(
+                        f"SELECT name, x, y, z FROM system_coords WHERE name IN ({placeholders}) "
+                        "AND x IS NOT NULL AND y IS NOT NULL AND z IS NOT NULL", names)
+                    for name, x, y, z in rows:
+                        coord_lookup[name] = (x, y, z)
+        except Exception as e:
+            logging.warning("[DISTANCE CALC] Market coord lookup failed: %s", e)
+        return coord_lookup
+
+    @staticmethod
     def add_distances_to_results(results: List[Dict], reference_system: str, is_cancelled=None) -> List[Dict]:
         """
         Add distance information to galaxy-wide results using local database + EDSM fallback
@@ -1448,34 +1480,13 @@ class MarketplaceAPI:
                     logging.warning("[DISTANCE CALC] Batch coord lookup failed: %s", _ce)
 
             if MarketplaceAPI.EDDN_CACHE_PATH:
-                try:
-                    import sqlite3
-                    from contextlib import closing
-                    missing_names = list({r['systemName'] for r in missing_coord_results
-                                          if any(r.get(axis) is None for axis in ('systemX', 'systemY', 'systemZ'))})
-                    coord_lookup = {}
-                    with closing(sqlite3.connect(MarketplaceAPI.EDDN_CACHE_PATH)) as conn:
-                        for start in range(0, len(missing_names), 500):
-                            names = missing_names[start:start + 500]
-                            placeholders = ','.join('?' for _ in names)
-                            rows = conn.execute(
-                                f"SELECT system_name, system_x, system_y, system_z FROM commodity_prices_data "
-                                f"WHERE system_name IN ({placeholders}) "
-                                "AND system_x IS NOT NULL AND system_y IS NOT NULL AND system_z IS NOT NULL "
-                                "ORDER BY updated_at", names)
-                            for name, x, y, z in rows:
-                                coord_lookup[name] = (x, y, z)
-                            rows = conn.execute(
-                                f"SELECT name, x, y, z FROM system_coords WHERE name IN ({placeholders}) "
-                                "AND x IS NOT NULL AND y IS NOT NULL AND z IS NOT NULL", names)
-                            for name, x, y, z in rows:
-                                coord_lookup[name] = (x, y, z)
-                    for result in missing_coord_results:
-                        coords = coord_lookup.get(result['systemName'])
-                        if coords:
-                            result['systemX'], result['systemY'], result['systemZ'] = coords
-                except Exception as e:
-                    logging.warning("[DISTANCE CALC] Market coord lookup failed: %s", e)
+                missing_names = list({r['systemName'] for r in missing_coord_results
+                                      if any(r.get(axis) is None for axis in ('systemX', 'systemY', 'systemZ'))})
+                coord_lookup = MarketplaceAPI._cached_system_coords(missing_names)
+                for result in missing_coord_results:
+                    coords = coord_lookup.get(result['systemName'])
+                    if coords:
+                        result['systemX'], result['systemY'], result['systemZ'] = coords
 
             missing_names = list({r['systemName'] for r in missing_coord_results
                                   if any(r.get(axis) is None for axis in ('systemX', 'systemY', 'systemZ'))})

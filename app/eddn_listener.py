@@ -405,6 +405,8 @@ class EDDNListener:
 
             timestamp = msg_data.get('timestamp') or message.get('header', {}).get('gatewayTimestamp', '')
 
+            self._store_system_coords(msg_data, timestamp)
+
             # Station metadata — Docked and Location only
             if event in ('Docked', 'Location'):
                 market_id = msg_data.get('MarketID')
@@ -436,6 +438,30 @@ class EDDNListener:
 
         except Exception as e:
             log.error(f"EDDN: Error processing journal message: {e}")
+
+    def _store_system_coords(self, msg_data: dict, timestamp: str):
+        """Save the system's position so price reports from systems missing in the galaxy database get a distance."""
+        system_name = msg_data.get('StarSystem')
+        star_pos = msg_data.get('StarPos')
+        if not system_name or not isinstance(star_pos, (list, tuple)) or len(star_pos) != 3:
+            return
+        try:
+            x, y, z = (float(v) for v in star_pos)
+        except (TypeError, ValueError):
+            return
+        # Explorer jumps would grow the table by ~100k systems a day; only keep systems that can have a market
+        at_station = msg_data.get('event') in ('Docked', 'CarrierJump') or msg_data.get('Docked') is True
+        try:
+            with sqlite3.connect(self.database_path) as conn:
+                if not at_station and conn.execute(
+                        'SELECT 1 FROM commodity_prices_data WHERE system_name = ? LIMIT 1',
+                        (system_name,)).fetchone() is None:
+                    return
+                conn.execute('INSERT OR REPLACE INTO system_coords (name, x, y, z, updated_at) VALUES (?, ?, ?, ?, ?)',
+                             (system_name, x, y, z, timestamp))
+                conn.commit()
+        except Exception as e:
+            log.debug(f"EDDN: system_coords write error: {e}")
 
     def _process_powerplay_from_event(self, msg_data: dict, timestamp: str):
         """Upsert powerplay data for a system from a FSDJump or Location event."""

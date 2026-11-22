@@ -199,6 +199,66 @@ class CacheIndexChecks(unittest.TestCase):
             self.assertEqual(conn.execute('SELECT count(*) FROM commodity_prices_data WHERE market_id=1').fetchone()[0], 1)
             self.assertEqual(conn.execute('PRAGMA integrity_check').fetchall(), [('ok',)])
 
+    def test_jump_reports_give_distances_to_systems_missing_from_the_galaxy_database(self):
+        def price(system, market_id):
+            self.listener._update_commodity_prices(system, f'Port {market_id}', 'Coriolis', market_id, [
+                dict(name='platinum', sellPrice=1000, buyPrice=0, demand=10, stock=0)], self.now)
+
+        def journal(event, system, star_pos, **extra):
+            self.listener._process_journal_message({'message': dict(
+                event=event, StarSystem=system, StarPos=star_pos, timestamp=self.now, **extra)})
+
+        def search():
+            return {r['marketId']: r for r in MarketplaceAPI._fetch_eddn_cache(
+                'platinum', 'Sol', 'buy', max_distance=500, max_days_ago=7)}
+
+        price('Colony Alpha', 10)
+        price('Far Colony', 11)
+        self.assertFalse({10, 11} & search().keys())
+
+        journal('FSDJump', 'Colony Alpha', [30, 40, 0])
+        journal('CarrierJump', 'Far Colony', [1000, 0, 0])
+        journal('Docked', 'Colony Beta', [0, 0, 12])
+        journal('Location', 'Docked Here', [1, 1, 1], Docked=True)
+        journal('Location', 'Floating', [2, 2, 2], Docked=False)
+        journal('FSDJump', 'Explorer Jump', [3, 3, 3])
+        journal('Docked', 'Broken Pos', [1, 2])
+        journal('Docked', 'Bad Pos', ['x', 0, 0])
+        journal('Scan', 'Not A Jump', [5, 5, 5])
+        with closing(sqlite3.connect(self.path)) as conn:
+            coords = {name: (x, y, z) for name, x, y, z in conn.execute('SELECT name, x, y, z FROM system_coords')}
+            plan = conn.execute('EXPLAIN QUERY PLAN SELECT 1 FROM commodity_prices_data '
+                                'WHERE system_name = ? LIMIT 1', ('Sol',)).fetchall()
+        self.assertEqual(coords, {'Sol': (0, 0, 0), 'Colony Alpha': (30, 40, 0), 'Far Colony': (1000, 0, 0),
+                                  'Colony Beta': (0, 0, 12), 'Docked Here': (1, 1, 1)})
+        self.assertTrue(any('USING' in row[-1] and 'INDEX' in row[-1] for row in plan), plan)
+
+        price('Colony Alpha', 12)
+        price('Colony Beta', 13)
+        rows = search()
+        self.assertEqual((rows[10]['distance'], rows[12]['distance'], rows[13]['distance']), (50, 50, 12))
+        self.assertNotIn(11, rows)
+        with closing(sqlite3.connect(self.path)) as conn:
+            self.assertEqual(conn.execute('SELECT system_x FROM commodity_prices_data WHERE market_id=12').fetchone()[0], 30)
+
+        # A second report for the same system replaces the first, one row per system
+        journal('FSDJump', 'Colony Alpha', [30, 40, 0])
+        with closing(sqlite3.connect(self.path)) as conn:
+            self.assertEqual(conn.execute("SELECT count(*) FROM system_coords WHERE name='Colony Alpha'").fetchone()[0], 1)
+
+    def test_systems_without_jump_reports_use_coordinates_from_other_price_records(self):
+        with closing(sqlite3.connect(self.path)) as conn:
+            for market_id, coords in ((20, (6, 8, 0)), (21, (None, None, None))):
+                conn.execute('''INSERT INTO commodity_prices_data
+                    (system_name,system_x,system_y,system_z,station_name,station_type,
+                     commodity_name,sell_price,buy_price,demand,stock,market_id,updated_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+                    ('Colony Gamma', *coords, f'Station {market_id}', 'Coriolis', 'platinum',
+                     100, 50, 1000, 2000, market_id, self.now))
+            conn.commit()
+        rows = {r['marketId']: r for r in MarketplaceAPI._fetch_eddn_cache('platinum', 'Sol', 'buy', max_days_ago=7)}
+        self.assertEqual((rows[20]['distance'], rows[21]['distance']), (10, 10))
+
     def test_saved_prices_keep_their_original_source(self):
         self.listener._update_commodity_prices('Sol', 'Station 1', 'Coriolis', 1, [
             dict(name='platinum', sellPrice=250000, buyPrice=200000, demand=500, stock=25),

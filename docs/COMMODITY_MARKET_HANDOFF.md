@@ -13,7 +13,8 @@ The user's requirement: today's search works and must not break. Each step must 
 3. **Steps 3 and 4.**
 4. **Step E1:** EDDN coordinates.
 5. **Step 6:** hardcoded text.
-6. Optional later: 7, 8, E2 and E3. Postponed: 1, 5 and 9.
+6. **Step 7b:** Station Type column in Multiple Prices (user request).
+7. Optional later: 7, 8, E2 and E3. Postponed: 1, 5 and 9.
 
 Run the steps one after another, never in parallel. Steps 2, 3, 4 and E1 all change `marketplace_api.py`, and other chats may edit the same checkout. A subagent is only worth it for step 0, which is a new file of its own.
 
@@ -166,6 +167,17 @@ Measured on 22 Nov 2026 (Painite near Sol, 500 LY):
 - **Dev test:** on Trade, switch Buy↔Sell with each sort option; select Fleet Carrier; press Current System before any journal location is known.
 - **Model:** Sonnet, low.
 
+## Step 7b — Station Type Column in Multiple Prices (user request)
+
+- Audit (22 Nov 2026): Mining Commodities and Trade Commodities show `location, type, pad, distance, ls, demand, price, powerstate, updated`, and Sell My Hold's details table also has Type. Multiple Prices (`multi_mineral_tab.py`, `cols` around line 119) has the same columns except Type. Its grouped layout (one station row with a Mineral column and one child row per mineral) is intentional because one station can buy several of the chosen minerals, so keep it. Only the missing station column is the gap.
+- Add `"type"` after `"location"` in `cols`, `headings` (reuse `t('marketplace.type')`, so no new strings), `widths` (95, as in Mining) and the station row values in `_complete`, filled with `format_market_station_type(info.get('stationType'))` from `app_utils` (the helper Mining and Sell My Hold use). Child mineral rows get `""` there.
+- Check that `_sort` handles the new column (text sort, station rows only, like Location) and that the value indexes used by sorting and the context menu (Location at index 0, etc.) still point at the right columns after the insert.
+- Column order is saved per table (`column_order` for `multiple_prices`). For players who reordered columns, `_cv_set_order` appends a new column at the end. Accept this, or insert `type` after `location` when the saved order lacks it; say which in the commit.
+- Saved column widths (`multiple_prices_column_widths`) are by name, so they stay valid.
+- **Checks:** `py_compile`, `check_marketplace` (and any check that lists Multiple Prices columns: search `scripts/` for `multiple_prices`).
+- **Dev test:** Multiple Prices search; Type shows for every station (Fleet Carrier, Coriolis, settlements and so on); sort by Type both ways; Columns button can hide and show it; widths persist after restart; a previously reordered table still opens.
+- **Model:** Sonnet, low.
+
 ## Step 8 — Column Sort Fixes and Faster Table Refresh
 
 - Mining Commodities column sort: a distance of "-" (unknown) fails to parse and becomes 0, so unknown distances sort first in ascending order. Trade's `parse_value` sends unknown values to the end. Make Mining use one shared parse helper.
@@ -214,7 +226,7 @@ Measured on a copy of the dev cache:
 - Expected effect: more fresh stations in Near System results, mostly outside the bubble and in newly colonised systems. Nothing that shows today should disappear.
 - Make the before/after comparison script first (see the risk notes) and check that only stations are added.
 - **Checks:** `check_marketplace`, `check_marketplace_indexes`, `check_search_stop`, plus a new check: a journal message with StarPos fills `system_coords`, and a later price row in that system gets a distance.
-- **Dev test:** run the app for 10 minutes, then search near a system outside the galaxy database (for example `HIP 67282`); the log shows `system_coords` growing.
+- **Dev test:** restart, run a Mining Commodities Sell search near Sol or `HIP 67282` (Max Age Any) and one Galaxy-Wide search; after a few minutes `system_coords` holds rows from station events anywhere (no log line, check the table).
 - **Model:** Opus, high (writes on the listener thread).
 
 ### Step E2 — Reconnect After a Silent Connection (optional)
@@ -257,8 +269,9 @@ Measured on a copy of the dev cache:
 | 5 Powerplay fill-in | Not started | — |
 | 6 Hardcoded text | Not started | — |
 | 7 Trade parity | Not started | — |
+| 7b Station Type in Multiple Prices | Not started | — |
 | 8 Sort and refresh | Not started | — |
 | 9 Spansh nearby | Not started | — |
-| E1 EDDN coordinates | Not started | — |
+| E1 EDDN coordinates | Done, dev tested (first minutes after restart: 348 systems stored, 834 of 864 new EDDN price rows saved with coordinates; checks pass incl. 2 new; comparison only adds stations, e.g. Sol Any Painite sell 4674 -> 5004, Colonia unchanged; losses were age-outs between runs. Coordinates are stored only for station events or systems with price records, because all jumps would add ~100k systems a day) | — |
 | E2 EDDN reconnect | Not started | — |
 | E3 Legacy guard | Not started | — |
