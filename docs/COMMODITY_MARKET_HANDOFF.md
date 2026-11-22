@@ -270,7 +270,7 @@ Measured on a copy of the dev cache:
 | 6 Hardcoded text | Done, dev tested in German (checks pass; removed dead status text, banner and unused `_open_edtools_market`; follow-up: Mining and Trade price columns show "Price (CR)" in the header and plain numbers in rows, Multiple Prices unchanged) | see git log |
 | 7 Trade parity | Done, dev tested (py_compile, check_marketplace 28 pass) | see git log |
 | 7b Station Type in Multiple Prices | Done (checks pass; Type column shown in the dev app; saved column orders without it get Type inserted after Station) | see git log |
-| 8 Sort and refresh | Not started | — |
+| 8 Sort and refresh | Done, dev tested (checks pass; unknown values sort to the end on Mining like Trade; a new Mining search now clears the old sort arrow and direction, which made the first header click land on either order) | see git log |
 | 9 Spansh nearby | Not started | — |
 | E1 EDDN coordinates | Done, dev tested (first minutes after restart: 348 systems stored, 834 of 864 new EDDN price rows saved with coordinates; checks pass incl. 2 new; comparison only adds stations, e.g. Sol Any Painite sell 4674 -> 5004, Colonia unchanged; losses were age-outs between runs. Coordinates are stored only for station events or systems with price records, because all jumps would add ~100k systems a day) | — |
 | E2 EDDN reconnect | Not started | — |

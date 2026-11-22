@@ -14273,8 +14273,7 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
     def _display_trade_results(self, results: list, enrich_powerplay=True):
         """Display trade search results in trade table"""
         # Clear existing results
-        for item in self.trade_tree.get_children():
-            self.trade_tree.delete(item)
+        self.trade_tree.delete(*self.trade_tree.get_children())
         self._trade_row_source = {}
         if hasattr(self, 'trade_avg_label'):
             self.trade_avg_label.config(text="")
@@ -14302,12 +14301,12 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
         _trade_pp_names = list({r.get('systemName', '') for r in results if r.get('systemName')})
         _trade_pp_data = SystemFinderAPI._batch_get_powerplay(_trade_pp_names) if _trade_pp_names else {}
 
+        from app_utils import format_market_station_type, format_market_pad, format_relative_age, format_market_powerplay, format_market_source
+
         # Display results
         for row_index, result in enumerate(results):
             # LOCATION (System + Station)
             location = f"{result.get('systemName', 'Unknown')} / {result.get('stationName', 'Unknown')[:25]}"
-            
-            from app_utils import format_market_station_type, format_market_pad, format_relative_age, format_market_powerplay, format_market_source
             station_type = format_market_station_type(result.get('stationType'))
             pad = format_market_pad(result.get('maxLandingPadSize'))
 
@@ -14367,8 +14366,7 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
     def _clear_trade_results(self):
         """Clear trade results table"""
         if hasattr(self, 'trade_tree'):
-            for item in self.trade_tree.get_children():
-                self.trade_tree.delete(item)
+            self.trade_tree.delete(*self.trade_tree.get_children())
             self._trade_row_source = {}
         if hasattr(self, 'trade_avg_label'):
             self.trade_avg_label.config(text="")
@@ -14602,8 +14600,7 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
 
     def _clear_marketplace_results(self):
         """Clear marketplace results tree"""
-        for item in self.marketplace_tree.get_children():
-            self.marketplace_tree.delete(item)
+        self.marketplace_tree.delete(*self.marketplace_tree.get_children())
         self._marketplace_row_source = {}
         if hasattr(self, 'marketplace_avg_label'):
             self.marketplace_avg_label.config(text="")
@@ -14641,6 +14638,10 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
             # Determine mode for correct field handling
             is_buy_mode = self.marketplace_buy_mode.get()
             self._marketplace_row_source = {}
+            self.marketplace_sort_column = None
+            self.marketplace_sort_reverse = False
+            from ui.sort_indicator import apply_sort_arrow
+            apply_sort_arrow(self.marketplace_tree, None, False)
 
             # Bulk-fetch PowerPlay data from the local EDDN cache for all result systems in one
             # query - local-only, no Spansh/Inara calls (unlike Ring Finder's PowerPlay column).
@@ -14648,12 +14649,12 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
             _pp_system_names = list({r.get('systemName', '') for r in results if r.get('systemName')})
             _pp_data = SystemFinderAPI._batch_get_powerplay(_pp_system_names) if _pp_system_names else {}
 
+            from app_utils import format_market_station_type, format_market_pad, format_relative_age, format_market_powerplay, format_market_source
+
             # Populate results (sorted by distance - closest first)
             for row_index, result in enumerate(results):
                 # LOCATION (System + Station) - API uses camelCase
                 location = f"{result['systemName']} / {result['stationName'][:25]}"
-                
-                from app_utils import format_market_station_type, format_market_pad, format_relative_age, format_market_powerplay, format_market_source
                 station_type = format_market_station_type(result.get('stationType'))
                 pad = format_market_pad(result.get('maxLandingPadSize'))
 
@@ -14776,37 +14777,21 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
             # Define sort function based on column type
             if numeric:
                 def sort_key(item):
-                    value = item[0][col_index]
+                    value = item[0][col_index].strip()
                     try:
-                        if col_id == "ls":
-                            # Handle LS column with commas: "88,009" or "?"
-                            if value.strip() == '?':
-                                return 999999
-                            # Remove commas and convert to number
-                            return float(value.replace(',', '').strip())
-                        elif col_id == "distance":
-                            # Remove " LY" suffix and convert to float
-                            return float(value.replace(" LY", ""))
-                        elif col_id == "price":
-                            # Remove " CR" suffix and commas
-                            return float(value.replace(" CR", "").replace(",", ""))
-                        elif col_id == "demand":
-                            # Remove commas
-                            return float(value.replace(",", "")) if value != "0" else 0
-                        elif col_id == "updated":
-                            # Convert time format to comparable number (minutes)
-                            if "m" in value:
-                                return float(value.replace("m", ""))
-                            elif "h" in value:
-                                return float(value.replace("h", "")) * 60  # Convert hours to minutes
-                            elif "d" in value:
-                                return float(value.replace("d", "")) * 1440  # Convert days to minutes
-                            else:
-                                return float('inf')  # Unknown times go to end
-                        else:
-                            return float(value.replace(",", "")) if value.replace(",", "").replace(".", "").isdigit() else 0
-                    except:
-                        return 0 if not self.marketplace_sort_reverse else float('inf')
+                        if value in ('?', '-', ''):
+                            return 999999999
+                        if col_id == "updated":
+                            if value.endswith('m'):
+                                return float(value[:-1])
+                            if value.endswith('h'):
+                                return float(value[:-1]) * 60
+                            if value.endswith('d'):
+                                return float(value[:-1]) * 1440
+                            return 999999999
+                        return float(value.replace(" LY", "").replace(" CR", "").replace(",", ""))
+                    except ValueError:
+                        return 999999999
             else:
                 def sort_key(item):
                     # String sorting
@@ -14816,10 +14801,8 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
             items.sort(key=sort_key, reverse=self.marketplace_sort_reverse)
             
             # Clear tree and re-insert sorted items, re-applying row tags
-            for new_idx, (values, item) in enumerate(items):
+            for values, item in items:
                 self.marketplace_tree.move(item, '', 'end')
-                tag = 'oddrow' if new_idx % 2 == 0 else 'evenrow'
-                self.marketplace_tree.item(item, tags=(tag,))
             
             from ui.sort_indicator import apply_sort_arrow
             apply_sort_arrow(self.marketplace_tree, col_id, self.marketplace_sort_reverse)
