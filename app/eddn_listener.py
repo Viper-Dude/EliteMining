@@ -27,6 +27,7 @@ class EDDNListener:
 
     EDDN_RELAY = "tcp://eddn.edcd.io:9500"
     RECONNECT_DELAY = 30  # Seconds between reconnection attempts
+    SILENT_RECONNECT_SECS = 180  # Reconnect after this long with no messages
     CLEANUP_INTERVAL = 3600  # Clean up old data every hour
     MAX_DATA_AGE_HOURS = 336  # Keep data for 14 days
     MAX_DB_SIZE_BYTES = 350 * 1024 * 1024  # 350MB size cap safety net
@@ -305,10 +306,12 @@ class EDDNListener:
                 log.info("Connected to EDDN stream")
                 
                 # Listen for messages
+                last_recv = time.monotonic()
                 while self.running:
                     try:
                         # Receive compressed message
                         raw_message = subscriber.recv()
+                        last_recv = time.monotonic()
                         
                         # Decompress
                         message_json = zlib.decompress(raw_message).decode('utf-8')
@@ -327,13 +330,17 @@ class EDDNListener:
                     except zmq.Again:
                         # Timeout - check if we should continue
                         log.debug("EDDN: Receive timeout (no messages)")
+                        # A dead link gives no error, only silence; the feed normally sends ~20 msgs/s
+                        if time.monotonic() - last_recv >= self.SILENT_RECONNECT_SECS:
+                            log.info(f"EDDN: No messages for {self.SILENT_RECONNECT_SECS}s, reconnecting")
+                            break
                         continue
                         
                     except Exception as e:
                         log.error(f"EDDN: Error processing message: {e}")
                         continue
                 
-                subscriber.close()
+                subscriber.close(linger=0)
                 
             except Exception as e:
                 log.error(f"EDDN: Connection error: {e}")
