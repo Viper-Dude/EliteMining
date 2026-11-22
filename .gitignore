@@ -58,6 +58,10 @@ app/data/user_data.db
 app/data/user_data.db-shm
 app/data/user_data.db-wal
 app/data/marketplace_cache.db
+app/data/marketplace_cache.db-shm
+app/data/marketplace_cache.db-wal
+app/data/galaxy_systems.db-shm
+app/data/galaxy_systems.db-wal
 
 # API Keys and sensitive data
 *api_key*
