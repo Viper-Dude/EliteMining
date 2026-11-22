@@ -16,6 +16,9 @@ ROOT = Path(__file__).resolve().parents[1]
 TREE = ast.parse((ROOT / 'app/main.py').read_text(encoding='utf-8-sig'))
 APP = next(n for n in TREE.body if isinstance(n, ast.ClassDef) and n.name == 'App')
 METHODS = {n.name: n for n in APP.body if isinstance(n, ast.FunctionDef)}
+VA_TAB_TREE = ast.parse((ROOT / 'app/voiceattack_controls_tab.py').read_text(encoding='utf-8-sig'))
+VA_TAB_METHODS = {n.name: n for n in next(n for n in VA_TAB_TREE.body if isinstance(n, ast.ClassDef)).body
+                  if isinstance(n, ast.FunctionDef)}
 SELECTED = {
     '_on_voice_set_toggle', '_reset_sound_events', '_save_sound_events',
     '_clear_voice_set', '_apply_mapping', '_save_timer', '_execute_va_command', '_va_switch_tab',
@@ -239,7 +242,7 @@ class VoiceAttackChecks(unittest.TestCase):
                 self.assertEqual(app.thrust_closed_var.get(), expected)
 
     def test_open_thrust_wheel_stops_at_one_second(self):
-        call = next(n for n in ast.walk(METHODS['_build_timers_tab'])
+        call = next(n for n in ast.walk(VA_TAB_METHODS['_build_timers_tab'])
                     if isinstance(n, ast.Call) and getattr(n.func, 'attr', '') == '_make_stepper'
                     and ast.unparse(n.args[3]) == 'self.thrust_open_var')
         self.assertEqual(ast.literal_eval(call.args[1]), 1.0)

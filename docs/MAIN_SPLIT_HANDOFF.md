@@ -24,7 +24,8 @@ Make `app/main.py` (and later `prospector_panel.py` and `ring_finder.py`) smalle
 | 0 | Starting point | — | 21,293 |
 | 1 | Pilot: overlays and log handler | Done, user-tested, committed `1b7eee1` | 20,515 (−778) |
 | 2 | `CargoMonitor` into `cargo_monitor.py` | Done and committed 20 Nov 2026; app start and cargo list OK, in-game test pending | 17,833 (−2,682) |
-| 3 | Tabs and dialogs, when they're touched | Next (only alongside other work) | — |
+| 3 | Tabs and dialogs, when they're touched | In progress (only alongside other work) | — |
+| 3a | VoiceAttack Controls tab into `voiceattack_controls_tab.py` | Done 22 Nov 2026; checks OK, app test pending | 16,734 (−1,116) |
 | 4 | `prospector_panel.py`, `ring_finder.py` | Later | — |
 
 Line counts are physical lines, including blank lines.
@@ -51,6 +52,8 @@ Line counts are physical lines, including blank lines.
 
 ## Step 3 — Candidates in App (move when touched)
 
-The largest builder methods, by size: `_build_timers_tab` (about 760 lines), `_build_interface_options_tab` (710), `_build_announcements_tab` (530), `_create_main_sidebar` (450), `_build_system_finder_tab` (375), `_build_mining_commodities_tab` (305), `_build_trade_commodities_tab` (285), and backup/restore (`_create_backup`, `_show_restore_options_dialog`, about 500 together).
+The largest builder methods, by size: `_build_interface_options_tab` (710), `_build_announcements_tab` (530), `_create_main_sidebar` (450), `_build_system_finder_tab` (375), `_build_mining_commodities_tab` (305), `_build_trade_commodities_tab` (285), and backup/restore (`_create_backup`, `_show_restore_options_dialog`, about 500 together).
+
+Step 3a: `VoiceAttackControlsTabMixin` holds `_build_voiceattack_controls_tab`, `_build_voice_feedback_tab`, `_build_fg_tab` and `_build_timers_tab` unchanged; the helpers they call (`_save_toggle`, `_update_*_dependencies`, sound-event methods) stay in `main.py`. `check_voiceattack_controls.py` reads `_build_timers_tab` from the new module.
 
 Lowest-risk approach: a mixin class in its own module (for example `class TimersTabMixin` in `timers_tab.py`), added to `App`'s bases, with the method bodies unchanged. Once a tab's code is in its own module, a proper class like `mining_missions_tab.py` is possible, but optional.
