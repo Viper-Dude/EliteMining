@@ -1,5 +1,5 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
-**Release Date:** 2026-November-21
+**Release Date:** 2026-November-22
 
 ## New Features & Improvements
 - General code optimalization
@@ -17,6 +17,8 @@
 - Jumping during a Hotspots Finder search no longer changes your system name and filters, and the result count and German message are now correct.
 - The app no longer freezes for a moment when you map a ring with new hotspots.
 
-### Voiceattack Profile - no update (V5.6.7)
+### Voiceattack Profile - no update (V5.6.8)
+- Fixed the cargo scoop timer not starting on the first mining run. It can still fail when launching collector limpets, because each launch briefly opens and closes the cargo scoop.
+
 
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)

@@ -199,7 +199,7 @@ Run this in the app, not the installer. The app already has the update flow, the
 
 ### Later, as a separate decision
 
-- Test a `.vax` overwrite import with a fixed `InternalID`, which could remove the import step.
+- **Decided 22 November 2026: no automatic import.** Neither writing to `VoiceAttack.dat` nor a `.vax` overwrite import. Players often have several EliteMining profiles of different versions, an overwrite removes the old profile they could fall back to, and the player should keep control of the import.
 - Add a release rule: renaming an existing command requires updating the rename list.
 
 **Main risk:** a VoiceAttack update could change the data file and break the helper. The export flow stays as the fallback for that reason.

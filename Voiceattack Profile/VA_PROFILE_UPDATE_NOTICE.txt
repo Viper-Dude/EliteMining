@@ -1,10 +1,10 @@
 ============================================================
-  EliteMining v5.6.7 — VoiceAttack Profile Update 
+  EliteMining v5.6.8 — VoiceAttack Profile Update 
 ============================================================
 
-This release includes an updated VoiceAttack profile (v5.6.7).
+This release includes an updated VoiceAttack profile (v5.6.8).
 What's changed:
-- Fixed sound effect playing even when the prospector sequence was not launched due to unmet conditions.
+- Fixed the cargo scoop timer not starting on the first mining run. It can still fail when launching collector limpets, because each launch briefly opens and closes the cargo scoop.
 
 Keep the VoiceAttack profile option ticked on the next page to install the updated
 profile. Follow the app's profile update instructions to import it into VoiceAttack.
