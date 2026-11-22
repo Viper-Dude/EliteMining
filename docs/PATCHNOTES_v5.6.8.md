@@ -17,7 +17,7 @@
 - Jumping during a Hotspots Finder search no longer changes your system name and filters, and the result count and German message are now correct.
 - The app no longer freezes for a moment when you map a ring with new hotspots.
 
-### Voiceattack Profile - no update (V5.6.8)
+### Voiceattack Profile - update to V5.6.8
 - Fixed the cargo scoop timer not starting on the first mining run. It can still fail when launching collector limpets, because each launch briefly opens and closes the cargo scoop.
 
 
