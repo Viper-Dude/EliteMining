@@ -326,7 +326,7 @@ class CargoSellPlanner(ColumnVisibilityMixin):
             def fetch(name):
                 if control.is_cancelled():
                     return name, []
-                rows = MarketplaceAPI.search_buyers(name, system, radius, 30, carriers, is_cancelled=control.is_cancelled)
+                rows = MarketplaceAPI.search_buyers(name, system, radius, MarketplaceAPI.convert_age_to_days(age), carriers, is_cancelled=control.is_cancelled)
                 rows = MarketplaceAPI.filter_results(rows, 'All', age, carriers, large)
                 rows = [row for row in rows if row.get('distance') is not None and row['distance'] <= radius]
                 return name, rows

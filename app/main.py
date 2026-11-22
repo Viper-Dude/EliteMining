@@ -172,7 +172,7 @@ from overlays import (
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.6.8"
+APP_VERSION = "v5.5.9"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -14493,8 +14493,8 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
             import threading
             def search_thread():
                 try:
-                    # Always request 30 days from API, filter by max_age locally for accurate hour-level filtering
-                    api_days = 30
+                    # Request only the needed day window (the 1000-row cap hides fresh rows otherwise); hour-level filtering stays local
+                    api_days = MarketplaceAPI.convert_age_to_days(max_age_str)
                     
                     if search_mode == "galaxy_wide":
                         if is_buy_mode:

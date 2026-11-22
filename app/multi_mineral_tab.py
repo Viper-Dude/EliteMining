@@ -313,7 +313,7 @@ class MultiMineralTab:
             def fetch(mineral):
                 if control.is_cancelled():
                     return mineral, []
-                return mineral, MarketplaceAPI.search_buyers(mineral, system, None, 30, exclude_carriers, is_cancelled=control.is_cancelled)
+                return mineral, MarketplaceAPI.search_buyers(mineral, system, None, MarketplaceAPI.convert_age_to_days(max_age), exclude_carriers, is_cancelled=control.is_cancelled)
             with ThreadPoolExecutor(max_workers=3) as pool:
                 raw = list(pool.map(fetch, minerals))
             stations = self._group(raw, station_type, max_age, exclude_carriers, large_pad)

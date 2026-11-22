@@ -1044,6 +1044,12 @@ class MarketplaceAPI:
         return commodity_lower.replace(" ", "")
     
     @staticmethod
+    def convert_age_to_days(age_str: str) -> int:
+        """Max Age label to the whole-day window the price APIs accept (sub-day values round up to 1)."""
+        age_map = {"Any": 30, "1 hour": 1, "8 hours": 1, "16 hours": 1, "1 day": 1, "2 days": 2}
+        return age_map.get(age_str, 1)
+
+    @staticmethod
     def search_buyers(commodity: str, reference_system: str, max_distance: Optional[int] = None, max_days_ago: float = 2, exclude_carriers: bool = False, is_cancelled=None) -> List[Dict]:
         """
         Search for stations buying a commodity near a reference system (for SELLING to them)
