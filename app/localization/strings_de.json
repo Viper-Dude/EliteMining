@@ -581,6 +581,8 @@
     "multi_max_reached": "Du kannst bis zu {max} Mineralien wählen",
     "multi_col_station": "System / Station",
     "multi_col_mineral": "Mineral",
+    "multi_collapse_all": "Alle einklappen",
+    "multi_expand_all": "Alle ausklappen",
     "multi_found": "{count} Stationen gefunden (meiste Mineralien zuerst)",
     "search_title": "Rohstoffpreise suchen",
     "help_tooltip": "Anleitung zum Rohstoffmarkt öffnen (README)",

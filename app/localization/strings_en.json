@@ -585,6 +585,8 @@
     "multi_max_reached": "You can pick up to {max} minerals",
     "multi_col_station": "System / Station",
     "multi_col_mineral": "Mineral",
+    "multi_collapse_all": "Collapse all",
+    "multi_expand_all": "Expand all",
     "multi_found": "Found {count} stations (most minerals bought first)",
     "search_title": "Search For Commodity Prices",
     "help_tooltip": "Open Commodity Market guide (README)",

@@ -110,6 +110,10 @@ class MultiMineralTab:
         ttk.Label(results_header, text=t('marketplace.search_results'),
                   font=app._scaled_font(10, "bold")).pack(side="left")
         app._cv_add_columns_button(results_header, 'multiple_prices')
+        self.toggle_btn = create_action_button(results_header, text=t('marketplace.multi_collapse_all'),
+                                               command=self._toggle_all)
+        self.toggle_btn.pack(side="right", padx=(0, 6))
+        self._collapsed = False
         if theme in ("modern", "modern_slate", "modern_orange"):
             self.status_label = ttk.Label(results_header, text='', anchor="w",
                 font=app._scaled_font(9, "bold"), foreground=modern_color("#E6EAF0"))
@@ -203,6 +207,13 @@ class MultiMineralTab:
             return float(text[:-1]) * {"m": 1, "h": 60, "d": 1440}[text[-1]]
         except (ValueError, KeyError, IndexError):
             return float("inf")
+
+    def _toggle_all(self) -> None:
+        collapse = not self._collapsed
+        self._collapsed = collapse
+        for item in self.tree.get_children():
+            self.tree.item(item, open=not collapse)
+        self.toggle_btn.configure(text=t('marketplace.multi_expand_all' if collapse else 'marketplace.multi_collapse_all'))
 
     def _sort(self, col: str) -> None:
         """Sort stations by a column. Mineral-level columns order stations by their best mineral row
@@ -353,6 +364,8 @@ class MultiMineralTab:
         self._row_source = {}
         self._sort_col, self._sort_rev = None, False
         self._show_sort_arrow()
+        self._collapsed = False
+        self.toggle_btn.configure(text=t('marketplace.multi_collapse_all'))
         if not stations:
             self.status_label.config(text=t('marketplace.no_results'))
             return
