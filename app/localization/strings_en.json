@@ -571,6 +571,7 @@
     "limpets_used": "Limpets"
   },
   "marketplace": {
+    "price_cr": "Price (CR)",
     "avg_price": "Avg: {price} CR",
     "best_buy_price": "Best Buy: {price} CR",
     "best_sell_price": "Best Sell: {price} CR",

@@ -267,7 +267,7 @@ Measured on a copy of the dev cache:
 | 4 Carrier page sharing | Done, dev tested (checks pass; real carriers still appear with Station = Fleet Carrier). Found a separate bug: settlements labelled as carriers, see "Carrier Label Fix" | see git log |
 | Carrier Label Fix (found in step 4) | Done, dev tested (checks pass incl. new settlement check; near Wregoe MD-K d8-38 carrier-labelled rows 349 -> 168, all real carriers) | — |
 | 5 Powerplay fill-in | Not started | — |
-| 6 Hardcoded text | Done, dev tested in German (checks pass; removed dead status text, banner and unused `_open_edtools_market`) | see git log |
+| 6 Hardcoded text | Done, dev tested in German (checks pass; removed dead status text, banner and unused `_open_edtools_market`; follow-up: Mining and Trade price columns show "Price (CR)" in the header and plain numbers in rows, Multiple Prices unchanged) | see git log |
 | 7 Trade parity | Not started | — |
 | 7b Station Type in Multiple Prices | Not started | — |
 | 8 Sort and refresh | Not started | — |

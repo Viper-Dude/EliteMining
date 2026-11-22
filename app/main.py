@@ -13290,7 +13290,7 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
             "distance": t('marketplace.distance'),
             "ls": "LS",
             "demand": t('marketplace.supply') if is_buy_mode else t('marketplace.demand'),  # Dynamic based on mode
-            "price": t('marketplace.price'),
+            "price": t('marketplace.price_cr'),
             "updated": t('marketplace.updated'),
             "powerstate": t('marketplace.powerstate')
         }
@@ -14320,9 +14320,9 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
             
             # PRICE
             if is_buy_mode:
-                price = f"{result.get('buyPrice', 0):,} CR"
+                price = f"{result.get('buyPrice', 0):,}"
             else:
-                price = f"{result.get('sellPrice', 0):,} CR"
+                price = f"{result.get('sellPrice', 0):,}"
             
             updated = format_relative_age(result.get('updatedAt')) or '?'
             powerstate = format_market_powerplay(_trade_pp_data.get(result.get('systemName', ''), {}))
@@ -14671,10 +14671,10 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
                 if is_buy_mode:
                     # Buy mode (exports endpoint): Use 'buyPrice' (what YOU pay to buy FROM them)
                     # API has backwards field naming - sellPrice is 0, actual price is in buyPrice
-                    price = f"{result.get('buyPrice', 0):,} CR"
+                    price = f"{result.get('buyPrice', 0):,}"
                 else:
                     # Sell mode (imports endpoint): Use 'sellPrice' (what YOU get when selling TO them)
-                    price = f"{result.get('sellPrice', 0):,} CR"
+                    price = f"{result.get('sellPrice', 0):,}"
                 
                 updated = format_relative_age(result.get('updatedAt')) or '?'
                 powerstate = format_market_powerplay(_pp_data.get(result.get('systemName', ''), {}))

@@ -567,6 +567,7 @@
     "limpets_used": "Drohnen"
   },
   "marketplace": {
+    "price_cr": "Preis (CR)",
     "avg_price": "Durchschnitt: {price} CR",
     "best_buy_price": "Bester Kauf: {price} CR",
     "best_sell_price": "Bester Verkauf: {price} CR",
