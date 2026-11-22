@@ -14275,6 +14275,10 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin):
         # Clear existing results
         self.trade_tree.delete(*self.trade_tree.get_children())
         self._trade_row_source = {}
+        self.trade_sort_column = None
+        self.trade_sort_reverse = False
+        from ui.sort_indicator import apply_sort_arrow
+        apply_sort_arrow(self.trade_tree, None, False)
         if hasattr(self, 'trade_avg_label'):
             self.trade_avg_label.config(text="")
         if hasattr(self, 'trade_best_label'):
