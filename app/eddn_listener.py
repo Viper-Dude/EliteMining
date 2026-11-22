@@ -360,7 +360,12 @@ class EDDNListener:
         """
         try:
             schema_ref = message.get('$schemaRef', '')
-            
+
+            # Legacy (pre-Odyssey) galaxy is a separate universe; skip all of its data
+            game_version = str(message.get('header', {}).get('gameversion') or '')
+            if 'legacy' in game_version.lower() or game_version.startswith(('2.', '3.')):
+                return
+
             # Commodity market data — update prices
             if 'commodity' in schema_ref.lower():
                 self._process_commodity_message(message)
@@ -496,10 +501,6 @@ class EDDNListener:
 
     def _process_system_info_from_event(self, message: dict, msg_data: dict):
         """Store system status from a jump/location event, keeping whichever report is newest."""
-        # Legacy (pre-Odyssey) galaxy has its own faction states
-        game_version = str(message.get('header', {}).get('gameversion') or '')
-        if 'legacy' in game_version.lower() or game_version.startswith(('2.', '3.')):
-            return
         info = system_info_cache.info_from_journal_event(msg_data)
         if not info:
             return

@@ -274,4 +274,4 @@ Measured on a copy of the dev cache:
 | 9 Spansh nearby | Not started | — |
 | E1 EDDN coordinates | Done, dev tested (first minutes after restart: 348 systems stored, 834 of 864 new EDDN price rows saved with coordinates; checks pass incl. 2 new; comparison only adds stations, e.g. Sol Any Painite sell 4674 -> 5004, Colonia unchanged; losses were age-outs between runs. Coordinates are stored only for station events or systems with price records, because all jumps would add ~100k systems a day) | — |
 | E2 EDDN reconnect | Done, dev tested (network off 5 min: reconnect logged at 20:26:40 after 180 s; reconnects after 180 s of silence, logs once at INFO; new `check_eddn_reconnect` 2 pass, `check_marketplace_indexes` 14 pass) | — |
-| E3 Legacy guard | Not started | — |
+| E3 Legacy guard | Done (checks pass; one guard in `_process_message` skips all Legacy messages; fake-message test only, no Legacy in live sample; dev test pending) | see git log |
