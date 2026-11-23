@@ -189,12 +189,15 @@ class ReleaseBuilder:
                 profile_dir = self.project_root / "Voiceattack Profile"
                 if not profile_dir.exists():
                     profile_dir = self.project_root
-                profile_file = profile_dir / f"EliteMining v{version}-Profile.vap"
-                if profile_file.exists():
+                # The profile keeps the version of the release that last changed it, not the app version
+                profile_files = list(profile_dir.glob("EliteMining v*-Profile.vap"))
+                if len(profile_files) == 1:
+                    profile_file = profile_files[0]
                     zipf.write(profile_file, f"EliteMining/{profile_file.name}")
                     print(f"✅ Added: EliteMining/{profile_file.name}")
                 else:
-                    print(f"⚠️  Production profile not found: {profile_file.name}")
+                    print(f"❌ Expected one VoiceAttack profile in {profile_dir}, found {len(profile_files)}")
+                    return False
 
                 for source_file, dest_file in config_files:
                     config_path = self.project_root / source_file
