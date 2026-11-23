@@ -125,10 +125,10 @@ class MultiMineralTab:
             self.status_label.pack(side="left", fill="x", expand=True, padx=(10, 0))
         table = ttk.Frame(container, relief="solid", borderwidth=1)
         table.pack(fill="both", expand=True, pady=(5, 0))
-        cols = ("location", "type", "pad", "distance", "ls", "demand", "price", "powerstate", "updated", "_spacer")
+        cols = ("system", "station", "type", "pad", "distance", "ls", "demand", "price", "powerstate", "updated", "_spacer")
         self.tree = StripedTreeview(table, columns=cols, show="tree headings", height=15,
                                  style="Marketplace.Treeview", selectmode="browse")
-        headings = {"location": t('marketplace.multi_col_station'),
+        headings = {"system": t('ring_finder.col_system'), "station": t('ring_finder.col_station'),
                     "type": t('marketplace.type'), "pad": t('marketplace.pad'), "distance": t('marketplace.distance'),
                     "ls": "LS", "demand": t('marketplace.demand'), "price": t('marketplace.price'),
                     "powerstate": t('marketplace.powerstate'), "updated": t('marketplace.updated')}
@@ -145,7 +145,7 @@ class MultiMineralTab:
 
         self.tree.column("#0", width=max(app._scaled_px(170), min_for("#0")), minwidth=min_for("#0"),
                          stretch=False, anchor="w")
-        widths = {"location": 255, "type": 95, "pad": 45, "distance": 70, "ls": 70, "demand": 80,
+        widths = {"system": 180, "station": 210, "type": 95, "pad": 45, "distance": 70, "ls": 70, "demand": 80,
                   "price": 120, "powerstate": 150, "updated": 80}
         for c in cols:
             if c == "_spacer":
@@ -165,7 +165,7 @@ class MultiMineralTab:
         saved_order = list(load_column_order('multiple_prices') or [])
         if saved_order and 'type' not in saved_order and 'location' in saved_order:
             saved_order.insert(saved_order.index('location') + 1, 'type')
-            app._cv_set_order('multiple_prices', saved_order, save=False)
+        app._cv_split_saved_column('multiple_prices', 'location', ('system', 'station'), saved_order)
 
         from config import load_multiple_prices_column_widths, save_multiple_prices_column_widths
         for col, width in load_multiple_prices_column_widths().items():
@@ -228,7 +228,7 @@ class MultiMineralTab:
             self._sort_rev = not self._sort_rev
         else:
             self._sort_col, self._sort_rev = col, False
-        vals = ("location", "type", "pad", "distance", "ls", "demand", "price", "powerstate", "updated")
+        vals = ("system", "station", "type", "pad", "distance", "ls", "demand", "price", "powerstate", "updated")
         idx = {c: i for i, c in enumerate(vals)}
 
         def child_key(item):
@@ -383,7 +383,8 @@ class MultiMineralTab:
             dist = info.get('distance')
             ls = info.get('distanceToArrival')
             parent = self.tree.insert("", "end", open=True, text="", values=(
-                f"{info.get('systemName', '')} / {info.get('stationName', '')[:25]}",
+                info.get('systemName', ''),
+                info.get('stationName', ''),
                 format_market_station_type(info.get('stationType')),
                 format_market_pad(info.get('maxLandingPadSize')),
                 f"{dist:.1f}" if dist is not None else "-",
@@ -391,7 +392,7 @@ class MultiMineralTab:
                 format_market_powerplay(pp_data.get(info.get('systemName', ''), {})), ""))
             for mineral, r in sorted(s['minerals'].items(), key=lambda kv: -kv[1].get('sellPrice', 0)):
                 child = self.tree.insert(parent, "end", text=app._commodity_map.get(mineral, mineral), values=(
-                    "", "", "", "", "", f"{r.get('demand', 0):,}", f"{r.get('sellPrice', 0):,} CR", "", format_relative_age(r.get('updatedAt')) or '?'))
+                    "", "", "", "", "", "", f"{r.get('demand', 0):,}", f"{r.get('sellPrice', 0):,} CR", "", format_relative_age(r.get('updatedAt')) or '?'))
                 self._row_source[child] = format_market_source(r)
         self.status_label.config(text=t('marketplace.multi_found').format(count=len(stations)))
 

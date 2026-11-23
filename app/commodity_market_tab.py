@@ -657,7 +657,7 @@ class CommodityMarketTabMixin:
         # _spacer is an always-empty trailing column (never in the visibility menu) that
         # absorbs extra horizontal space, same as Ring Finder's results table - without it
         # the last real column gets force-stretched and its right border isn't draggable.
-        columns = ("location", "type", "pad", "distance", "ls", "demand", "price", "powerstate", "updated", "_spacer")
+        columns = ("system", "station", "type", "pad", "distance", "ls", "demand", "price", "powerstate", "updated", "_spacer")
         
         # Configure Marketplace Treeview style (theme-aware)
         from config import load_theme
@@ -741,7 +741,7 @@ class CommodityMarketTabMixin:
         # both possible strings and take the larger one.
         import tkinter.font as _tkfont
         _heading_font = _tkfont.Font(font=self._scaled_font(9, "bold"))
-        _base_widths = {"location": 255, "type": 95, "pad": 45, "distance": 70, "ls": 70,
+        _base_widths = {"system": 180, "station": 210, "type": 95, "pad": 45, "distance": 70, "ls": 70,
                         "demand": 75, "price": 125, "powerstate": 150, "updated": 95}
         _header_pad = self._scaled_px(24)  # header cell padding + sort-arrow space
 
@@ -773,6 +773,7 @@ class CommodityMarketTabMixin:
             allow_reorder=True,
             use_displaycolumns=True
         )
+        self._cv_split_saved_column('mining_commodities', 'location', ('system', 'station'))
 
         # Load saved column widths from config — but never let an old (pre-scale)
         # saved width sit below the current scaled minwidth, or headers get squeezed.
@@ -851,7 +852,8 @@ class CommodityMarketTabMixin:
         is_buy_mode = self.marketplace_buy_mode.get() if hasattr(self, 'marketplace_buy_mode') else False
         
         titles = {
-            "location": t('marketplace.location'),
+            "system": t('ring_finder.col_system'),
+            "station": t('ring_finder.col_station'),
             "type": t('marketplace.type'),
             "pad": t('marketplace.pad'),
             "distance": t('marketplace.distance'),
@@ -867,7 +869,7 @@ class CommodityMarketTabMixin:
         """Update column headers when mode changes"""
         if hasattr(self, 'marketplace_tree'):
             numeric_columns = {"distance", "ls", "demand", "price", "updated"}
-            for col in ("location", "type", "pad", "distance", "ls", "demand", "price", "updated", "powerstate"):
+            for col in ("system", "station", "type", "pad", "distance", "ls", "demand", "price", "updated", "powerstate"):
                 is_numeric = col in numeric_columns
                 self.marketplace_tree.heading(col, text=self._get_column_title(col),
                                             anchor="center" if col in ("pad", "updated") else "w",
@@ -931,81 +933,57 @@ class CommodityMarketTabMixin:
         self.trade_context_menu.add_separator()
         self.trade_context_menu.add_command(label=t('context_menu.copy_system'), command=self._copy_trade_system)
     
+    @staticmethod
+    def _row_system_station(tree, item):
+        """(system, station) from a results row's System and Station cells."""
+        values = tree.item(item, 'values')
+        if not values or len(values) < 2:
+            return "", ""
+        return str(values[0]).strip(), str(values[1]).strip()
+
+    def _selected_system_station(self, tree):
+        selection = tree.selection()
+        return self._row_system_station(tree, selection[0]) if selection else ("", "")
+
+    def _open_station_on_inara(self, tree):
+        import urllib.parse
+        import webbrowser
+        _system, station = self._selected_system_station(tree)
+        if station:
+            webbrowser.open(f"https://inara.cz/elite/stations/?search={urllib.parse.quote_plus(station)}")
+
+    def _open_station_on_edsm(self, tree):
+        import urllib.parse
+        import webbrowser
+        _system, station = self._selected_system_station(tree)
+        if station:
+            webbrowser.open(f"https://www.edsm.net/en/search/stations/index/name/{urllib.parse.quote(station)}/")
+
+    def _open_system_on_spansh(self, tree):
+        import urllib.parse
+        import webbrowser
+        system, _station = self._selected_system_station(tree)
+        if system:
+            webbrowser.open(f"https://spansh.co.uk/search/{urllib.parse.quote(system)}")
+
+    def _copy_selected_system(self, tree, label):
+        system, _station = self._selected_system_station(tree)
+        if system:
+            self.clipboard_clear()
+            self.clipboard_append(system)
+            label.config(text=t('marketplace.copied_to_clipboard').format(system=system))
+
     def _open_inara_from_menu(self):
-        """Open Inara station search from context menu"""
-        selection = self.marketplace_tree.selection()
-        if selection:
-            try:
-                item = selection[0]
-                values = self.marketplace_tree.item(item, 'values')
-                if values and len(values) > 0:
-                    location = values[0]  # "System / Station"
-                    if ' / ' in location:
-                        system_name, station_name = location.split(' / ', 1)
-                        # URL encode station name using quote_plus (converts spaces to +)
-                        import urllib.parse
-                        encoded_station = urllib.parse.quote_plus(station_name.strip())
-                        url = f"https://inara.cz/elite/stations/?search={encoded_station}"
-                        import webbrowser
-                        webbrowser.open(url)
-                        print(f"[MARKETPLACE] Opening Inara for station: {station_name}")
-            except Exception as e:
-                log.error(f"[MARKETPLACE] Error opening Inara: {e}")
-    
+        self._open_station_on_inara(self.marketplace_tree)
+
     def _open_edsm_from_menu(self):
-        """Open EDSM station search from context menu"""
-        selection = self.marketplace_tree.selection()
-        if selection:
-            try:
-                item = selection[0]
-                values = self.marketplace_tree.item(item, 'values')
-                if values and len(values) > 0:
-                    location = values[0]  # "System / Station"
-                    if ' / ' in location:
-                        system_name, station_name = location.split(' / ', 1)
-                        # URL encode station name using quote (no + for EDSM)
-                        import urllib.parse
-                        encoded_station = urllib.parse.quote(station_name.strip())
-                        url = f"https://www.edsm.net/en/search/stations/index/name/{encoded_station}/"
-                        import webbrowser
-                        webbrowser.open(url)
-                        print(f"[MARKETPLACE] Opening EDSM for station: {station_name}")
-            except Exception as e:
-                log.error(f"[MARKETPLACE] Error opening EDSM: {e}")
-    
+        self._open_station_on_edsm(self.marketplace_tree)
+
     def _open_spansh_from_menu(self):
-        """Open Spansh system search from context menu"""
-        selection = self.marketplace_tree.selection()
-        if selection:
-            try:
-                item = selection[0]
-                values = self.marketplace_tree.item(item, 'values')
-                if values and len(values) > 0:
-                    location = values[0]  # "System / Station"
-                    if ' / ' in location:
-                        system_name, station_name = location.split(' / ', 1)
-                        import urllib.parse
-                        import webbrowser
-                        url = f"https://spansh.co.uk/search/{urllib.parse.quote(system_name.strip())}"
-                        webbrowser.open(url)
-                        print(f"[MARKETPLACE] Opening Spansh for system: {system_name}")
-            except Exception as e:
-                log.error(f"[MARKETPLACE] Error opening Spansh: {e}")
+        self._open_system_on_spansh(self.marketplace_tree)
 
     def _copy_marketplace_system(self):
-        """Copy system name from location column (format: 'System / Station')"""
-        selection = self.marketplace_tree.selection()
-        if selection:
-            item = selection[0]
-            values = self.marketplace_tree.item(item, 'values')
-            if values and len(values) > 0:
-                location = values[0]  # Location is first column
-                # Extract system name (before the " / ")
-                if " / " in location:
-                    system_name = location.split(" / ")[0]
-                    self.clipboard_clear()
-                    self.clipboard_append(system_name)
-                    self.marketplace_total_label.config(text=t('marketplace.copied_to_clipboard').format(system=system_name))
+        self._copy_selected_system(self.marketplace_tree, self.marketplace_total_label)
     
     def _find_hotspots_from_marketplace(self):
         """Open Hotspots Finder with the selected commodity to find mining locations"""
@@ -1020,15 +998,7 @@ class CommodityMarketTabMixin:
             return
         
         # Get the system from the selected row
-        selection = self.marketplace_tree.selection()
-        system_name = None
-        if selection:
-            item = selection[0]
-            values = self.marketplace_tree.item(item, 'values')
-            if values and len(values) > 0:
-                location = values[0]  # Location is first column "System / Station"
-                if " / " in location:
-                    system_name = location.split(" / ")[0].strip()
+        system_name = self._selected_system_station(self.marketplace_tree)[0] or None
         
         # Switch to Hotspots Finder tab
         try:
@@ -1073,63 +1043,13 @@ class CommodityMarketTabMixin:
             traceback.print_exc()
     
     def _open_inara_from_trade_menu(self):
-        """Open Inara station search from Trade context menu"""
-        selection = self.trade_tree.selection()
-        if selection:
-            try:
-                item = selection[0]
-                values = self.trade_tree.item(item, 'values')
-                if values and len(values) > 0:
-                    location = values[0]  # "System / Station"
-                    if ' / ' in location:
-                        system_name, station_name = location.split(' / ', 1)
-                        import urllib.parse
-                        encoded_station = urllib.parse.quote_plus(station_name.strip())
-                        url = f"https://inara.cz/elite/stations/?search={encoded_station}"
-                        import webbrowser
-                        webbrowser.open(url)
-                        print(f"[TRADE] Opening Inara for station: {station_name}")
-            except Exception as e:
-                log.error(f"[TRADE] Error opening Inara: {e}")
-    
+        self._open_station_on_inara(self.trade_tree)
+
     def _open_edsm_from_trade_menu(self):
-        """Open EDSM station search from Trade context menu"""
-        selection = self.trade_tree.selection()
-        if selection:
-            try:
-                item = selection[0]
-                values = self.trade_tree.item(item, 'values')
-                if values and len(values) > 0:
-                    location = values[0]  # "System / Station"
-                    if ' / ' in location:
-                        system_name, station_name = location.split(' / ', 1)
-                        import urllib.parse
-                        encoded_station = urllib.parse.quote(station_name.strip())
-                        url = f"https://www.edsm.net/en/search/stations/index/name/{encoded_station}/"
-                        import webbrowser
-                        webbrowser.open(url)
-                        print(f"[TRADE] Opening EDSM for station: {station_name}")
-            except Exception as e:
-                log.error(f"[TRADE] Error opening EDSM: {e}")
-    
+        self._open_station_on_edsm(self.trade_tree)
+
     def _open_spansh_from_trade_menu(self):
-        """Open Spansh system search from Trade context menu"""
-        selection = self.trade_tree.selection()
-        if selection:
-            try:
-                item = selection[0]
-                values = self.trade_tree.item(item, 'values')
-                if values and len(values) > 0:
-                    location = values[0]  # "System / Station"
-                    if ' / ' in location:
-                        system_name, station_name = location.split(' / ', 1)
-                        import urllib.parse
-                        import webbrowser
-                        url = f"https://spansh.co.uk/search/{urllib.parse.quote(system_name.strip())}"
-                        webbrowser.open(url)
-                        print(f"[TRADE] Opening Spansh for system: {system_name}")
-            except Exception as e:
-                log.error(f"[TRADE] Error opening Spansh: {e}")
+        self._open_system_on_spansh(self.trade_tree)
     
     def _show_trade_context_menu(self, event):
         """Show context menu on right-click in Trade Commodities table"""
@@ -1144,19 +1064,7 @@ class CommodityMarketTabMixin:
             self.trade_context_menu.grab_release()
     
     def _copy_trade_system(self):
-        """Copy system name from Trade Commodities location column"""
-        selection = self.trade_tree.selection()
-        if selection:
-            item = selection[0]
-            values = self.trade_tree.item(item, 'values')
-            if values and len(values) > 0:
-                location = values[0]  # Location is first column
-                # Extract system name (before the " / ")
-                if " / " in location:
-                    system_name = location.split(" / ")[0]
-                    self.clipboard_clear()
-                    self.clipboard_append(system_name)
-                    self.trade_total_label.config(text=t('marketplace.copied_to_clipboard').format(system=system_name))
+        self._copy_selected_system(self.trade_tree, self.trade_total_label)
     
     def _populate_marketplace_system(self):
         """Auto-populate marketplace system on startup (independent of ring finder's reference system)"""
@@ -1665,7 +1573,7 @@ class CommodityMarketTabMixin:
         # _spacer is an always-empty trailing column (never in the visibility menu) that
         # absorbs extra horizontal space, same as Ring Finder's results table - without it
         # the last real column gets force-stretched and its right border isn't draggable.
-        columns = ("location", "type", "pad", "distance", "ls", "demand", "price", "powerstate", "updated", "_spacer")
+        columns = ("system", "station", "type", "pad", "distance", "ls", "demand", "price", "powerstate", "updated", "_spacer")
 
         # Create separate Treeview for trade tab
         self.trade_tree = StripedTreeview(table_frame, columns=columns, show="headings", height=15, style="Marketplace.Treeview")
@@ -1693,7 +1601,7 @@ class CommodityMarketTabMixin:
         # both possible strings and take the larger one.
         import tkinter.font as _tkfont
         _heading_font = _tkfont.Font(font=self._scaled_font(9, "bold"))
-        _base_widths = {"location": 255, "type": 95, "pad": 45, "distance": 70, "ls": 70,
+        _base_widths = {"system": 180, "station": 210, "type": 95, "pad": 45, "distance": 70, "ls": 70,
                         "demand": 75, "price": 125, "powerstate": 150, "updated": 95}
         _header_pad = self._scaled_px(24)  # header cell padding + sort-arrow space
 
@@ -1725,6 +1633,7 @@ class CommodityMarketTabMixin:
             allow_reorder=True,
             use_displaycolumns=True
         )
+        self._cv_split_saved_column('trade_commodities', 'location', ('system', 'station'))
 
         # Load saved column widths from config — but never let an old (pre-scale)
         # saved width sit below the current scaled minwidth, or headers get squeezed.
@@ -1877,8 +1786,8 @@ class CommodityMarketTabMixin:
 
         # Display results
         for row_index, result in enumerate(results):
-            # LOCATION (System + Station)
-            location = f"{result.get('systemName', 'Unknown')} / {result.get('stationName', 'Unknown')[:25]}"
+            system_name = result.get('systemName', 'Unknown')
+            station_name = result.get('stationName', 'Unknown')
             station_type = format_market_station_type(result.get('stationType'))
             pad = format_market_pad(result.get('maxLandingPadSize'))
 
@@ -1914,7 +1823,8 @@ class CommodityMarketTabMixin:
             # Insert row with alternating row tag
             row_tag = 'oddrow' if row_index % 2 == 0 else 'evenrow'
             row_id = self.trade_tree.insert('', 'end', values=(
-                f" {location} ",
+                f" {system_name} ",
+                f" {station_name} ",
                 f" {station_type} ",
                 f" {pad} ",
                 f" {distance} ",
@@ -2072,21 +1982,17 @@ class CommodityMarketTabMixin:
             self.marketplace_total_label.config(text=self._found_stations_text(len(results_sorted), is_buy_mode, commodity, reference_system))
 
     def _on_commodity_tree_double_click(self, event, tree, refresh_powerplay=True):
-        """Open Inara from a System/Station or Powerplay cell, refreshing Powerplay when supported."""
+        """Open Inara from a System, Station or Powerplay cell, refreshing Powerplay when supported."""
         if tree.identify_region(event.x, event.y) != "cell":
             return
         item = tree.identify_row(event.y)
         if not item:
             return
         col_name = displayed_column(tree, tree.identify_column(event.x))
-        if col_name not in ("location", "powerstate"):
+        if col_name not in ("system", "station", "powerstate"):
             return
 
-        values = tree.item(item, 'values')
-        if not values or len(values) < 1:
-            return
-        location = values[0].strip()  # "System / Station"
-        system_name = location.split(' / ')[0].strip() if ' / ' in location else location
+        system_name = self._row_system_station(tree, item)[0]
         if not system_name:
             return
 
@@ -2122,8 +2028,7 @@ class CommodityMarketTabMixin:
                 vals = list(tree.item(item, 'values'))
                 if not vals:
                     continue
-                location = vals[0].strip()
-                row_system = location.split(' / ')[0].strip() if ' / ' in location else location
+                row_system = str(vals[0]).strip()
                 if row_system == system_name and len(vals) > pp_col_index:
                     vals[pp_col_index] = f" {pp_str} "
                     tree.item(item, values=vals)
@@ -2181,9 +2086,7 @@ class CommodityMarketTabMixin:
             vals = list(tree.item(item, 'values'))
             if not vals or len(vals) <= pp_col_index:
                 continue
-            location = vals[0].strip()
-            row_system = location.split(' / ')[0].strip() if ' / ' in location else location
-            entry = pp_data.get(row_system)
+            entry = pp_data.get(str(vals[0]).strip())
             if not entry:
                 continue
             from app_utils import format_market_powerplay
@@ -2246,8 +2149,8 @@ class CommodityMarketTabMixin:
 
             # Populate results (sorted by distance - closest first)
             for row_index, result in enumerate(results):
-                # LOCATION (System + Station) - API uses camelCase
-                location = f"{result['systemName']} / {result['stationName'][:25]}"
+                system_name = result['systemName']
+                station_name = result['stationName']
                 station_type = format_market_station_type(result.get('stationType'))
                 pad = format_market_pad(result.get('maxLandingPadSize'))
 
@@ -2291,7 +2194,8 @@ class CommodityMarketTabMixin:
 
                 # Add subtle visual separator using spacing
                 row_id = self.marketplace_tree.insert("", "end", values=(
-                    f" {location} ",
+                    f" {system_name} ",
+                    f" {station_name} ",
                     f" {station_type} ",
                     f" {pad} ",
                     f" {distance} ",
@@ -2347,11 +2251,10 @@ class CommodityMarketTabMixin:
             
             # Get column index - column IDs, not display names (must match the treeview's
             # actual column order, including the trailing _spacer)
-            column_ids = ("location", "type", "pad", "distance", "ls", "demand", "price", "powerstate", "updated", "_spacer")
+            column_ids = ("system", "station", "type", "pad", "distance", "ls", "demand", "price", "powerstate", "updated", "_spacer")
 
             # Map display names to column IDs
             display_to_id = {
-                "Location": "location",
                 "Station Type": "type",
                 "Pad": "pad",
                 "Distance": "distance",

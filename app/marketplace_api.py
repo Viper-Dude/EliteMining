@@ -1674,7 +1674,7 @@ class MarketplaceAPI:
         results = [r for r in results if r.get(volume, 0) > 0 and r.get(price, 0) > 0]
         if exclude_carriers and station_type != 'Fleet Carrier':
             results = [r for r in results if 'FleetCarrier' not in (r.get('stationType') or '')]
-        orbital = ('Coriolis', 'Orbis', 'Ocellus', 'Outpost', 'Asteroid', 'Dodec', 'Orbital', 'Space')
+        orbital = ('Coriolis', 'Orbis', 'Ocellus', 'Bernal', 'Outpost', 'Asteroid', 'Dodec', 'Orbital', 'Space')
         surface = ('Crater', 'OnFoot', 'Planetary', 'Surface', 'Ground', 'Settlement')
         if station_type == 'Orbital':
             results = [r for r in results if any(k in (r.get('stationType') or '') for k in orbital)

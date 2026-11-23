@@ -613,6 +613,12 @@ def format_market_station_type(api_type):
     if api_type is None or api_type == '':
         api_type = 'Unknown'
 
+    # Alternate spellings from the journal and Spansh
+    api_type = {'Bernal': 'Ocellus', 'Megaship': 'MegaShip', 'Mega ship': 'MegaShip',
+                'Mega Ship': 'MegaShip', 'Asteroid base': 'AsteroidBase', 'Asteroid Base': 'AsteroidBase',
+                'Dodec Starport': 'Dodec', 'Settlement': 'OnFootSettlement',
+                'Stronghold Carrier': 'StrongholdCarrier'}.get(api_type, api_type)
+
     # Orbital starports - show as "Orbital/Type"
     # Exact known types first, then prefix-based fallback for new
     # Trailblazers/colonization types (OrbitalConstruction, SurfaceConstruction, etc.)

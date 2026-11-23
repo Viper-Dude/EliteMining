@@ -531,10 +531,10 @@ class MultiplePricesTableTests(unittest.TestCase):
                 self.assertEqual(str(tab.exclude_carriers_cb['state']), 'disabled')
                 tab.station_var.set('All')
                 self.assertEqual(str(tab.exclude_carriers_cb['state']), 'normal')
-                tab.tree.column('location', width=600)
+                tab.tree.column('station', width=600)
                 tab.tree.event_generate('<ButtonRelease-1>', x=0, y=0)
                 root.update()
-                self.assertEqual(widths['location'], 600)
+                self.assertEqual(widths['station'], 600)
                 stations = [dict(info=market(i, distanceToArrival=ls), minerals={})
                             for i, ls in enumerate(('1234.9', 0, None))]
                 with patch('system_finder_api.SystemFinderAPI._batch_get_powerplay', return_value={}):
@@ -542,7 +542,7 @@ class MultiplePricesTableTests(unittest.TestCase):
                 self.assertEqual([tab.tree.set(item, 'ls') for item in tab.tree.get_children()], ['1,234', '0', '?'])
                 root.geometry('800x650+-3000+-3000')
                 root.update()
-                self.assertEqual(tab.tree.column('location', 'width'), 600)
+                self.assertEqual(tab.tree.column('station', 'width'), 600)
                 tab.tree.xview_moveto(1)
                 root.update()
                 self.assertGreater(tab.tree.xview()[0], 0)
@@ -554,21 +554,64 @@ class MultiplePricesTableTests(unittest.TestCase):
                 self.assertGreater(tab.tree.yview()[0], 0)
                 root._cv_toggle('price', 'multiple_prices')
                 self.assertNotIn('price', tab.tree['displaycolumns'])
-                root._cv_set_order('multiple_prices', ['updated', 'location'])
+                root._cv_set_order('multiple_prices', ['updated', 'station'])
                 self.assertEqual(displayed_column(tab.tree, '#1'), 'updated')
-                self.assertEqual(tab.tree.column('location', 'width'), 600)
+                self.assertEqual(tab.tree.column('station', 'width'), 600)
                 self.cancel_callbacks(root)
                 frame.destroy()
                 frame = tk.Frame(root)
                 frame.pack(fill='both', expand=True)
                 restored = MultiMineralTab(frame, root)
                 root.update()
-                self.assertEqual(restored.tree.column('location', 'width'), 600)
+                self.assertEqual(restored.tree.column('station', 'width'), 600)
                 self.assertNotIn('price', restored.tree['displaycolumns'])
                 self.assertEqual(displayed_column(restored.tree, '#1'), 'updated')
                 root._cv_toggle('price', 'multiple_prices')
                 self.assertIn('price', restored.tree['displaycolumns'])
                 self.assertGreaterEqual(restored.tree.column('price', 'width'), restored.tree.column('price', 'minwidth'))
+
+    def test_saved_layout_puts_system_and_station_where_location_was(self):
+        with ExitStack() as stack:
+            widths, visibility, order = {}, {'location': False}, ['pad', 'location', 'type']
+            stack.enter_context(patch('multi_mineral_tab.t', lambda key: key))
+            stack.enter_context(patch('config.load_multiple_prices_column_widths', side_effect=lambda: widths.copy()))
+            stack.enter_context(patch('config.save_multiple_prices_column_widths', side_effect=lambda value: widths.update(value)))
+            stack.enter_context(patch('config.load_column_visibility', side_effect=lambda key: visibility.copy()))
+            stack.enter_context(patch('config.save_column_visibility', side_effect=lambda key, value: visibility.update(value)))
+            stack.enter_context(patch('config.load_column_order', side_effect=lambda key: order.copy()))
+            stack.enter_context(patch('config.save_column_order', side_effect=lambda key, value: order.__setitem__(slice(None), value)))
+            root = TableApp()
+            stack.callback(root.destroy)
+            stack.callback(self.cancel_callbacks, root)
+            root.withdraw()
+            root._scaled_font = lambda size, *style: ('Segoe UI', size, *style)
+            root._scaled_px = lambda size: size
+            for key, value in dict(reference_system='Sol', station_type='All', exclude_carriers=True,
+                                   large_pad_only=False, max_age='Any').items():
+                setattr(root, 'marketplace_' + key, tk.BooleanVar(root, value) if isinstance(value, bool) else tk.StringVar(root, value))
+            root._station_type_map = {key: key for key in ('All', 'Fleet Carrier')}
+            root._station_type_rev_map = {}
+            root._station_type_order = ['All', 'Fleet Carrier']
+            root._commodity_map = {}
+            root._age_map = {'Any': 'Any'}
+            root._age_order = ['Any']
+            root._cv_add_columns_button = lambda *args: None
+            tab = MultiMineralTab(tk.Frame(root), root)
+            shown = list(tab.tree['displaycolumns'])
+            self.assertEqual(shown[:2], ['pad', 'type'])
+            self.assertNotIn('system', shown)
+            self.assertNotIn('station', shown)
+            visibility.clear()
+            order[:] = ['pad', 'location']
+            tab = MultiMineralTab(tk.Frame(root), root)
+            self.assertEqual(list(tab.tree['displaycolumns'])[:4], ['pad', 'system', 'station', 'type'])
+            with patch('system_finder_api.SystemFinderAPI._batch_get_powerplay', return_value={}):
+                tab._complete([dict(info=market(0, stationName='A Very Long Station Name / With Slash'),
+                                    minerals={'Gold': market(0)})], 1)
+            parent = tab.tree.get_children()[0]
+            self.assertEqual(tab.tree.set(parent, 'station'), 'A Very Long Station Name / With Slash')
+            child = tab.tree.get_children(parent)[0]
+            self.assertTrue(tab.tree.set(child, 'demand'))
 
 
 if __name__ == '__main__':

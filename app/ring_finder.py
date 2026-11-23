@@ -4220,43 +4220,8 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
 
     @staticmethod
     def _format_station_type(api_type: str) -> str:
-        """Map a raw marketplace API stationType to the same friendly label the
-        Commodity Market tab uses (main.py _search_marketplace)."""
-        if not api_type:
-            return 'Unknown'
-        if api_type == 'AsteroidBase':
-            return 'Orbital/Asteroid'
-        if api_type in ('Coriolis', 'Orbis', 'Ocellus', 'Outpost', 'Dodec'):
-            return f'Orbital/{api_type}'
-        if api_type == 'CraterOutpost':
-            return 'Surface/Crater'
-        if api_type == 'CraterPort':
-            return 'Surface/Port'
-        if api_type in ('SurfaceStation', 'SurfacePort'):
-            return 'Surface/Port'
-        if api_type == 'OnFootSettlement':
-            return 'Surface/Settlement'
-        if api_type == 'FleetCarrier':
-            return 'Carrier'
-        if api_type == 'StrongholdCarrier':
-            return 'Stronghold'
-        if api_type == 'MegaShip':
-            return 'MegaShip'
-        if api_type == 'Unknown':
-            return 'Unknown'
-        if 'Planetary' in api_type or 'Crater' in api_type or 'Ground' in api_type:
-            return 'Surface/Station'
-        if 'Space' in api_type and 'Construction' in api_type:
-            return 'Orbital/Station'
-        if 'Surface' in api_type or 'Settlement' in api_type or 'OnFoot' in api_type:
-            return 'Surface/Station'
-        if 'Carrier' in api_type or 'Drake' in api_type:
-            return 'Carrier'
-        if 'Outpost' in api_type:
-            return 'Orbital/Outpost'
-        if 'Orbital' in api_type or 'Port' in api_type or 'Station' in api_type:
-            return 'Orbital/Station'
-        return 'Orbital/Station'
+        from app_utils import format_market_station_type
+        return format_market_station_type(api_type)
 
     @staticmethod
     def _format_pad_size(pad_size) -> str:

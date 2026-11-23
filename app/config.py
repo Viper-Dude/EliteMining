@@ -368,7 +368,7 @@ def load_commodity_market_column_widths() -> Dict[str, int]:
     """Load Commodity Market table column widths from config"""
     cfg = _load_cfg()
     defaults = {
-        "location": 308, "type": 149, "pad": 62, "distance": 116,
+        "system": 180, "station": 210, "type": 149, "pad": 62, "distance": 116,
         "ls": 116, "demand": 128, "price": 132, "updated": 94
     }
     return cfg.get("commodity_market_column_widths", defaults)

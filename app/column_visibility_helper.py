@@ -162,6 +162,22 @@ class ColumnVisibilityMixin:
             from config import save_column_order
             save_column_order(config_key, tree_data['order'])
 
+    def _cv_split_saved_column(self, config_key, old, new, order=None):
+        """Put the columns that replaced a removed one where it sat in the saved order, and
+        keep them hidden if it was hidden; otherwise they would land at the far right."""
+        from config import load_column_order, load_column_visibility
+        tree_data = self._cv_trees[config_key]
+        order = list(order if order is not None else (load_column_order(config_key) or []))
+        if old in order and not any(col in order for col in new):
+            index = order.index(old)
+            order[index:index + 1] = list(new)
+            self._cv_set_order(config_key, order, save=False)
+        saved_visibility = load_column_visibility(config_key) or {}
+        if saved_visibility.get(old) is False and not any(col in saved_visibility for col in new):
+            for col in new:
+                tree_data['visible'][col] = False
+            self._cv_apply_displaycolumns(config_key)
+
     def _cv_show_order_dialog(self, config_key):
         from config import load_theme, scaled_font, scaled_px
         from tkinter import ttk
