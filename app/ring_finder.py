@@ -2909,7 +2909,7 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
                 
                 # Convert database format to display format for special cases
                 if material_name in ("LowTemperatureDiamond", "Low Temperature Diamonds"):
-                    material_name = get_material("Low Temperature Diamonds")
+                    material_name = get_abbr("Low Temperature Diamonds")
                 
                 # Check if material_name already contains counts (from RingFinder.ALL_MINERALS GROUP_CONCAT)
                 # Format: "Material (X)" or "Material1 (X), Material2 (Y)"

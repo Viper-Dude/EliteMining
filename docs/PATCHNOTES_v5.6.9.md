@@ -1,16 +1,17 @@
 # <img src="https://github.com/Viper-Dude/EliteMining/blob/main/app/Images/logo_multi.ico" width="32" height="32"> EliteMining
-**Release Date:** 2026-November-22
+**Release Date:** 2026-November-23
 
 ## New Features & Improvements
 
-
+- Commodity Market searches are faster and find more stations with fresh prices, both nearby and galaxy-wide.
+- Low Temperature Diamonds is now named consistently across the app.
 
 ## Bug Fixes
 
 - Commodity Market no longer mistakes newly built colony settlements for fleet carriers, so they no longer appear in Fleet Carrier searches or vanish when Exclude Carriers is ticked.
 
 
-### Voiceattack Profile
+### Voiceattack Profile - no update (V5.6.8)
 
 
 
