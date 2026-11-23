@@ -949,13 +949,10 @@ class BestMineralsMixin:
         if ((view == 'acquisition' and acq_frame is None) or (view == 'merit_miner' and mm_frame is None)
                 or (view == 'best_mining' and bm_frame is None)):
             view = 'hotspots'
-        more_btn = getattr(self, '_more_btn', None)  # Modern only; opens hotspot search filters
         status = getattr(self, '_results_status_label', None)
         before = {'before': status} if status is not None and status.winfo_manager() else {}
-        for btn in (self._columns_btn, more_btn):
-            if btn is not None:
-                btn.pack_forget()
-        # Status, More filters and Columns belong to the hotspot table; the other views
+        self._columns_btn.pack_forget()
+        # Status and Columns belong to the hotspot table; the other views
         # have their own label row
         tools_row = getattr(self, '_results_tools_row', None)
         if tools_row is not None:
@@ -979,8 +976,6 @@ class BestMineralsMixin:
         else:
             self._hotspots_tree_frame.pack(fill="both", expand=True, padx=5, pady=(5, 2))
             self._columns_btn.pack(side="right", padx=(scaled_px(8), 0), **before)
-            if more_btn is not None:
-                more_btn.pack(side="right", padx=(0, 8), **before)
 
     # --- Auto Prices -----------------------------------------------------------------
 

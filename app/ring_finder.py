@@ -741,6 +741,10 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Mer
 
         reset_btn_fg = "#ff8c00" if _cb_theme == "elite_orange" else "#ffffff"
         reset_btn_active_fg = "#ffa500" if _cb_theme == "elite_orange" else "#ffffff"
+        if _modern_form:
+            # Created first so it sits just before Reset Filters; its label is set once the filters exist
+            self._more_btn = self._rf_button(self._rf_actions, text=t('ring_finder.more_filters'),
+                                             command=self._toggle_more_filters)
         reset_btn = self._rf_button(self._rf_actions if _modern_form else pp_inner_row, text=t('ring_finder.reset_filters'),
                              command=self._reset_filters,
                              bg="#3a3a3a", fg=reset_btn_fg,
@@ -1062,9 +1066,6 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Mer
         # The other views put their Columns button in their own control row
         self._columns_btn = self._cv_add_columns_button(tools_row, 'ring_finder')
         if _modern_form:
-            self._more_btn = self._rf_button(tools_row, text="", command=self._toggle_more_filters)
-            self._more_btn.pack(side="right", padx=(0, 8))
-            self._refresh_more_btn()
             self._results_status_label = ttk.Label(tools_row, textvariable=self.status_var, font=scaled_font(9, "bold"),
                                                    foreground=modern_color("#E6EAF0"))
             self._results_status_label.pack(side="left")
@@ -2224,6 +2225,8 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Mer
             self.distance_var.set("50")
         if hasattr(self, 'max_results_var'):
             self.max_results_var.set("100")
+        # A remembered pre-Power-State distance would otherwise overwrite the 50 below
+        self._pp_distance_override_saved = None
 
         # Ring Type
         self.material_var.set(t('ring_finder.all'))

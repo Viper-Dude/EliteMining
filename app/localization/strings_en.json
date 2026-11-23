@@ -140,7 +140,7 @@
     "reset_short": "Reset Filters",
     "find_best_short": "Best Mining System",
     "columns_button": "Columns",
-    "reset_filters_tooltip": "Reset all search filters to default values (All ring types, All reserves, All minerals, checkboxes unchecked)",
+    "reset_filters_tooltip": "Reset all search filters to their defaults (All minerals and ring types, Pristine reserve, 50 Ly, Local data, no Power filter, checkboxes unchecked)",
     "reverse_search_max_distance": "Max Distance:",
     "reverse_search_searching": "Searching mining systems near {system}...",
     "reverse_search_no_candidates": "No known hotspot systems found within range of {system}",

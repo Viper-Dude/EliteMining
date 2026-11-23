@@ -140,7 +140,7 @@
     "reset_short": "Filter zurücksetzen",
     "find_best_short": "Bestes Bergbausystem",
     "columns_button": "Spalten",
-    "reset_filters_tooltip": "Alle Suchfilter auf Standardwerte zurücksetzen (Alle Ringtypen, Alle Reservestufen, Alle Mineralien, Kontrollkästchen deaktiviert)",
+    "reset_filters_tooltip": "Alle Suchfilter auf ihre Standardwerte zurücksetzen (Alle Mineralien und Ringtypen, Reserve Makellos, 50 Ly, Lokale Daten, kein Macht-Filter, Kontrollkästchen deaktiviert)",
     "reverse_search_max_distance": "Max. Entfernung:",
     "reverse_search_searching": "Suche Abbausysteme nahe {system}...",
     "reverse_search_no_candidates": "Keine bekannten Hotspot-Systeme im Umkreis von {system} gefunden",

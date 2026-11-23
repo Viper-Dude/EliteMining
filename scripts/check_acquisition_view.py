@@ -287,7 +287,8 @@ class ApplyViewTests(unittest.TestCase):
 
     def test_hotspots_unchanged(self):
         v = self.make('hotspots')
-        self.assertEqual(self.shown(v), {'_hotspots_tree_frame', '_columns_btn', '_more_btn'})
+        # More filters now lives beside Reset Filters and is not touched here
+        self.assertEqual(self.shown(v), {'_hotspots_tree_frame', '_columns_btn'})
 
 
 class OutdatedResultTests(unittest.TestCase):
