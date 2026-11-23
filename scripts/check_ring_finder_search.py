@@ -838,6 +838,7 @@ class StatusAndAutoSearchTests(unittest.TestCase):
         f._update_new_entries_label = Mock()
         f.auto_save_var = variable(False)
         f.data_source_var = variable('database')
+        f.specific_material_var = variable('ring_finder.all_minerals')
         f.highlight_timer = None
         f._ring_type_rev_map = {'Alle': 'All', 'Eisig': 'Icy'}
 

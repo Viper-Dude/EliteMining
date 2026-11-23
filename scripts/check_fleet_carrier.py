@@ -84,6 +84,7 @@ class CarrierChecks(unittest.TestCase):
         monitor = Monitor()
         monitor.journal_parser = self.parser
         monitor.main_app_ref = SimpleNamespace(update_current_system=Mock())
+        monitor._queue_cache_upserts = Mock()
         monitor._process_journal_event_impl(json.dumps(self.event(
             'CarrierJump', MarketID=222, StarSystem='Achenar', StarPos=[3, 4, 0])))
         self.assertEqual(self.parser.carrier_data['system'], 'Sol')

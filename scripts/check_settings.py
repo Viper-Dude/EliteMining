@@ -119,6 +119,8 @@ class SettingsChecks(unittest.TestCase):
                 self.app.prospector_panel = panel
                 self.app._ann_update_display = lambda: None
                 self.app._ann_set_active_preset = lambda n: None
+                self.app._ann_preset_notice = None
+                self.app._show_notice = lambda label, msg: None
                 self.method('_ann_load_preset')(self.app, num)
                 self.assertFalse(panel.announce_map['New mineral'])
                 panel.min_pct_map['Platinum'] = 45
