@@ -3,10 +3,12 @@
 
 ## New Features & Improvements
 
-- Best mineral prices now show in the Hotspots Finder search results instead of a popup, and Auto Prices switches to them after each jump.
+- Best mineral prices and Find Acquisition Systems now show in the Hotspots Finder search results instead of popups, and Auto Prices switches to the prices after each jump.
 
 
 ## Bug Fixes
+
+- Find Acquisition Systems now shows "Unoccupied" instead of a placeholder name in the Contesting Power column.
 
 
 

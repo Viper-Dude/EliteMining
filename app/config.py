@@ -320,15 +320,15 @@ def save_reverse_search_window_geometry(geom: Dict[str, Any]) -> None:
     cfg["reverse_search_window"] = geom
     _save_cfg(cfg)
 
-def load_acquisition_search_window_width() -> int:
-    """Load Find Acquisition Targets popup window width from config (0 = not saved)"""
+def load_acquisition_search_column_widths() -> Dict[str, int]:
+    """Load Hotspots Finder Acquisition table column widths from config"""
     cfg = _load_cfg()
-    return int(cfg.get("acquisition_search_window_width", 0) or 0)
+    return dict(cfg.get("acquisition_search_column_widths", {}) or {})
 
-def save_acquisition_search_window_width(width: int) -> None:
-    """Save Find Acquisition Targets popup window width to config"""
+def save_acquisition_search_column_widths(widths: Dict[str, int]) -> None:
+    """Save Hotspots Finder Acquisition table column widths to config"""
     cfg = _load_cfg()
-    cfg["acquisition_search_window_width"] = int(width)
+    cfg["acquisition_search_column_widths"] = widths
     _save_cfg(cfg)
 
 def load_column_visibility(table_key: str) -> Dict[str, bool]:

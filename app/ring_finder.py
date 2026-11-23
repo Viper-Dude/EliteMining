@@ -1042,7 +1042,8 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Col
         self._results_view_var = tk.StringVar(value='hotspots')
         results_view_switch = SegmentedSelector(
             results_header,
-            [('hotspots', t('ring_finder.view_hotspots')), ('best_prices', t('ring_finder.view_best_prices'))],
+            [('hotspots', t('ring_finder.view_hotspots')), ('best_prices', t('ring_finder.view_best_prices')),
+             ('acquisition', t('ring_finder.view_acquisition'))],
             self._results_view_var, bg=_cb_bg, accent=slider_colors(_cb_theme)["accent"],
             font=scaled_font(8), scale=scaled_px(100) / 100, gap=scaled_px(4))
         results_view_switch.pack(side="left", padx=(10, 0))
@@ -1051,6 +1052,8 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Col
         self._columns_btn = self._cv_add_columns_button(results_header, 'ring_finder')
         self._bp_columns_btn = self._cv_add_columns_button(results_header, 'rank_minerals')
         self._bp_columns_btn.pack_forget()
+        self._acq_columns_btn = self._cv_add_columns_button(results_header, 'acquisition_search')
+        self._acq_columns_btn.pack_forget()
         if _modern_form:
             self._more_btn = self._rf_button(results_header, text="", command=self._toggle_more_filters)
             self._more_btn.pack(side="right", padx=(0, 8))
@@ -1374,6 +1377,7 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Col
         self._search_overlay_active = False
 
         self._build_best_prices_view(results_frame, _cb_bg, _cb_select, tree_bg, tree_fg)
+        self._build_acquisition_view(results_frame, _cb_bg, tree_bg, tree_fg)
         self._results_view_var.trace_add('write', lambda *_: self._apply_results_view())
         
         # Configure style for the treeview to allow tag colors

@@ -903,6 +903,9 @@ class BestMineralsMixin:
         """A click on Best Prices loads the selected hotspot row, unless that ring is already
         shown. With no row selected it loads the Reference System's whole-system prices when
         the shown prices are for another system; otherwise it only switches."""
+        if self._results_view_var.get() == 'acquisition':
+            self._acq_on_view_click()
+            return
         bp = self._bp
         if self._results_view_var.get() != 'best_prices' or bp['busy']:
             return
@@ -920,22 +923,32 @@ class BestMineralsMixin:
         self._rank_minerals_for_system('ring')
 
     def _apply_results_view(self):
-        """Show the hotspot table or the Best Prices view, each with its own Columns button."""
+        """Show the hotspot table, the Best Prices view or the Acquisition view, each with
+        its own Columns button."""
         from config import scaled_px
-        prices = self._results_view_var.get() == 'best_prices'
+        view = self._results_view_var.get()
+        acq_frame = getattr(self, '_acq_frame', None)
+        acq_btn = getattr(self, '_acq_columns_btn', None)
+        if view == 'acquisition' and acq_frame is None:
+            view = 'hotspots'
         more_btn = getattr(self, '_more_btn', None)  # Modern only; opens hotspot search filters
         status = getattr(self, '_results_status_label', None)
         before = {'before': status} if status is not None and status.winfo_manager() else {}
-        for btn in (self._columns_btn, self._bp_columns_btn, more_btn):
+        for btn in (self._columns_btn, self._bp_columns_btn, acq_btn, more_btn):
             if btn is not None:
                 btn.pack_forget()
-        if prices:
-            self._hotspots_tree_frame.pack_forget()
+        if view != 'best_prices':
+            self._bp_close_extra_picker()
+        for frame in (self._hotspots_tree_frame, self._bp_frame, acq_frame):
+            if frame is not None:
+                frame.pack_forget()
+        if view == 'best_prices':
             self._bp_frame.pack(fill="both", expand=True)
             self._bp_columns_btn.pack(side="right", padx=(scaled_px(8), 0), **before)
+        elif view == 'acquisition':
+            acq_frame.pack(fill="both", expand=True)
+            acq_btn.pack(side="right", padx=(scaled_px(8), 0), **before)
         else:
-            self._bp_close_extra_picker()
-            self._bp_frame.pack_forget()
             self._hotspots_tree_frame.pack(fill="both", expand=True, padx=5, pady=(5, 2))
             self._columns_btn.pack(side="right", padx=(scaled_px(8), 0), **before)
             if more_btn is not None:

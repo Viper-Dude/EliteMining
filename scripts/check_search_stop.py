@@ -427,7 +427,7 @@ class RemainingWorkerTests(unittest.TestCase):
                 patch.object(SystemFinderAPI, '_fetch_spansh_powerplay_systems', side_effect=nearby), \
                 patch.object(SystemFinderAPI, '_store_powerplay_batch'), \
                 patch.object(MarketplaceAPI, 'search_buyers') as buyers:
-            finder._acquisition_search_worker('Sol', 'Platinum', SimpleNamespace(), Widget(), Widget(), control)
+            finder._acquisition_search_worker('Sol', 'Platinum', control)
         parent.flush()
         buyers.assert_not_called()
         render.assert_not_called()
