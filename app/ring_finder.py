@@ -1770,6 +1770,7 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
             self.data_source_both_rb.configure(state="disabled")
             
             # Set mineral dropdown to "All Minerals" before disabling
+            self._ring_search_stashed_mineral = self.specific_material_var.get()
             self.specific_material_var.set(t('ring_finder.all_minerals'))
             
             # Disable mineral dropdown (specific material) when Ring Type Only is active
@@ -1786,6 +1787,10 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
             # Re-enable mineral dropdown
             self.specific_material_combo.configure(state="readonly")
             print("[DEBUG] Ring Type Only disabled - re-enabled mineral dropdown")
+            stashed = getattr(self, '_ring_search_stashed_mineral', None)
+            self._ring_search_stashed_mineral = None
+            if stashed and self._is_all_minerals(self.specific_material_var.get()):
+                self.specific_material_var.set(stashed)
             # Re-enable min hotspots if specific material is selected
             current_material = self.specific_material_var.get()
             if not self._is_all_minerals(current_material):

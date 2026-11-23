@@ -17,6 +17,6 @@
 - Picking a Home System from the suggestion list now saves the full system name.
 - The Distance Calculator no longer stalls for up to a minute when the online system lookup is slow.
 
-### Voiceattack Profile - no update (V5.6.8)
+### Voiceattack Profile - no update (v5.6.8)
 
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)
