@@ -150,14 +150,39 @@ class RingFinderSearchTests(unittest.TestCase):
 
     def test_ring_with_both_minerals_is_listed_once(self):
         a = row('Sol', '1 A Ring', type='Plat (1), Pain (1)')
-        b = row('Sol', 'Sol 1 A Ring', type='Pain (1), Plat (1)', source='Spansh')
+        b = row('Sol', 'Sol 1 A Ring', type='Pain (1), Plat (1)')
         self.assertEqual(self.finder._combine_mineral_results([a], [b], False), [a])
 
     def test_same_ring_needs_both_minerals_on_one_ring(self):
         both = row('Sol', '1 A Ring', type='Plat')
         apart = row('Sol', '2 A Ring', type='Plat')
-        b = [row('Sol', 'Sol 1 A Ring', source='Spansh'), row('Sol', '3 A Ring')]
+        b = [row('Sol', 'Sol 1 A Ring'), row('Sol', '3 A Ring')]
         self.assertEqual(self.finder._combine_mineral_results([both, apart], b, True), [both])
+
+    def test_ring_found_by_different_sources_keeps_each_version(self):
+        local = row('Sol', '1 A Ring', source='Local')
+        spansh = row('Sol', 'Sol 1 A Ring', source='Spansh')
+        for same_ring in (False, True):
+            with self.subTest(same_ring=same_ring):
+                self.assertEqual(self.finder._combine_mineral_results([spansh], [local, dict(spansh)], same_ring),
+                                 [local, spansh])
+
+    def test_two_mineral_search_applies_reserve_before_combining(self):
+        f = self.finder
+        f.db_ready = True
+        f.systems_data = {}
+        f._is_all_minerals = Mock(return_value=False)
+        f._update_results = Mock()
+        f._reset_search_button = Mock()
+        found = {'Platinum': [dict(row('Sol', '1 A Ring'), reserve='Pristine')],
+                 'Painite': [dict(row('Sol', '2 A Ring'), reserve='Major')]}
+        f._get_hotspots = Mock(side_effect=lambda ref, rt, mineral, *a, **kw: found[mineral])
+        f._search_worker('Sol', 'Metallic', 'Platinum', True, 50, dict(x=0, y=0, z=0), 10,
+                         search_generation=1, use_spansh_pp=False, second_material='Painite',
+                         reserve_filter='Pristine')
+        f.parent.flush()
+        # Painite's ring is Major, so Sol has no Painite left and nothing combines
+        self.assertEqual(f._update_results.call_args[0][0], [])
 
     def test_combined_rows_are_sorted_closest_first(self):
         far = dict(row('Far', '1 A Ring'), distance='20.0')
@@ -194,7 +219,7 @@ class RingFinderSearchTests(unittest.TestCase):
         ten = dict(row('Sys', '10 A Ring'), distance=10.0, ls_distance='2,000')
         star_b = dict(row('Sys', 'B 2 A Ring'), distance=10.1, ls_distance=50)
         second = dict(row('Sys', '2 B Ring'), distance=10.0, ls_distance=10)
-        both_b = dict(row('Sys', 'Sys 9 A Ring'), source='Spansh')
+        both_b = row('Sys', 'Sys 9 A Ring')
         other = dict(row('Other', '1 A Ring'), distance=10.05)
         other_b = dict(row('Other', '2 A Ring'), distance=10.05)
         expected = [second, both_a, ten, star_b, other, other_b]

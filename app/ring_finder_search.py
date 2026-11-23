@@ -226,9 +226,8 @@ class RingFinderSearchMixin:
                 self._search_generation += 1
                 self.results_tree.delete(*self.results_tree.get_children())
                 self.status_var.set(impossible)
-                if self._saved_data_source:
-                    self.data_source_var.set(self._saved_data_source)
-                    self._saved_data_source = None
+                self._use_cached_spansh = False
+                self._reset_search_button()
                 return
 
         # Keep search button clickable (it now doubles as a Stop button)
@@ -281,10 +280,10 @@ class RingFinderSearchMixin:
         # Run search in background - pass reference system coords and max results to worker
         threading.Thread(target=self._search_worker,
                         args=(reference_system, material_filter, specific_material, confirmed_only, max_distance, self.current_system_coords, max_results, min_hotspots, overlaps_only, res_only, data_source, ring_type_only, current_generation, pp_power_filter, pp_state_filter, use_spansh_pp, spansh_stop_at_limit, force_database, cached_spansh),
-                        kwargs={'second_material': second_material, 'same_ring': same_ring},
+                        kwargs={'second_material': second_material, 'same_ring': same_ring, 'reserve_filter': reserve_filter},
                         daemon=True).start()
 
-    def _search_worker(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, reference_coords, max_results, min_hotspots: int = 1, overlaps_only: bool = False, res_only: bool = False, data_source: str = "both", ring_type_only: bool = False, search_generation: int = 0, pp_power: str = 'Any', pp_state: str = 'Any', use_spansh_pp: bool = True, spansh_stop_at_limit: bool = False, force_database: bool = False, cached_spansh=None, second_material=None, same_ring: bool = False):
+    def _search_worker(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, reference_coords, max_results, min_hotspots: int = 1, overlaps_only: bool = False, res_only: bool = False, data_source: str = "both", ring_type_only: bool = False, search_generation: int = 0, pp_power: str = 'Any', pp_state: str = 'Any', use_spansh_pp: bool = True, spansh_stop_at_limit: bool = False, force_database: bool = False, cached_spansh=None, second_material=None, same_ring: bool = False, reserve_filter: str = None):
         """Background worker for hotspot search.
 
         Writes no search state on self: coordinates, PowerPlay data and Spansh rows go to
@@ -379,6 +378,9 @@ class RingFinderSearchMixin:
                                               reference_coords=reference_coords)
                     if min_hotspots > 1:
                         rows = [h for h in rows if h.get('count', 1) >= min_hotspots]
+                    # Before combining: filtering afterwards would drop a system's other-mineral ring
+                    if reserve_filter and reserve_filter != t('ring_finder.all_reserves'):
+                        rows = [h for h in rows if h.get('reserve', '') == reserve_filter]
                     per_mineral.append(rows)
                 hotspots = (self._combine_mineral_results(per_mineral[0], per_mineral[1], same_ring)
                             if len(per_mineral) == 2 else [])
@@ -674,15 +676,20 @@ class RingFinderSearchMixin:
             body = self.user_db._normalize_body_name(row.get('bodyName', row.get('ring', '')), system)
             return system.lower(), body
 
+        def source(row):
+            return str(row.get('source', '')).lower()
+
         rings_a = {keys(r) for r in rows_a}
         rings_b = {keys(r) for r in rows_b}
+        # A ring holding both minerals is listed from rows_a; rows_b adds only its other source's version
+        listed = {(keys(r), source(r)) for r in rows_a}
         if same_ring:
             combined = [r for r in rows_a if keys(r) in rings_b]
+            combined += [r for r in rows_b if keys(r) in rings_a and (keys(r), source(r)) not in listed]
         else:
             both_systems = {s for s, _ in rings_a} & {s for s, _ in rings_b}
             combined = [r for r in rows_a if keys(r)[0] in both_systems]
-            # A ring holding both minerals is already listed from rows_a
-            combined += [r for r in rows_b if keys(r)[0] in both_systems and keys(r) not in rings_a]
+            combined += [r for r in rows_b if keys(r)[0] in both_systems and (keys(r), source(r)) not in listed]
 
         def number(value, default):
             try:
