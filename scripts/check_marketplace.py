@@ -128,6 +128,12 @@ class MarketTests(unittest.TestCase):
         self.assertEqual([r['marketId'] for r in MarketplaceAPI.sort_results(
             [market(1, distance=None), market(2, distance=0), market(3, distance=1)], 'Distance')], [2, 3, 1])
 
+    def test_no_match_count_ignores_stations_that_only_trade_the_other_way(self):
+        rows = [market(1, stationType='FleetCarrier'), market(2, stock=0, buyPrice=0),
+                market(3, demand=0, sellPrice=0)]
+        self.assertEqual([r['marketId'] for r in MarketplaceAPI.trading_rows(rows, True)], [1, 3])
+        self.assertEqual([r['marketId'] for r in MarketplaceAPI.trading_rows(rows, False)], [1, 2])
+
     def test_age_filter_accepts_utc_naive_and_offset_dates(self):
         now = datetime.now(timezone.utc)
         rows = [market(1, updatedAt=now.isoformat()), market(2, updatedAt=now.replace(tzinfo=None).isoformat()),

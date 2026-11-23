@@ -1502,7 +1502,7 @@ class CommodityMarketTabMixin:
                             results = MarketplaceAPI.search_buyers(commodity, reference_system, None, max_days_ago, exclude_carriers, is_cancelled=control.is_cancelled)
                     
                     # Do heavy filtering/sorting in background thread (keeps UI responsive)
-                    original_count = len(results)
+                    original_count = len(MarketplaceAPI.trading_rows(results, is_buy_mode))
 
                     results = MarketplaceAPI.filter_results(
                         results, trade_station_type_filter, max_age_str, exclude_carriers, large_pad_only, is_buy_mode)
@@ -1922,7 +1922,7 @@ class CommodityMarketTabMixin:
                             results = MarketplaceAPI.search_buyers(commodity, reference_system, None, api_days, exclude_carriers, is_cancelled=control.is_cancelled)
                     
                     # Do heavy filtering/sorting in background thread (keeps UI responsive)
-                    original_count = len(results)
+                    original_count = len(MarketplaceAPI.trading_rows(results, is_buy_mode))
 
                     results = MarketplaceAPI.filter_results(
                         results, station_type_filter, max_age_str, exclude_carriers, large_pad_only, is_buy_mode)

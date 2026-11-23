@@ -1670,11 +1670,16 @@ class MarketplaceAPI:
 
 
     @staticmethod
-    def filter_results(results, station_type='All', max_age='Any', exclude_carriers=False,
-                       large_pad=False, is_buy_mode=False):
+    def trading_rows(results, is_buy_mode=False):
+        """Rows that actually sell (buy mode) or buy (sell mode); caches list every station carrying the commodity."""
         volume = 'stock' if is_buy_mode else 'demand'
         price = 'buyPrice' if is_buy_mode else 'sellPrice'
-        results = [r for r in results if r.get(volume, 0) > 0 and r.get(price, 0) > 0]
+        return [r for r in results if r.get(volume, 0) > 0 and r.get(price, 0) > 0]
+
+    @staticmethod
+    def filter_results(results, station_type='All', max_age='Any', exclude_carriers=False,
+                       large_pad=False, is_buy_mode=False):
+        results = MarketplaceAPI.trading_rows(results, is_buy_mode)
         if exclude_carriers and station_type != 'Fleet Carrier':
             results = [r for r in results if 'FleetCarrier' not in (r.get('stationType') or '')]
         orbital = ('Coriolis', 'Orbis', 'Ocellus', 'Bernal', 'Outpost', 'Asteroid', 'Dodec', 'Orbital', 'Space')
