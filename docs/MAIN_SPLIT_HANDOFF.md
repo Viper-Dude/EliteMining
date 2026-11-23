@@ -31,6 +31,7 @@ Make `app/main.py` (and later `prospector_panel.py` and `ring_finder.py`) smalle
 | 4 | `prospector_panel.py`, `ring_finder.py` | Later | — |
 | 4a | Best Minerals to Mine and Auto Prices into `best_minerals_view.py` (`BestMineralsMixin`) | Done 23 Nov 2026; checks OK | ring_finder.py 8,181 (−1,015) |
 | 4b | Find Acquisition Systems into `acquisition_view.py` (`AcquisitionMixin`) | Done 23 Nov 2026; checks OK | ring_finder.py 7,749 (−456) |
+| 4c | Find Best Mining System into `best_mining_view.py` (`BestMiningMixin`) | Done 23 Nov 2026; checks OK | ring_finder.py 7,015 (−753) |
 
 Line counts are physical lines, including blank lines.
 
