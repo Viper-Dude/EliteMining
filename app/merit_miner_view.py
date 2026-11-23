@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 Merit Miner view of the Hotspots Finder: the nearest Fortified/Stronghold systems of the
-player's power with hotspots for the chosen minerals, each with the best Unoccupied
-system in range to sell them for merits. Mixed into RingFinder (ring_finder.py).
+player's power with hotspots for the chosen mineral, each with the best Unoccupied
+system in range to sell it for merits. Mixed into RingFinder (ring_finder.py).
 """
 import threading
 import tkinter as tk
@@ -29,9 +29,9 @@ class _MMOverlayStatus(_OverlayStatus):
 
 class MeritMinerMixin:
     MM_SEARCH_RADIUS = 500.0
-    MM_RESULTS_PER_MINERAL = 5
-    MM_MAX_ATTEMPTS_PER_MINERAL = 15
-    MM_BATCH = 5  # mining systems checked at once
+    MM_MAX_RESULTS = 5
+    MM_MAX_ATTEMPTS = 15
+    MM_BATCH = 3  # mining systems checked at once; each sends ~6 requests, mostly to Spansh
 
     MM_COLUMNS = ("Mineral", "MineSystem", "Ring", "State", "Dist", "SellSystem", "Station", "Pad",
                   "SellDist", "Demand", "Price", "Updated")
@@ -52,7 +52,6 @@ class MeritMinerMixin:
         from system_finder_api import ELITE_POWERS
 
         current_theme = load_theme()
-        fg = "#ff8c00" if current_theme == "elite_orange" else "#e6e6e6"
 
         self._mm = {
             'busy': False, 'status': '', 'hint': '', 'spin': 0, 'spinning': False, 'ran': False,
@@ -68,8 +67,7 @@ class MeritMinerMixin:
         top_row.pack(fill="x", padx=5, pady=(5, 4))
         self._mm_columns_btn = self._cv_add_columns_button(top_row, 'merit_miner')
 
-        btn_style = dict(bg="#3a3a3a", fg=fg, activebackground="#4a4a4a", activeforeground=fg,
-                         relief="raised", bd=1, cursor="hand2", padx=15, pady=2, font=scaled_font(8, "normal"))
+        btn_style = self._view_button_style()
         self._mm_search_btn = self._rf_button(top_row, text=t('ring_finder.search'), **btn_style,
                                               command=self._mm_on_search)
         self._mm_search_btn.pack(side="right")
@@ -195,9 +193,8 @@ class MeritMinerMixin:
 
     # --- inputs --------------------------------------------------------------------
 
-    def _mm_selected_minerals(self) -> list:
-        mineral = self._mm_mineral_names.get(self._mm_mineral_var.get())
-        return [mineral] if mineral else []
+    def _mm_selected_mineral(self) -> str:
+        return self._mm_mineral_names.get(self._mm_mineral_var.get(), '')
 
     def _mm_power(self) -> str:
         power = self._mm_power_var.get()
@@ -227,7 +224,8 @@ class MeritMinerMixin:
     def _mm_on_mineral_selected(self, event=None):
         from config import save_merit_miner_minerals
         self._mm_mineral_combo.selection_clear()
-        save_merit_miner_minerals(self._mm_selected_minerals())
+        mineral = self._mm_selected_mineral()
+        save_merit_miner_minerals([mineral] if mineral else [])
         self._mm_refresh_controls()
 
     # --- state and overlay ---------------------------------------------------------
@@ -236,7 +234,7 @@ class MeritMinerMixin:
         """Why Search can't run yet, or '' when it can."""
         if not self._mm_power():
             return t('ring_finder.merit_miner_pick_power')
-        if not self._mm_selected_minerals():
+        if not self._mm_selected_mineral():
             return t('ring_finder.merit_miner_pick_minerals')
         return ''
 
@@ -289,7 +287,7 @@ class MeritMinerMixin:
 
     def _mm_on_view_click(self):
         """A click on Merit Miner shows the view; the first time, it also searches when
-        a power and minerals are already set."""
+        a power and mineral are already set."""
         self._mm_sync_power()
         if not self._mm['ran'] and not self._mm_control.running and not self._mm_ready_hint():
             self._mm_start()
@@ -312,7 +310,7 @@ class MeritMinerMixin:
             return
         reference = self._saved_system_spelling(reference)
         power = self._mm_power()
-        minerals = self._mm_selected_minerals()
+        mineral = self._mm_selected_mineral()
         mm.update(busy=True, ran=True, hint='', reference=reference, power=power, count=0,
                   status=t('ring_finder.merit_miner_searching').format(power=power, system=reference))
         self._mm_fill([])
@@ -324,11 +322,11 @@ class MeritMinerMixin:
             mm['spinning'] = True
             mm['spin'] = 0
             self._mm_spin()
-        threading.Thread(target=control.run, args=(self._mm_worker, reference, power, minerals, control),
+        threading.Thread(target=control.run, args=(self._mm_worker, reference, power, mineral, control),
                          daemon=True).start()
 
-    def _mm_worker(self, reference: str, power: str, minerals: list, control):
-        """Background worker: nearest Fortified/Stronghold hotspot systems of power for each
+    def _mm_worker(self, reference: str, power: str, mineral: str, control):
+        """Background worker: nearest Fortified/Stronghold hotspot systems of power for
         mineral, then the best-paying Unoccupied buyer within that state's radius."""
         is_cancelled = control.is_cancelled
         coords = self._lookup_system_coords(reference, is_cancelled=is_cancelled)
@@ -336,19 +334,13 @@ class MeritMinerMixin:
             hint = t('ring_finder.coords_not_found_warning').format(system=reference)
             control.complete([], lambda rows: self._mm_show_results(rows, hint))
             return
+        if is_cancelled():
+            control.complete([], self._mm_show_results)
+            return
 
-        hotspots = []
-        for mineral in minerals:
-            if is_cancelled():
-                control.complete([], self._mm_show_results)
-                return
-            rows = self._get_hotspots(reference, "All", mineral, False, self.MM_SEARCH_RADIUS, None,
+        hotspots = self._get_hotspots(reference, "All", mineral, False, self.MM_SEARCH_RADIUS, None,
                                       data_source='database', is_cancelled=is_cancelled, reference_coords=coords)
-            for row in rows:
-                row['_mm_mineral'] = mineral
-            hotspots.extend(rows)
 
-        # One Spansh query per state covers every mineral's rows
         state_by_system = {}
         for state in ('Fortified', 'Stronghold'):
             if is_cancelled():
@@ -359,63 +351,50 @@ class MeritMinerMixin:
             for row in matched:
                 state_by_system.setdefault(row.get('systemName') or row.get('system', ''), state)
 
-        candidates = self._mm_candidate_systems(hotspots, state_by_system, minerals)
-        nearby_cache = {}
-        nearby_lock = threading.Lock()
-        results = []
-        for mineral in minerals:
-            found = self._mm_find_for_mineral(mineral, candidates.get(mineral, []), nearby_cache, nearby_lock,
-                                              is_cancelled)
-            if is_cancelled():
-                control.complete([], self._mm_show_results)
-                return
-            results.extend(found)
+        candidates = self._mm_candidate_systems(hotspots, state_by_system)
+        results = self._mm_find_sell_targets(mineral, candidates, is_cancelled)
+        if is_cancelled():
+            control.complete([], self._mm_show_results)
+            return
 
         hint = ''
         if not results:
-            names = ', '.join(self._format_material_for_display(m) for m in minerals)
-            key = 'merit_miner_no_mine_systems' if not any(candidates.values()) else 'merit_miner_no_buyers'
-            hint = t('ring_finder.' + key).format(power=power, minerals=names, system=reference,
-                                                  radius=int(self.MM_SEARCH_RADIUS))
+            key = 'merit_miner_no_mine_systems' if not candidates else 'merit_miner_no_buyers'
+            hint = t('ring_finder.' + key).format(power=power, minerals=self._format_material_for_display(mineral),
+                                                  system=reference, radius=int(self.MM_SEARCH_RADIUS))
         control.complete(results, lambda rows: self._mm_show_results(rows, hint))
 
     @staticmethod
-    def _mm_candidate_systems(hotspots: list, state_by_system: dict, minerals: list) -> dict:
-        """{mineral: [(system, ring, state, distance)]} nearest first, one entry per
-        system (its nearest-listed ring), only systems in state_by_system."""
-        per_mineral = {m: {} for m in minerals}
+    def _mm_candidate_systems(hotspots: list, state_by_system: dict) -> list:
+        """[(system, ring, state, distance)] nearest first, one entry per system (its
+        nearest-listed ring), only systems in state_by_system."""
+        systems = {}
         for row in hotspots:
-            mineral = row.get('_mm_mineral')
             system = row.get('systemName') or row.get('system', '')
             state = state_by_system.get(system)
-            if mineral not in per_mineral or not state or system in per_mineral[mineral]:
+            if not state or system in systems:
                 continue
             try:
                 distance = float(row.get('distance', 0) or 0)
             except (TypeError, ValueError):
                 distance = 0.0
-            per_mineral[mineral][system] = (system, row.get('ring', ''), state, distance)
-        return {m: sorted(systems.values(), key=lambda c: c[3]) for m, systems in per_mineral.items()}
+            systems[system] = (system, row.get('ring', ''), state, distance)
+        return sorted(systems.values(), key=lambda c: c[3])
 
-    def _mm_find_for_mineral(self, mineral: str, candidates: list, nearby_cache: dict, nearby_lock, is_cancelled) -> list:
+    def _mm_find_sell_targets(self, mineral: str, candidates: list, is_cancelled) -> list:
         """Walk candidates nearest first in small parallel batches until enough have a buyer."""
         from system_finder_api import SystemFinderAPI
         found = []
-        attempts = candidates[:self.MM_MAX_ATTEMPTS_PER_MINERAL]
+        attempts = candidates[:self.MM_MAX_ATTEMPTS]
 
         def check(candidate):
             system, ring, state, distance = candidate
             if is_cancelled():
                 return None
             radius = self.ACQUISITION_RADIUS_BY_STATE[state]
-            with nearby_lock:
-                nearby = nearby_cache.get(system)
-            if nearby is None:
-                nearby = SystemFinderAPI._fetch_spansh_powerplay_systems(system, radius, 'Any', 'Unoccupied',
-                                                                        is_cancelled=is_cancelled)
-                SystemFinderAPI._store_powerplay_batch(nearby)
-                with nearby_lock:
-                    nearby_cache[system] = nearby
+            nearby = SystemFinderAPI._fetch_spansh_powerplay_systems(system, radius, 'Any', 'Unoccupied',
+                                                                    is_cancelled=is_cancelled)
+            SystemFinderAPI._store_powerplay_batch(nearby)
             sells, prices, _best, rows = self._acq_find_sell_targets(system, radius, [mineral], is_cancelled,
                                                                      nearby=nearby)
             if not sells:
@@ -426,12 +405,12 @@ class MeritMinerMixin:
                     'price': prices.get(sell_system, 0), 'buyer': rows.get(sell_system, {})}
 
         for start in range(0, len(attempts), self.MM_BATCH):
-            if is_cancelled() or len(found) >= self.MM_RESULTS_PER_MINERAL:
+            if is_cancelled() or len(found) >= self.MM_MAX_RESULTS:
                 break
             batch = attempts[start:start + self.MM_BATCH]
             with ThreadPoolExecutor(max_workers=len(batch)) as pool:
                 for hit in pool.map(check, batch):
-                    if hit and len(found) < self.MM_RESULTS_PER_MINERAL:
+                    if hit and len(found) < self.MM_MAX_RESULTS:
                         found.append(hit)
         return found
 

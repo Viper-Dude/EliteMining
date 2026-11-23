@@ -750,15 +750,6 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Mer
         reset_btn.pack(side="left", padx=(15, 0))
         ToolTip(reset_btn, t('ring_finder.reset_filters_tooltip'))
 
-        best_mining_btn = self._rf_button(self._rf_actions if _modern_form else pp_inner_row, text=t('ring_finder.find_best_mining_system'),
-                             command=self._show_reverse_search_dialog,
-                             bg="#3a3a3a", fg=reset_btn_fg,
-                             activebackground="#4a4a4a", activeforeground=reset_btn_active_fg,
-                             relief="raised", bd=1, cursor="hand2",
-                             padx=15, pady=2, font=scaled_font(8, "normal"))
-        best_mining_btn.pack(side="left", padx=(10, 0))
-        ToolTip(best_mining_btn, t('ring_finder.find_best_mining_system_tooltip'))
-
         # --- Row 2: Unvisited Only + Favourites Only + Data Source ---
         # Gridded directly in search_frame (not row3_container) so it starts
         # flush at column 0, aligned under "Power:" instead of under Power State.
@@ -1045,6 +1036,7 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Mer
         results_view_switch = SegmentedSelector(
             results_header,
             [('hotspots', t('ring_finder.view_hotspots')), ('best_prices', t('ring_finder.view_best_prices')),
+             ('best_mining', t('ring_finder.view_where_to_mine')),
              ('acquisition', t('ring_finder.view_acquisition')),
              ('merit_miner', t('ring_finder.view_merit_miner'))],
             self._results_view_var, bg=_cb_bg, accent=slider_colors(_cb_theme)["accent"],
@@ -1054,6 +1046,7 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Mer
         add_segment_tooltips(results_view_switch, {
             'hotspots': t('ring_finder.view_hotspots_tooltip'),
             'best_prices': t('ring_finder.view_best_prices_tooltip'),
+            'best_mining': t('ring_finder.view_where_to_mine_tooltip'),
             'acquisition': t('ring_finder.view_acquisition_tooltip'),
             'merit_miner': t('ring_finder.view_merit_miner_tooltip')})
         # Runs after the switch's own click handler has set the view
@@ -1393,6 +1386,7 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Mer
         self._build_best_prices_view(results_frame, _cb_bg, _cb_select, tree_bg, tree_fg)
         self._build_acquisition_view(results_frame, _cb_bg, tree_bg, tree_fg)
         self._build_merit_miner_view(results_frame, _cb_bg, tree_bg, tree_fg)
+        self._build_best_mining_view(results_frame, _cb_bg, _cb_select, tree_bg, tree_fg)
         self._results_view_var.trace_add('write', lambda *_: self._apply_results_view())
         
         # Configure style for the treeview to allow tag colors

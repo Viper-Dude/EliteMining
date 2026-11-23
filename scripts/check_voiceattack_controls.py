@@ -131,12 +131,12 @@ class VoiceAttackChecks(unittest.TestCase):
         calls = []
         self.app.switch_to_tab = lambda tab: calls.append(tab)
         self.app.ring_finder = types.SimpleNamespace(
-            _show_reverse_search_dialog=lambda: calls.append('search-dialog'))
+            _bm_show_view=lambda: calls.append('search-view'))
         self.app.prospector_panel = types.SimpleNamespace(
             last_system='Sol', last_body='Sol A 1 A Ring',
             _show_bookmark_dialog=lambda data: calls.append(data))
         self.app._execute_va_command('SEARCH:BEST_MINING_SYSTEM')
-        self.assertEqual(calls, ['hotspots_finder', 'search-dialog'])
+        self.assertEqual(calls, ['hotspots_finder', 'search-view'])
         calls.clear()
         self.app._execute_va_command('BOOKMARK:ADD')
         self.assertEqual(calls, ['bookmarks', {'system': 'Sol', 'body': 'Sol A 1 A Ring'}])

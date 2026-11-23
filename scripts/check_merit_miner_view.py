@@ -46,7 +46,7 @@ class View(MeritMinerMixin, AcquisitionMixin, BestMineralsMixin):
     pass
 
 
-def make_view(power='Aisling Duval', minerals=('Platinum',)):
+def make_view(power='Aisling Duval', mineral='Platinum'):
     v = View()
     v._mm = {'busy': False, 'status': '', 'hint': '', 'spin': 0, 'spinning': True, 'ran': False,
              'reference': '', 'power': '',
@@ -56,7 +56,7 @@ def make_view(power='Aisling Duval', minerals=('Platinum',)):
     v._mm_power_var = Var(power)
     v._mm_mineral_names = {'Platinum': 'Platinum', 'Painite': 'Painite', 'Osmium': 'Osmium',
                            'LTDs': 'Low Temperature Diamonds'}
-    v._mm_mineral_var = Var(minerals[0] if minerals else '')
+    v._mm_mineral_var = Var(mineral)
     v._mm_fill = Mock()
     v._mm_refresh_controls = Mock()
     v._mm_control = Mock(running=False)
@@ -72,7 +72,7 @@ def hotspot(system, mineral, distance, ring='A Ring'):
     return {'systemName': system, 'system': system, 'ring': ring, 'distance': f"{distance:.1f}", 'type': mineral}
 
 
-def run_worker(v, hotspots_by_mineral, states, nearby, buyers, control=None, minerals=None):
+def run_worker(v, hotspots_by_mineral, states, nearby, buyers, control=None, mineral=None):
     """states: {system: 'Fortified'|'Stronghold'} for the pledged power's systems.
     nearby: {mine system: {unoccupied system: {distance}}}; buyers: {mine system: [rows]}."""
     control = control or Control()
@@ -86,7 +86,7 @@ def run_worker(v, hotspots_by_mineral, states, nearby, buyers, control=None, min
             patch.object(SystemFinderAPI, '_store_powerplay_batch'), \
             patch('marketplace_api.MarketplaceAPI.search_buyers',
                   side_effect=lambda mineral, system, *a, **k: buyers.get(system, [])):
-        v._mm_worker('Sol', 'Aisling Duval', minerals or v._mm_selected_minerals(), control)
+        v._mm_worker('Sol', 'Aisling Duval', mineral or v._mm_selected_mineral(), control)
     return control, spansh
 
 
@@ -120,7 +120,7 @@ class WorkerTests(unittest.TestCase):
         systems = [f'S{i:02d}' for i in range(30)]
         hot = {'Platinum': [hotspot(s, 'Platinum', i) for i, s in enumerate(systems)]}
         control, spansh = run_worker(v, hot, {s: 'Fortified' for s in systems}, {}, {})
-        self.assertEqual(spansh.call_count, View.MM_MAX_ATTEMPTS_PER_MINERAL)
+        self.assertEqual(spansh.call_count, View.MM_MAX_ATTEMPTS)
         self.assertEqual(control.results, [])
         self.assertIn('Aisling Duval', v._mm['hint'])
 
@@ -132,15 +132,14 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual(control.results, [])
         self.assertIn('500', v._mm['hint'])
 
-    def test_unoccupied_lookup_shared_across_minerals(self):
-        v = make_view()
+    def test_searches_only_the_chosen_mineral(self):
+        v = make_view(mineral='Painite')
         hot = {'Platinum': [hotspot('Fort', 'Platinum', 10)], 'Painite': [hotspot('Fort', 'Painite', 10)]}
         nearby = {'Fort': {'U1': {'distance': 8}}}
         buyers = {'Fort': [{'systemName': 'U1', 'sellPrice': 100}]}
-        control, spansh = run_worker(v, hot, {'Fort': 'Fortified'}, nearby, buyers,
-                                     minerals=['Platinum', 'Painite'])
-        self.assertEqual(spansh.call_count, 1)
-        self.assertEqual([r['mineral'] for r in control.results], ['Platinum', 'Painite'])
+        control, _ = run_worker(v, hot, {'Fort': 'Fortified'}, nearby, buyers)
+        self.assertEqual([c.args[2] for c in v._get_hotspots.call_args_list], ['Painite'])
+        self.assertEqual([r['mineral'] for r in control.results], ['Painite'])
 
     def test_stop_drops_results(self):
         v = make_view()
@@ -153,7 +152,7 @@ class WorkerTests(unittest.TestCase):
         v = make_view()
         v._lookup_system_coords = Mock(return_value=None)
         control = Control()
-        v._mm_worker('Nowhere', 'Aisling Duval', ['Platinum'], control)
+        v._mm_worker('Nowhere', 'Aisling Duval', 'Platinum', control)
         self.assertIn('Nowhere', v._mm['hint'])
 
 
@@ -166,17 +165,17 @@ class InputTests(unittest.TestCase):
         thread.assert_not_called()
 
     def test_no_minerals_blocks_search(self):
-        v = make_view(minerals=())
+        v = make_view(mineral='')
         self.assertNotEqual(v._mm_ready_hint(), '')
 
     def test_start_runs_worker_with_inputs(self):
-        v = make_view(minerals=('LTDs',))
+        v = make_view(mineral='LTDs')
         v._saved_system_spelling = lambda name: name
         with patch('merit_miner_view.threading.Thread') as thread:
             v._mm_start()
         self.assertEqual(v._results_view_var.value, 'merit_miner')
         self.assertEqual(thread.call_args.kwargs['args'][1:4],
-                         ('Sol', 'Aisling Duval', ['Low Temperature Diamonds']))
+                         ('Sol', 'Aisling Duval', 'Low Temperature Diamonds'))
 
     def test_view_click_runs_only_once(self):
         v = make_view()
@@ -263,8 +262,10 @@ class ApplyPledgeTests(unittest.TestCase):
         import ast
         tree = ast.parse((ROOT / 'app' / 'main.py').read_text(encoding='utf-8-sig'))
         app_cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'App')
-        method = next(n for n in app_cls.body if isinstance(n, ast.FunctionDef) and n.name == '_apply_journal_pledge')
-        module = ast.Module(body=[ast.ClassDef(name='Harness', bases=[], keywords=[], decorator_list=[], body=[method])],
+        methods = [n for n in app_cls.body if isinstance(n, ast.FunctionDef)
+                   and n.name in ('_apply_journal_pledge', '_apply_startup_pledge', '_save_player_power')]
+        self.assertEqual(len(methods), 3)
+        module = ast.Module(body=[ast.ClassDef(name='Harness', bases=[], keywords=[], decorator_list=[], body=methods)],
                             type_ignores=[])
         ast.fix_missing_locations(module)
         from journal_parser import JournalParser
@@ -304,6 +305,40 @@ class ApplyPledgeTests(unittest.TestCase):
         self.app._apply_journal_pledge('Not pledged', '2026-11-23T09:00:00Z')
         self.assertEqual(self.cfg['player_power'], 'Not pledged')
         self.assertEqual(self.app.sysfinder_my_power_var.value, 'PROMPT')
+
+    def test_star_systems_pick_updates_merit_miner(self):
+        self.app._sysfinder_option_value = lambda label: label
+        self.app.sysfinder_my_power_var.set('Zemina Torval')
+        self.app._save_player_power()
+        self.assertEqual(self.cfg['player_power'], 'Zemina Torval')
+        self.app.ring_finder._mm_sync_power.assert_called_once()
+
+    def test_startup_pledge_waits_for_the_lookup(self):
+        self.app.after = Mock()
+        self.app._apply_journal_pledge = Mock()
+        self.app._journal_pledge_result = []
+        self.app._apply_startup_pledge()
+        self.app.after.assert_called_once_with(250, self.app._apply_startup_pledge)
+        self.app._apply_journal_pledge.assert_not_called()
+        self.app._journal_pledge_result.append(('Aisling Duval', '2026-11-23T09:00:00Z'))
+        self.app._apply_startup_pledge()
+        self.app._apply_journal_pledge.assert_called_once_with('Aisling Duval', '2026-11-23T09:00:00Z')
+        self.assertEqual(self.app.after.call_count, 1)
+
+    def test_startup_without_pledge_changes_nothing(self):
+        self.app.after = Mock()
+        self.app._apply_journal_pledge = Mock()
+        self.app._journal_pledge_result = [None]
+        self.app._apply_startup_pledge()
+        self.app._apply_journal_pledge.assert_not_called()
+        self.app.after.assert_not_called()
+
+    def test_lookup_worker_makes_no_tk_calls(self):
+        # A worker's Tk call fails with "main thread is not in main loop" during startup
+        src = (ROOT / 'app' / 'main.py').read_text(encoding='utf-8-sig')
+        worker = src[src.index('def _lookup_pledge():'):src.index('threading.Thread(target=_lookup_pledge')]
+        self.assertNotIn('self.after', worker)
+        self.assertIn('self.after(0, self._apply_startup_pledge)', src)
 
 if __name__ == '__main__':
     unittest.main()

@@ -197,8 +197,7 @@ class BestMineralsMixin:
         top_row.pack(fill="x", padx=5, pady=(5, 4))
         self._bp_columns_btn = self._cv_add_columns_button(top_row, 'rank_minerals')
 
-        btn_style = dict(bg="#3a3a3a", fg=fg, activebackground="#4a4a4a", activeforeground=fg,
-                         relief="raised", bd=1, cursor="hand2", padx=15, pady=2, font=scaled_font(8, "normal"))
+        btn_style = self._view_button_style()
         self._bp_refresh_btn = self._rf_button(top_row, text=t('ring_finder.rank_refresh'), **btn_style,
                                                command=lambda: self._bp_reload(self._bp['scope'], True))
         self._bp_refresh_btn.pack(side="right")
@@ -894,6 +893,17 @@ class BestMineralsMixin:
                          args=(system_name, fetch_materials, new_extras, new_ring_types, new_scope, ring_name, req, force),
                          daemon=True).start()
 
+    @staticmethod
+    def _view_button_style() -> dict:
+        """Button colours for the results views' control rows, from the active theme
+        (Modern themes draw their own rounded buttons and ignore these)."""
+        from config import load_theme, scaled_font
+        from ui.theme import get_theme_colors
+        colors = get_theme_colors(load_theme())
+        return dict(bg=colors['btn_bg'], fg=colors['btn_fg'], activebackground=colors['btn_bg_hover'],
+                    activeforeground=colors['btn_fg'], relief="raised", bd=1, cursor="hand2",
+                    padx=15, pady=2, font=scaled_font(8, "normal"))
+
     def _show_results_view(self, view: str):
         var = getattr(self, '_results_view_var', None)
         if var is not None and var.get() != view:
@@ -908,6 +918,9 @@ class BestMineralsMixin:
             return
         if self._results_view_var.get() == 'merit_miner':
             self._mm_on_view_click()
+            return
+        if self._results_view_var.get() == 'best_mining':
+            self._bm_on_view_click()
             return
         bp = self._bp
         if self._results_view_var.get() != 'best_prices' or bp['busy']:
@@ -926,13 +939,15 @@ class BestMineralsMixin:
         self._rank_minerals_for_system('ring')
 
     def _apply_results_view(self):
-        """Show the hotspot table, the Best Prices, Acquisition or Merit Miner view, each
-        with its own Columns button."""
+        """Show the hotspot table, the Best Prices, Where to Mine, Acquisition or Merit
+        Miner view, each with its own Columns button."""
         from config import scaled_px
         view = self._results_view_var.get()
         acq_frame = getattr(self, '_acq_frame', None)
         mm_frame = getattr(self, '_mm_frame', None)
-        if (view == 'acquisition' and acq_frame is None) or (view == 'merit_miner' and mm_frame is None):
+        bm_frame = getattr(self, '_bm_frame', None)
+        if ((view == 'acquisition' and acq_frame is None) or (view == 'merit_miner' and mm_frame is None)
+                or (view == 'best_mining' and bm_frame is None)):
             view = 'hotspots'
         more_btn = getattr(self, '_more_btn', None)  # Modern only; opens hotspot search filters
         status = getattr(self, '_results_status_label', None)
@@ -950,7 +965,7 @@ class BestMineralsMixin:
                 tools_row.pack(fill="x", padx=(10, 15), pady=(6, 0), after=self._results_header)
         if view != 'best_prices':
             self._bp_close_extra_picker()
-        for frame in (self._hotspots_tree_frame, self._bp_frame, acq_frame, mm_frame):
+        for frame in (self._hotspots_tree_frame, self._bp_frame, acq_frame, mm_frame, bm_frame):
             if frame is not None:
                 frame.pack_forget()
         if view == 'best_prices':
@@ -959,6 +974,8 @@ class BestMineralsMixin:
             acq_frame.pack(fill="both", expand=True)
         elif view == 'merit_miner':
             mm_frame.pack(fill="both", expand=True)
+        elif view == 'best_mining':
+            bm_frame.pack(fill="both", expand=True)
         else:
             self._hotspots_tree_frame.pack(fill="both", expand=True, padx=5, pady=(5, 2))
             self._columns_btn.pack(side="right", padx=(scaled_px(8), 0), **before)

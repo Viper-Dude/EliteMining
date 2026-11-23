@@ -887,16 +887,19 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
 
             threading.Thread(target=_backfill_pp, daemon=True).start()
 
+            # The worker only stores its answer; _apply_startup_pledge picks it up. Any Tk
+            # call from a worker fails until mainloop runs, and building the window takes longer.
+            self._journal_pledge_result = []
+
             def _lookup_pledge():
                 try:
                     pledge = self.cargo_monitor.journal_parser.latest_pledged_power()
-                    if pledge:
-                        self.after(0, self._apply_journal_pledge, *pledge)
                 except Exception as e:
                     log.warning(f"[WARN] Journal pledge lookup failed: {e}")
+                    pledge = None
+                self._journal_pledge_result.append(pledge)
 
-            # Started from the event loop: a worker can't hand results to Tk before mainloop runs
-            self.after(0, lambda: threading.Thread(target=_lookup_pledge, daemon=True).start())
+            threading.Thread(target=_lookup_pledge, daemon=True).start()
 
         # Initialize API uploader for session/hotspot sharing
         from api_uploader import APIUploader
@@ -987,6 +990,9 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
         # Dismiss splash after a short delay once mainloop starts
         # (splash has been visible since the very start of __init__)
         self.after(2000, self._dismiss_splash)
+
+        # Scheduled last, so it runs from mainloop with every tab already built
+        self.after(0, self._apply_startup_pledge)
 
         # Safety: re-apply cargo overlay state after full init settles
         # Guards against any startup race where overlay ends up hidden despite being enabled
@@ -1971,7 +1977,7 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
                 action = parts[1] if len(parts) > 1 else ""
                 if action == "BEST_MINING_SYSTEM":
                     self.switch_to_tab('hotspots_finder')
-                    self.ring_finder._show_reverse_search_dialog()
+                    self.ring_finder._bm_show_view()
 
             elif cmd_type == "BOOKMARK":
                 action = parts[1] if len(parts) > 1 else ""
@@ -11620,6 +11626,17 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
             if power:
                 self._apply_journal_pledge(power, event.get('timestamp', ''))
 
+    def _apply_startup_pledge(self):
+        """Apply the startup journal pledge lookup once its worker has finished."""
+        result = getattr(self, '_journal_pledge_result', None)
+        if result is None:
+            return  # no journal reader
+        if not result:
+            self.after(250, self._apply_startup_pledge)
+            return
+        if result[0]:
+            self._apply_journal_pledge(*result[0])
+
     def _apply_journal_pledge(self, power, timestamp):
         """Set My Power from a journal pledge event. Only an event newer than the last
         one applied changes it, so a manual pick stays until the next login."""
@@ -11649,6 +11666,9 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
         save_player_power(self._sysfinder_option_value(self.sysfinder_my_power_var.get()))
         if getattr(self, '_sysfinder_ref_status', None):
             self._update_sysfinder_ref_labels(self._sysfinder_ref_status)
+        ring_finder = getattr(self, 'ring_finder', None)
+        if ring_finder is not None and hasattr(ring_finder, '_mm_power_var'):
+            ring_finder._mm_sync_power()
 
     @staticmethod
     def _compute_pp_foryou(power: str, power_state: str, player_power: str) -> str:

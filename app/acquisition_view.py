@@ -54,7 +54,6 @@ class AcquisitionMixin:
         from ui.cell_tooltip import attach_cell_tooltip
 
         current_theme = load_theme()
-        fg = "#ff8c00" if current_theme == "elite_orange" else "#e6e6e6"
 
         self._acq = {
             'system': '', 'state': '', 'radius': None, 'mineral': None, 'busy': False, 'count': 0,
@@ -71,8 +70,7 @@ class AcquisitionMixin:
         top_row.pack(fill="x", padx=5, pady=(5, 4))
         self._acq_columns_btn = self._cv_add_columns_button(top_row, 'acquisition_search')
 
-        btn_style = dict(bg="#3a3a3a", fg=fg, activebackground="#4a4a4a", activeforeground=fg,
-                         relief="raised", bd=1, cursor="hand2", padx=15, pady=2, font=scaled_font(8, "normal"))
+        btn_style = self._view_button_style()
         self._acq_refresh_btn = self._rf_button(top_row, text=t('ring_finder.rank_refresh'), **btn_style,
                                                 command=self._acq_on_refresh)
         self._acq_refresh_btn.pack(side="right")

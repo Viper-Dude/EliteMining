@@ -395,11 +395,12 @@ class RemainingWorkerTests(unittest.TestCase):
     def test_best_mining_search_stop_keeps_partial_prices(self):
         cls = load_methods('app/best_mining_view.py', 'BestMiningMixin', {'_reverse_search_worker'})
         finder = cls()
+        finder.BM_MAX_CANDIDATES = 20
         parent, control = self.make_control()
         finder._get_hotspots = Mock(return_value=[dict(systemName='Mining', type='Platinum', distance=1)])
         finder._parse_materials_from_hotspots = lambda value: ['Platinum', 'Painite']
         finder._expand_abbreviated_materials = lambda value: value
-        finder._rerank_reverse_search_results = Mock()
+        finder._bm_show_results = Mock()
         local_db = Mock()
         local_db.LocalSystemsDatabase.return_value.is_database_available.return_value = False
         def fetch(*args, **kwargs):
@@ -408,10 +409,10 @@ class RemainingWorkerTests(unittest.TestCase):
         with patch.object(MarketplaceAPI, 'search_buyers', side_effect=fetch) as buyers, \
                 patch('concurrent.futures.ThreadPoolExecutor', InlinePool), \
                 patch.dict(sys.modules, local_database=local_db):
-            finder._reverse_search_worker('Sol', 50, None, False, SimpleNamespace(), Widget(), Widget(), control)
+            finder._reverse_search_worker('Sol', 50, None, control)
         parent.flush()
         self.assertEqual(buyers.call_count, 1)
-        self.assertEqual(sum(bool(rows) for rows in finder._rerank_reverse_search_results.call_args.args[2].values()), 1)
+        self.assertEqual(sum(bool(rows) for rows in finder._bm_show_results.call_args.args[0]['rows_by_material'].values()), 1)
 
     def test_acquisition_stop_skips_price_searches(self):
         cls = load_methods('app/acquisition_view.py', 'AcquisitionMixin', {'_acquisition_search_worker', '_acq_find_sell_targets'})

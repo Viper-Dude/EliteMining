@@ -295,7 +295,7 @@ def save_reverse_search_mineral(mineral: str) -> None:
     _save_cfg(cfg)
 
 def load_reverse_search_column_widths() -> Dict[str, int]:
-    """Load Find Best Mining System popup table column widths from config"""
+    """Load Hotspots Finder Where to Mine table column widths from config"""
     cfg = _load_cfg()
     defaults = {
         "System": 200, "Dist": 80, "Mineral": 130, "Price": 110, "Station": 260,
@@ -304,20 +304,9 @@ def load_reverse_search_column_widths() -> Dict[str, int]:
     return cfg.get("reverse_search_column_widths", defaults)
 
 def save_reverse_search_column_widths(widths: Dict[str, int]) -> None:
-    """Save Find Best Mining System popup table column widths to config"""
+    """Save Hotspots Finder Where to Mine table column widths to config"""
     cfg = _load_cfg()
     cfg["reverse_search_column_widths"] = widths
-    _save_cfg(cfg)
-
-def load_reverse_search_window_geometry() -> Dict[str, Any]:
-    """Load Find Best Mining System popup window size from config"""
-    cfg = _load_cfg()
-    return cfg.get("reverse_search_window", {})
-
-def save_reverse_search_window_geometry(geom: Dict[str, Any]) -> None:
-    """Save Find Best Mining System popup window size to config"""
-    cfg = _load_cfg()
-    cfg["reverse_search_window"] = geom
     _save_cfg(cfg)
 
 def load_acquisition_search_column_widths() -> Dict[str, int]:
@@ -343,12 +332,12 @@ def save_merit_miner_column_widths(widths: Dict[str, int]) -> None:
     _save_cfg(cfg)
 
 def load_merit_miner_minerals() -> list:
-    """Load the minerals ticked in the Merit Miner view (English names)"""
+    """Load the mineral chosen in the Merit Miner view, as a one-item list (English name)"""
     cfg = _load_cfg()
     return list(cfg.get("merit_miner_minerals", []) or [])
 
 def save_merit_miner_minerals(minerals: list) -> None:
-    """Save the minerals ticked in the Merit Miner view (English names)"""
+    """Save the mineral chosen in the Merit Miner view, as a one-item list (English name)"""
     cfg = _load_cfg()
     cfg["merit_miner_minerals"] = list(minerals)
     _save_cfg(cfg)
