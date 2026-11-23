@@ -2,6 +2,6 @@
   "Icy": true,
   "Metallic": true,
   "Metal-Rich": true,
-  "Rocky": false,
+  "Rocky": true,
   "RES Sites": true
 }

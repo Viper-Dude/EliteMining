@@ -7,6 +7,7 @@
 - Low Temperature Diamonds is now named LTD consistently across the app.
 - Commodity Market results now show System and Station in separate columns, with full station names.
 - The Distance Calculator now uses colours that match your theme, with a larger distance result.
+- Hotspots Finder can now find systems or rings that have two chosen minerals, such as Platinum and Painite.
 
 ## Bug Fixes
 

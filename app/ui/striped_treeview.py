@@ -6,6 +6,8 @@ class StripedTreeview(ttk.Treeview):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._stripe_pending = None
+        # Optional callable(item) -> key; neighbouring rows with the same non-None key share one shade
+        self.stripe_group = None
         self.bind('<Map>', self._queue_stripes, add='+')
         self.bind('<<TreeviewOpen>>', self._queue_stripes, add='+')
         self.bind('<<TreeviewClose>>', self._queue_stripes, add='+')
@@ -33,7 +35,15 @@ class StripedTreeview(ttk.Treeview):
                 yield item
                 if self.item(item, 'open'):
                     yield from rows(item)
-        for index, item in enumerate(rows()):
+        band, band_key = -1, None
+        for row_index, item in enumerate(rows()):
+            key = self.stripe_group(item) if self.stripe_group else None
+            if key is None:
+                index = row_index
+            else:
+                if key != band_key:
+                    band, band_key = band + 1, key
+                index = band
             parity = 'evenrow' if index % 2 == 0 else 'oddrow'
             tags = []
             for tag in self.item(item, 'tags'):

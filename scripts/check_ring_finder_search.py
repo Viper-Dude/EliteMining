@@ -35,10 +35,12 @@ def load_methods(filename, class_name, names):
 
 Finder = type('RingFinder', (
     load_methods('app/ring_finder.py', 'RingFinder', {
-        '_insert_row_batch', '_sort_column', '_update_results', '_powerplay_display',
+        '_insert_row_batch', '_sort_column', '_update_results', '_powerplay_display', '_searched_mineral_rank',
+        '_results_stripe_group',
     }),
     load_methods('app/ring_finder_search.py', 'RingFinderSearchMixin', {
-        '_limit_results_by_unique_rings', '_run_search_callback', '_complete_search',
+        '_limit_results_by_unique_rings', '_combine_mineral_results', '_impossible_mineral_search',
+        '_run_search_callback', '_complete_search',
         '_search_worker', '_hotspot_missing_metadata', '_start_edsm_metadata_fill',
         '_edsm_metadata_worker', '_read_filled_ring_metadata', '_apply_edsm_metadata',
         '_start_pp_backfill', '_pp_backfill_worker', '_apply_pp_backfill', '_get_hotspots',
@@ -73,6 +75,7 @@ class Parent:
 class Tree:
     def __init__(self):
         self.rows = {}
+        self.tags = {}
         self.order = []
         self.sequence = 0
 
@@ -83,6 +86,7 @@ class Tree:
         self.sequence += 1
         key = str(self.sequence)
         self.rows[key] = values
+        self.tags[key] = tags
         self.order.append(key)
         return key
 
@@ -135,6 +139,91 @@ class RingFinderSearchTests(unittest.TestCase):
     def test_unlimited_results(self):
         rows = [row(), row(body='2 A Ring')]
         self.assertEqual(self.finder._limit_results_by_unique_rings(rows, None), rows)
+
+    def test_same_system_keeps_both_minerals_rings_and_drops_one_mineral_systems(self):
+        plat = row('Both', '1 A Ring', type='Plat')
+        pain = row('Both', 'Both 2 A Ring', type='Pain', source='Spansh')
+        only_plat = row('Plat Only', '1 A Ring', type='Plat')
+        only_pain = row('Pain Only', '1 A Ring', type='Pain')
+        self.assertEqual(self.finder._combine_mineral_results([plat, only_plat], [pain, only_pain], False),
+                         [plat, pain])
+
+    def test_ring_with_both_minerals_is_listed_once(self):
+        a = row('Sol', '1 A Ring', type='Plat (1), Pain (1)')
+        b = row('Sol', 'Sol 1 A Ring', type='Pain (1), Plat (1)', source='Spansh')
+        self.assertEqual(self.finder._combine_mineral_results([a], [b], False), [a])
+
+    def test_same_ring_needs_both_minerals_on_one_ring(self):
+        both = row('Sol', '1 A Ring', type='Plat')
+        apart = row('Sol', '2 A Ring', type='Plat')
+        b = [row('Sol', 'Sol 1 A Ring', source='Spansh'), row('Sol', '3 A Ring')]
+        self.assertEqual(self.finder._combine_mineral_results([both, apart], b, True), [both])
+
+    def test_combined_rows_are_sorted_closest_first(self):
+        far = dict(row('Far', '1 A Ring'), distance='20.0')
+        near = dict(row('Near', '1 A Ring'), distance=3.5)
+        far_b = dict(row('Far', '2 A Ring'), distance='20.0')
+        near_b = dict(row('Near', '2 A Ring'), distance=3.5)
+        self.assertEqual(self.finder._combine_mineral_results([far, near], [far_b, near_b], False),
+                         [near, near_b, far, far_b])
+
+    def test_impossible_two_mineral_searches_explain_why(self):
+        f = self.finder
+        f.MINING_METHOD_BY_RING = {'Alexandrite': {'Icy': 'core', 'Rocky': 'core'},
+                                   'Painite': {'Metallic': 'both', 'Metal Rich': 'core'}}
+        check = lambda ring, same_ring, first='Alexandrite', second='Painite': f._impossible_mineral_search(
+            ring, ring, first, first, second, second, same_ring)
+        for same_ring in (False, True):
+            self.assertEqual(check('Metallic', same_ring), 'ring_finder.mineral_not_in_ring_type')
+            self.assertEqual(check('Icy', same_ring), 'ring_finder.mineral_not_in_ring_type')
+        self.assertEqual(check('All', True), 'ring_finder.minerals_never_same_ring')
+        self.assertIsNone(check('All', False))
+        self.assertIsNone(check('Icy', True, second='Unknown Mineral'))
+
+    def test_searched_minerals_lead_the_hotspots_list_in_search_order(self):
+        short = {'Alexandrite': 'Alex', 'Low Temperature Diamonds': 'LTD', 'Grandidierite': 'Gran'}
+        self.finder._abbreviate_material_for_display = lambda text: short.get(text, text)
+        searched = ['Grandidierite', 'Low Temperature Diamonds']
+        for names in (['Alex', 'LTD', 'Gran'], ['Alexandrite', 'Low Temperature Diamonds', 'Grandidierite']):
+            with self.subTest(names=names):
+                self.assertEqual(sorted(names, key=lambda n: self.finder._searched_mineral_rank(n, searched)),
+                                 [names[2], names[1], names[0]])
+
+    def test_same_system_lists_rings_by_number_and_keeps_the_system_together(self):
+        both_a = dict(row('Sys', '9 A Ring'), distance=10.1, ls_distance=900)
+        ten = dict(row('Sys', '10 A Ring'), distance=10.0, ls_distance='2,000')
+        star_b = dict(row('Sys', 'B 2 A Ring'), distance=10.1, ls_distance=50)
+        second = dict(row('Sys', '2 B Ring'), distance=10.0, ls_distance=10)
+        both_b = dict(row('Sys', 'Sys 9 A Ring'), source='Spansh')
+        other = dict(row('Other', '1 A Ring'), distance=10.05)
+        other_b = dict(row('Other', '2 A Ring'), distance=10.05)
+        expected = [second, both_a, ten, star_b, other, other_b]
+        self.assertEqual(
+            self.finder._combine_mineral_results([ten, both_a, star_b, other], [second, both_b, other_b], False),
+            expected)
+        self.assertEqual([r['pair_order'] for r in expected], list(range(6)))
+
+    def test_two_mineral_search_asks_for_each_mineral_without_reused_spansh_rows(self):
+        f = self.finder
+        f.db_ready = True
+        f.systems_data = {}
+        f._is_all_minerals = Mock(return_value=False)
+        f._update_results = Mock()
+        f._reset_search_button = Mock()
+        found = {'Platinum': [row('Sol', '1 A Ring', count=1), row('Sol', '3 A Ring', count=3)],
+                 'Painite': [row('Sol', '2 A Ring', count=3)]}
+        f._get_hotspots = Mock(side_effect=lambda ref, rt, mineral, *a, **kw: found[mineral])
+        f._search_worker('Sol', 'Metallic', 'Platinum', True, 50, dict(x=0, y=0, z=0), 10, min_hotspots=2,
+                         search_generation=1, use_spansh_pp=False, cached_spansh=['old'],
+                         second_material='Painite', same_ring=False)
+        f.parent.flush()
+        self.assertEqual([c.args[1:3] for c in f._get_hotspots.call_args_list],
+                         [('Metallic', 'Platinum'), ('Metallic', 'Painite')])
+        for call in f._get_hotspots.call_args_list:
+            self.assertNotIn('cached_spansh', call.kwargs)
+            self.assertNotIn('spansh_fetched', call.kwargs)
+        shown, = f._update_results.call_args[0]
+        self.assertEqual([h['bodyName'] for h in shown], ['2 A Ring', '3 A Ring'])
 
     def test_old_completion_and_callbacks_cannot_change_new_search(self):
         f = self.finder
@@ -214,6 +303,68 @@ class RingFinderSearchTests(unittest.TestCase):
     def test_display_filters_before_limit_and_visit_lookup_only_once(self):
         f = self.finder
         db = f.user_db
+        module = self.prepare_display()
+        rows = [row('Visited', reserve='Pristine'), row('Wrong reserve', reserve='Low'),
+                row('Wanted', reserve='Pristine'), row('Farther', reserve='Pristine')]
+        with patch.dict(sys.modules, system_finder_api=module):
+            f._update_results(rows)
+            f.parent.flush()
+        self.assertEqual([values[2] for values in f.results_tree.rows.values()], ['Wanted'])
+        db.bulk_get_visit_counts.assert_called_once()
+        self.assertEqual(len(f._search_cache), 4)
+        self.assertEqual(f._finish_update_results.call_args[0][0], 1)
+        db.bulk_get_visit_counts.assert_called_once()
+        self.assertEqual(sorted(db.bulk_get_visit_counts.call_args[0][0]),
+                         ['Farther', 'Visited', 'Wanted', 'Wrong reserve'])
+        for name in ('bulk_get_ring_comments_for_rings', 'bulk_get_ring_density_for_rings'):
+            getattr(db, name).assert_called_once_with(['Wanted'])
+
+    def test_two_mineral_rows_keep_their_grouped_order(self):
+        f = self.finder
+        module = self.prepare_display()
+        f.unvisited_only_var = variable(False)
+        f._search_result_limit = None
+        # Distances and LS would reorder these if the grouped order weren't kept
+        rows = [dict(row('A', '9 A Ring', reserve='Pristine'), distance='2.0', ls_distance=900, pair_order=0),
+                dict(row('A', '1 A Ring', reserve='Pristine'), distance='1.0', ls_distance=5, pair_order=1),
+                dict(row('B', '1 A Ring', reserve='Pristine'), distance='3.0', pair_order=2),
+                dict(row('C', '1 A Ring', reserve='Pristine'), distance='4.0', pair_order=3),
+                dict(row('C', '2 A Ring', reserve='Pristine'), distance='4.0', pair_order=4)]
+        with patch.dict(sys.modules, system_finder_api=module):
+            f._update_results(rows)
+            f.parent.flush()
+        tree = f.results_tree
+        self.assertEqual([(tree.rows[k][2], tree.rows[k][3]) for k in tree.order],
+                         [('A', '9 A Ring'), ('A', '1 A Ring'), ('B', '1 A Ring'), ('C', '1 A Ring'), ('C', '2 A Ring')])
+
+    def test_results_table_shades_two_mineral_rows_per_system(self):
+        import tkinter as tk
+        with patch.object(sys, 'path', [str(ROOT / 'app')] + sys.path):
+            from ui.striped_treeview import StripedTreeview
+            try:
+                root = tk.Tk()
+            except tk.TclError as e:
+                self.skipTest(f'no display: {e}')
+            root.withdraw()
+            try:
+                tree = StripedTreeview(root, columns=('System',), show='headings')
+                rows = [('A', True), ('A', True), ('B', True), ('C', True), ('C', True), ('D', False), ('E', False)]
+                hotspots = {}
+                for system, paired in rows:
+                    item = tree.insert('', 'end', values=(system,), tags=('evenrow',))
+                    hotspots[item] = dict(systemName=system, **({'pair_order': 0} if paired else {}))
+                self.finder._result_row_hotspots = hotspots
+                tree.stripe_group = self.finder._results_stripe_group
+                tree._stripe_rows()
+                parity = [tree.item(i, 'tags')[0] for i in tree.get_children()]
+            finally:
+                root.destroy()
+        # One shade per system for paired rows; plain rows keep per-row stripes
+        self.assertEqual(parity, ['evenrow', 'evenrow', 'oddrow', 'evenrow', 'evenrow', 'oddrow', 'evenrow'])
+
+    def prepare_display(self):
+        f = self.finder
+        db = f.user_db
         db.bulk_get_visit_counts.return_value = {'Visited': 2}
         for name in ('bulk_get_favourites_for_rings', 'bulk_get_ring_comments_for_rings',
                      'bulk_get_ring_density_for_rings', 'bulk_get_ring_last_mined',
@@ -240,20 +391,7 @@ class RingFinderSearchTests(unittest.TestCase):
         f._get_system_coords_from_galaxy_db = Mock(return_value=None)
         module = ModuleType('system_finder_api')
         module.SystemFinderAPI = SimpleNamespace(_batch_get_powerplay=lambda names: {})
-        rows = [row('Visited', reserve='Pristine'), row('Wrong reserve', reserve='Low'),
-                row('Wanted', reserve='Pristine'), row('Farther', reserve='Pristine')]
-        with patch.dict(sys.modules, system_finder_api=module):
-            f._update_results(rows)
-            f.parent.flush()
-        self.assertEqual([values[2] for values in f.results_tree.rows.values()], ['Wanted'])
-        db.bulk_get_visit_counts.assert_called_once()
-        self.assertEqual(len(f._search_cache), 4)
-        self.assertEqual(f._finish_update_results.call_args[0][0], 1)
-        db.bulk_get_visit_counts.assert_called_once()
-        self.assertEqual(sorted(db.bulk_get_visit_counts.call_args[0][0]),
-                         ['Farther', 'Visited', 'Wanted', 'Wrong reserve'])
-        for name in ('bulk_get_ring_comments_for_rings', 'bulk_get_ring_density_for_rings'):
-            getattr(db, name).assert_called_once_with(['Wanted'])
+        return module
 
     def test_visits_sort_numerically_in_both_directions(self):
         f = self.finder

@@ -189,7 +189,37 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         """Check if the given value represents 'All Minerals' (handles localized values)"""
         from localization import t
         return value == RingFinder.ALL_MINERALS or value == t('ring_finder.all_minerals')
-    
+
+    def _second_mineral_usable(self) -> bool:
+        """The second mineral only combines with a normal search for one specific first mineral."""
+        return not (self._is_all_minerals(self.specific_material_var.get())
+                    or self.overlaps_only_var.get() or self.res_only_var.get()
+                    or self.ring_type_only_var.get())
+
+    def _active_second_material(self):
+        """English name of the second mineral for the next search, or None when it doesn't apply."""
+        value = self.second_material_var.get()
+        if value == t('ring_finder.second_mineral_none') or not self._second_mineral_usable():
+            return None
+        return self._to_english(value)
+
+    def _update_second_mineral_state(self, *_):
+        """Refresh the second mineral list and grey out the row when it can't be used."""
+        if not hasattr(self, 'second_material_combo'):
+            return
+        none = t('ring_finder.second_mineral_none')
+        first = self.specific_material_var.get()
+        values = [none] + [m for m in self.specific_material_combo['values']
+                           if not self._is_all_minerals(m) and m != first]
+        self.second_material_combo['values'] = tuple(values)
+        if self.second_material_var.get() not in values:
+            self.second_material_var.set(none)
+        usable = self._second_mineral_usable()
+        self.second_material_combo.configure(state="readonly" if usable else "disabled")
+        scope_state = "normal" if usable and self.second_material_var.get() != none else "disabled"
+        for rb in (self.same_system_rb, self.same_ring_rb):
+            rb.configure(state=scope_state)
+
     def _deselect_on_empty_click(self, event):
         """Deselect all items when clicking on empty space in the results treeview"""
         item = self.results_tree.identify_row(event.y)
@@ -361,6 +391,24 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         except:
             return hotspot_text  # Return original if parsing fails
         
+    def _results_stripe_group(self, item):
+        """Two-mineral results are shaded per system, so each system's rings read as one block."""
+        hotspot = getattr(self, '_result_row_hotspots', {}).get(item)
+        if hotspot and 'pair_order' in hotspot:
+            return hotspot.get('systemName', hotspot.get('system', '')).lower()
+        return None
+
+    def _searched_mineral_rank(self, name: str, searched) -> int:
+        """Position of name among the searched minerals (len(searched) if not one of them).
+
+        Rows mix full names (Spansh) and short names (local), so both sides are compared shortened too.
+        """
+        short = self._abbreviate_material_for_display(name)
+        for i, mineral in enumerate(searched):
+            if self._material_matches(mineral, name) or self._abbreviate_material_for_display(mineral) == short:
+                return i
+        return len(searched)
+
     def _abbreviate_material_for_display(self, hotspot_text: str) -> str:
         """Abbreviate material names in hotspot display text for Ring Finder column
         
@@ -908,7 +956,33 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         # Tooltips for data sources
         for _rb in (self.data_source_db_rb, self.data_source_spansh_rb, self.data_source_both_rb):
             ToolTip(_rb, t('ring_finder.data_source_tooltip'))
-        
+
+        # Second mineral: beside Mineral in Classic, its own row below Mineral in Modern
+        self._rf_second = tk.Frame(search_frame, bg=_cb_bg)
+        self._rf_second.grid(row=3, column=2, columnspan=5, sticky="w", padx=5, pady=5)
+        self._second_mineral_lbl = ttk.Label(self._rf_second, text=t('ring_finder.second_mineral'))
+        self._second_mineral_lbl.pack(side="left", padx=(0, 5))
+        self.second_material_var = tk.StringVar(value=t('ring_finder.second_mineral_none'))
+        self.second_material_combo = ttk.Combobox(self._rf_second, textvariable=self.second_material_var,
+                                                  width=16, state="readonly")
+        self.second_material_combo.pack(side="left", padx=(0, 14))
+        self.second_material_combo.bind('<<ComboboxSelected>>', lambda e: e.widget.selection_clear(), add='+')
+        self.second_scope_var = tk.StringVar(value="system")
+        self.same_system_rb = ThemedRadiobutton(self._rf_second, text=t('ring_finder.same_system'),
+                                                variable=self.second_scope_var, value="system",
+                                                command=self._save_filter_settings, **rb_style)
+        self.same_system_rb.pack(side="left", padx=(0, 15))
+        self.same_ring_rb = ThemedRadiobutton(self._rf_second, text=t('ring_finder.same_ring'),
+                                              variable=self.second_scope_var, value="ring",
+                                              command=self._save_filter_settings, **rb_style)
+        self.same_ring_rb.pack(side="left")
+        self.second_material_var.trace_add('write', self._update_second_mineral_state)
+        self.second_material_var.trace_add('write', lambda *_: self._save_filter_settings())
+        self.specific_material_var.trace_add('write', self._update_second_mineral_state)
+        for _var in (self.overlaps_only_var, self.res_only_var, self.ring_type_only_var):
+            _var.trace_add('write', self._update_second_mineral_state)
+        self._update_second_mineral_state()
+
         # Start Spansh and EDDN status checks after a short delay
         self.parent.after(1000, self._check_spansh_status)
         self.parent.after(1200, self._check_eddn_status)
@@ -1055,6 +1129,7 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         # Results treeview with enhanced columns including source
         columns = ("Distance", "LS", "System", "Planet/Ring", "Sol Dist", "Visits", "Ring Type", "Reserve", "Hotspots", "Overlap", "RES Site", "PowerPlay", "Source", "Favourite", "Last Mined", "Comment", "Density", "_spacer")
         self.results_tree = StripedTreeview(tree_frame, columns=columns, show="headings", style="RingFinder.Treeview", selectmode='extended')
+        self.results_tree.stripe_group = self._results_stripe_group
         
         # Track column visibility and default widths
         self.column_default_widths = {
@@ -2118,7 +2193,9 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         
         # Mineral
         self.specific_material_var.set(t('ring_finder.all_minerals'))
-        
+        self.second_material_var.set(t('ring_finder.second_mineral_none'))
+        self.second_scope_var.set("system")
+
         # Data Source - set to Local (database)
         self.data_source_var.set("database")
         self._on_data_source_changed()
@@ -2195,6 +2272,9 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
             settings = {
                 "ring_type": self._ring_type_rev_map.get(self.material_var.get(), self.material_var.get()),
                 "specific_material": self._to_english(self.specific_material_var.get()),
+                "second_material": ("" if self.second_material_var.get() == t('ring_finder.second_mineral_none')
+                                    else self._to_english(self.second_material_var.get())),
+                "second_scope": self.second_scope_var.get(),
                 "distance": distance_to_save,
                 "max_results": max_results_value,
                 "min_hotspots": self.min_hotspots_var.get(),
@@ -2233,6 +2313,11 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
                     self.specific_material_var.set(display_name)
                 except Exception:
                     self.specific_material_var.set(settings["specific_material"])
+            if settings.get("second_material"):
+                # Unknown names fall back to None in _update_second_mineral_state
+                self.second_material_var.set(self._format_material_for_display(settings["second_material"]))
+            if settings.get("second_scope") in ("system", "ring"):
+                self.second_scope_var.set(settings["second_scope"])
             if "distance" in settings:
                 # Guard against a stale 500 saved by an earlier bug (the PowerPlay-state
                 # override leaking into the saved distance) - fall back to a normal default
@@ -2637,7 +2722,13 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         for b in self._rf_actions.winfo_children():
             b.pack(side="left", padx=(0, 8))
 
-        misc.grid(row=2, column=0, columnspan=7, sticky="ew", padx=5, pady=(8, 2))
+        # Second mineral row directly under Mineral; equal label widths line the two boxes up
+        label_chars = max(len(mineral_lbl.cget('text')), len(self._second_mineral_lbl.cget('text')))
+        mineral_lbl.configure(width=label_chars)
+        self._second_mineral_lbl.configure(width=label_chars)
+        self._rf_second.grid(row=2, column=0, columnspan=7, sticky="w", padx=5, pady=(4, 2))
+
+        misc.grid(row=3, column=0, columnspan=7, sticky="ew", padx=5, pady=(8, 2))
 
         more = self._rf_more
         reserve_lbl.grid(in_=more, row=0, column=0, sticky="w", padx=(0, 5), pady=3)
@@ -2680,7 +2771,7 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
     def _toggle_more_filters(self):
         self._more_open = not self._more_open
         if self._more_open:
-            self._rf_more.grid(row=3, column=0, columnspan=7, sticky="w", padx=5, pady=(0, 2))
+            self._rf_more.grid(row=4, column=0, columnspan=7, sticky="w", padx=5, pady=(0, 2))
         else:
             self._rf_more.grid_remove()
         self._refresh_more_btn()
@@ -2864,11 +2955,13 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         _rings_in_db = self.user_db.bulk_check_rings_exist(spansh_pairs) if spansh_pairs else set()
 
         # Sort: green entries first, then other top entries, then rest by distance
+        # (two-mineral results keep the grouped order they arrive in, via pair_order)
         try:
             hotspots.sort(key=lambda x: (
                 0 if (x.get('system', x.get('systemName', '')), x.get('ring', x.get('bodyName', ''))) in green_entries else (
                     1 if (x.get('system', x.get('systemName', '')), x.get('ring', x.get('bodyName', ''))) in top_entries else 2
                 ),  # Green first, then top, then rest
+                x.get('pair_order', -1),
                 float(x.get('distance', 999)),           # Then: Distance (closest first)
                 x.get('systemName', x.get('system', '')).lower(),  # Then: System name (alphabetical)
                 x.get('ls_distance') if x.get('ls_distance') is not None else 999999,  # Then: LS distance (closest first)
@@ -2887,7 +2980,7 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         for row_index, hotspot in enumerate(hotspots):
             system_name = hotspot.get("systemName", hotspot.get("system", ""))
             body_name = hotspot.get("bodyName", hotspot.get("body", ""))
-            
+
             # Get hotspot data for this ring
             system_name = hotspot.get("system", hotspot.get("systemName", "Unknown"))
             ring_name = hotspot.get("ring", hotspot.get("bodyName", "Unknown Ring"))
@@ -3011,8 +3104,12 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
             # Sort, abbreviate and localize material names in hotspot display
             hotspot_count_display = self._sort_hotspots_display(hotspot_count_display)
             if not self._is_all_minerals(current_material_filter) and ',' in hotspot_count_display:
+                _searched = [current_material_filter]
+                _second = self._active_second_material()
+                if _second:
+                    _searched.append(_second)
                 _parts = [p.strip() for p in hotspot_count_display.split(',')]
-                _parts.sort(key=lambda p: not self._material_matches(current_material_filter, p.split(' (')[0]))
+                _parts.sort(key=lambda p: self._searched_mineral_rank(p.split(' (')[0], _searched))
                 hotspot_count_display = ', '.join(_parts)
             hotspot_count_display = self._abbreviate_material_for_display(hotspot_count_display)
             hotspot_count_display = self._localize_hotspot_display(hotspot_count_display)
@@ -3174,6 +3271,8 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         mineral = self.specific_material_var.get()
         if mineral != t('ring_finder.all_minerals'):
             material_filter = mineral
+            if self._active_second_material():
+                material_filter = f"{mineral} + {self.second_material_var.get()}"
             all_types = False
         else:
             all_types = self._ring_type_rev_map.get(material_filter, material_filter) == 'All'

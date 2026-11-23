@@ -156,7 +156,11 @@ class RingFinderSearchMixin:
         # Convert dropdown display names to database names for SQL query
         if specific_material == "Low Temp Diamonds":
             specific_material = "Low Temperature Diamonds"
-        
+        second_material = self._active_second_material()
+        if second_material == "Low Temp Diamonds":
+            second_material = "Low Temperature Diamonds"
+        same_ring = self.second_scope_var.get() == "ring"
+
         # Get confirmed_only with error handling
         try:
             confirmed_only = self.confirmed_only_var.get()
@@ -213,6 +217,20 @@ class RingFinderSearchMixin:
             except (ValueError, AttributeError):
                 min_hotspots = 1
         
+        if second_material:
+            impossible = self._impossible_mineral_search(
+                material_filter, material_filter_local, specific_material, specific_material_local,
+                second_material, self.second_material_var.get(), same_ring)
+            if impossible:
+                # Nothing can match: clear the old rows and say why instead of searching
+                self._search_generation += 1
+                self.results_tree.delete(*self.results_tree.get_children())
+                self.status_var.set(impossible)
+                if self._saved_data_source:
+                    self.data_source_var.set(self._saved_data_source)
+                    self._saved_data_source = None
+                return
+
         # Keep search button clickable (it now doubles as a Stop button)
         self._search_in_progress = True
         self.search_btn.configure(text=t('ring_finder.stop'))
@@ -249,10 +267,11 @@ class RingFinderSearchMixin:
         spansh_stop_at_limit = not (
             min_hotspots > 1 or self.unvisited_only_var.get()
             or (reserve_filter and reserve_filter != t('ring_finder.all_reserves'))
-            or pp_power_filter != 'Any' or pp_state_filter != 'Any')
+            or pp_power_filter != 'Any' or pp_state_filter != 'Any'
+            or second_material)
 
         # Reuse the last Spansh rows (set after saving them to the database) for this search only
-        cached_spansh = self._cached_spansh_results if self._use_cached_spansh else None
+        cached_spansh = self._cached_spansh_results if self._use_cached_spansh and not second_material else None
         self._use_cached_spansh = False
 
         # Increment search generation to cancel any in-flight searches
@@ -262,9 +281,10 @@ class RingFinderSearchMixin:
         # Run search in background - pass reference system coords and max results to worker
         threading.Thread(target=self._search_worker,
                         args=(reference_system, material_filter, specific_material, confirmed_only, max_distance, self.current_system_coords, max_results, min_hotspots, overlaps_only, res_only, data_source, ring_type_only, current_generation, pp_power_filter, pp_state_filter, use_spansh_pp, spansh_stop_at_limit, force_database, cached_spansh),
+                        kwargs={'second_material': second_material, 'same_ring': same_ring},
                         daemon=True).start()
 
-    def _search_worker(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, reference_coords, max_results, min_hotspots: int = 1, overlaps_only: bool = False, res_only: bool = False, data_source: str = "both", ring_type_only: bool = False, search_generation: int = 0, pp_power: str = 'Any', pp_state: str = 'Any', use_spansh_pp: bool = True, spansh_stop_at_limit: bool = False, force_database: bool = False, cached_spansh=None):
+    def _search_worker(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, reference_coords, max_results, min_hotspots: int = 1, overlaps_only: bool = False, res_only: bool = False, data_source: str = "both", ring_type_only: bool = False, search_generation: int = 0, pp_power: str = 'Any', pp_state: str = 'Any', use_spansh_pp: bool = True, spansh_stop_at_limit: bool = False, force_database: bool = False, cached_spansh=None, second_material=None, same_ring: bool = False):
         """Background worker for hotspot search.
 
         Writes no search state on self: coordinates, PowerPlay data and Spansh rows go to
@@ -346,6 +366,22 @@ class RingFinderSearchMixin:
                 else:
                     hotspots = self._get_all_res_for_search(reference_system, reference_coords, specific_material)
                     print(f" DEBUG: RES Only mode - found {len(hotspots)} RES locations")
+            elif second_material:
+                is_cancelled = lambda: search_generation != self._search_generation
+                # No Spansh row reuse here: one mineral's rows must never stand in for the other's
+                per_mineral = []
+                for mineral in (specific_material, second_material):
+                    if is_cancelled():
+                        break
+                    rows = self._get_hotspots(reference_system, material_filter, mineral, confirmed_only, max_distance, max_results,
+                                              data_source=data_source, is_cancelled=is_cancelled,
+                                              spansh_stop_at_limit=False, force_database=force_database,
+                                              reference_coords=reference_coords)
+                    if min_hotspots > 1:
+                        rows = [h for h in rows if h.get('count', 1) >= min_hotspots]
+                    per_mineral.append(rows)
+                hotspots = (self._combine_mineral_results(per_mineral[0], per_mineral[1], same_ring)
+                            if len(per_mineral) == 2 else [])
             else:
                 hotspots = self._get_hotspots(reference_system, material_filter, specific_material, confirmed_only, max_distance, max_results, data_source=data_source, ring_type_only_active=ring_type_only,
                                                is_cancelled=lambda: search_generation != self._search_generation,
@@ -371,7 +407,7 @@ class RingFinderSearchMixin:
                     pp_backfill = (reference_system, max_distance)
 
             # Apply min hotspots filter if needed (skip for overlaps/RES only mode)
-            if min_hotspots > 1 and not self._is_all_minerals(specific_material) and not overlaps_only and not res_only:
+            if min_hotspots > 1 and not self._is_all_minerals(specific_material) and not overlaps_only and not res_only and not second_material:
                 original_count = len(hotspots)
                 hotspots = [h for h in hotspots if h.get('count', 1) >= min_hotspots]
                 filtered_count = len(hotspots)
@@ -612,7 +648,69 @@ class RingFinderSearchMixin:
             print(f"[MAX_RESULTS] Limited from {len(results)} rows to {len(limited_results)} rows ({len(seen_rings)} unique rings)")
         
         return limited_results
-    
+
+    def _impossible_mineral_search(self, ring_type: str, ring_type_display: str, first: str, first_display: str,
+                                   second: str, second_display: str, same_ring: bool) -> Optional[str]:
+        """Message explaining why a two-mineral search can't match anything, or None.
+
+        ring_type/first/second are English names; minerals missing from the table are never blocked.
+        """
+        types = self.MINING_METHOD_BY_RING
+        if ring_type != 'All':
+            for mineral, display in ((first, first_display), (second, second_display)):
+                if mineral in types and ring_type not in types[mineral]:
+                    return t('ring_finder.mineral_not_in_ring_type').format(mineral=display, ring_type=ring_type_display)
+        if same_ring and first in types and second in types and not set(types[first]) & set(types[second]):
+            return t('ring_finder.minerals_never_same_ring').format(first=first_display, second=second_display)
+        return None
+
+    def _combine_mineral_results(self, rows_a: List[Dict], rows_b: List[Dict], same_ring: bool) -> List[Dict]:
+        """Rows for places holding both minerals: the same ring, or anywhere in the same system.
+
+        rows_a/rows_b are the results of searching for each mineral on its own.
+        """
+        def keys(row):
+            system = row.get('systemName', row.get('system', ''))
+            body = self.user_db._normalize_body_name(row.get('bodyName', row.get('ring', '')), system)
+            return system.lower(), body
+
+        rings_a = {keys(r) for r in rows_a}
+        rings_b = {keys(r) for r in rows_b}
+        if same_ring:
+            combined = [r for r in rows_a if keys(r) in rings_b]
+        else:
+            both_systems = {s for s, _ in rings_a} & {s for s, _ in rings_b}
+            combined = [r for r in rows_a if keys(r)[0] in both_systems]
+            # A ring holding both minerals is already listed from rows_a
+            combined += [r for r in rows_b if keys(r)[0] in both_systems and keys(r) not in rings_a]
+
+        def number(value, default):
+            try:
+                return float(str(value).replace(',', ''))
+            except (TypeError, ValueError):
+                return default
+
+        # Rows of one system can carry slightly different distances; the nearest keeps them together
+        system_distance = {}
+        for r in combined:
+            s = keys(r)[0]
+            system_distance[s] = min(system_distance.get(s, 999999.0), number(r.get('distance'), 999999.0))
+
+        def ring_order(body):
+            """Natural order within a system, like the system map: 2 B Ring before 10 A Ring."""
+            return tuple((0, int(part), '') if part.isdigit() else (1, 0, part)
+                         for part in re.findall(r'\d+|[^\d\s]+', body.lower()))
+
+        def sort_key(r):
+            key = keys(r)
+            return (system_distance[key[0]], key[0], ring_order(key[1]), str(r.get('source', '')).lower())
+
+        combined.sort(key=sort_key)
+        # _update_results keeps this order and shades the rows per system instead of per row
+        for i, r in enumerate(combined):
+            r['pair_order'] = i
+        return combined
+
     def _resolve_spansh_system_name(self, system_name: str, is_cancelled=None) -> Optional[str]:
         """Resolve system name to correct capitalization using Spansh API (case-insensitive)
 
