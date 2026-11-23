@@ -375,7 +375,7 @@ class RingFinderSearchMixin:
                     rows = self._get_hotspots(reference_system, material_filter, mineral, confirmed_only, max_distance, max_results,
                                               data_source=data_source, is_cancelled=is_cancelled,
                                               spansh_stop_at_limit=False, force_database=force_database,
-                                              reference_coords=reference_coords)
+                                              reference_coords=reference_coords, page_to_distance=True)
                     if min_hotspots > 1:
                         rows = [h for h in rows if h.get('count', 1) >= min_hotspots]
                     # Before combining: filtering afterwards would drop a system's other-mineral ring
@@ -772,7 +772,7 @@ class RingFinderSearchMixin:
             log.error(f"[SPANSH] System name resolution failed: {e}")
             return None
     
-    def _search_spansh_with_filters(self, reference_system: str, material_filter: str, specific_material: str, max_distance: float, max_results: int, reference_coords, ring_type_only: bool = False, is_cancelled=None, stop_at_limit: bool = False) -> List[Dict]:
+    def _search_spansh_with_filters(self, reference_system: str, material_filter: str, specific_material: str, max_distance: float, max_results: int, reference_coords, ring_type_only: bool = False, is_cancelled=None, stop_at_limit: bool = False, page_to_distance: bool = False) -> List[Dict]:
         """Search Spansh API with proper filters for hotspot fallback (EDMC approach)
 
         Args:
@@ -850,7 +850,9 @@ class RingFinderSearchMixin:
             # For "All Minerals" or "All Ring Types" or "Ring Type Only" searches, use pagination to get more results covering larger distances
             # Spansh returns bodies sorted by distance, but with no filters there are many bodies
             # so 500 results might only cover 10-15 LY per page in dense regions. Fetch multiple pages to reach max_distance.
-            use_pagination = self._is_all_minerals(specific_material) or ring_type_english == 'All' or ring_type_only
+            # page_to_distance: two-mineral searches need both lists to reach the full radius
+            use_pagination = (self._is_all_minerals(specific_material) or ring_type_english == 'All'
+                              or ring_type_only or page_to_distance)
             page_size = 500 if use_pagination else 200
             
             # Ring Type Only mode: allow many pages to reach 300 LY (for finding distant rings)
@@ -1148,7 +1150,7 @@ class RingFinderSearchMixin:
             filtered.append(h)
         return filtered, enrichment
 
-    def _get_hotspots(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, max_results: int = None, data_source: str = None, ring_type_only_active: bool = False, is_cancelled=None, spansh_stop_at_limit: bool = False, force_database: bool = False, reference_coords=None, cached_spansh=None, spansh_fetched=None) -> List[Dict]:
+    def _get_hotspots(self, reference_system: str, material_filter: str, specific_material: str, confirmed_only: bool, max_distance: float, max_results: int = None, data_source: str = None, ring_type_only_active: bool = False, is_cancelled=None, spansh_stop_at_limit: bool = False, force_database: bool = False, reference_coords=None, cached_spansh=None, spansh_fetched=None, page_to_distance: bool = False) -> List[Dict]:
         """Get hotspot data based on user's data source selection.
 
         cached_spansh: Spansh rows to reuse instead of asking Spansh again.
@@ -1211,7 +1213,8 @@ class RingFinderSearchMixin:
                         reference_coords if reference_coords else self.current_system_coords,
                         ring_type_only=ring_type_only_active,
                         is_cancelled=is_cancelled,
-                        stop_at_limit=spansh_stop_at_limit
+                        stop_at_limit=spansh_stop_at_limit,
+                        page_to_distance=page_to_distance
                     )
                     print(f"[SEARCH] Spansh returned {len(spansh_results)} results")
                     if spansh_fetched is not None:

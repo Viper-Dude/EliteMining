@@ -302,6 +302,7 @@ Search saved hotspots and Spansh ring data by mineral, ring type, and distance. 
 
 - **Data Source** — Choose Local Database (saved rings and scans), Spansh, or Both. Ring Type Only finds rings without requiring hotspots.
 - **Mineral and ring filters** — Choose a mineral, ring type, distance, and minimum hotspot count (1–20 when a mineral is selected).
+- **Two minerals** — Use the **And** box under Mineral to find systems with a second mineral too, either anywhere in the **same system** or in the **same ring**. Rings are listed in ring-number order, shaded one colour per system. Not available with All Minerals, Overlaps Only, RES Only or Ring Search.
 - **Search range** — Local searches support up to 500 LY; Spansh hotspot coverage is typically around 50 LY, and Ring Search reaches 300 LY.
 - **Overlaps and RES sites** — Find double/triple hotspots and Resource Extraction Sites. The bundled data includes 161 overlaps and 71 RES locations.
 - **Power/State** — Available for Local Database searches. Fortified/Stronghold searches use Spansh up to 500 LY; other states use locally received data and Max Distance.
@@ -331,7 +332,7 @@ Search saved hotspots and Spansh ring data by mineral, ring type, and distance. 
 *Edit Ring Data, opened from the right-click menu.*
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/ring_finder.png" width="900"><br>
-*Hotspot Finder showing search results with minerals filters and distance calculations.*
+*Hotspot Finder showing search results with mineral filters, the second mineral box and distance calculations.*
 
 <details>
 <summary>View acquisition searches and mineral price examples</summary>
