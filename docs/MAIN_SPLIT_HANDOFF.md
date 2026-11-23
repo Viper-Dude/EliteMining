@@ -29,6 +29,7 @@ Make `app/main.py` (and later `prospector_panel.py` and `ring_finder.py`) smalle
 | 3b | Commodity Market tab into `commodity_market_tab.py` | Done 22 Nov 2026; checks OK, user-tested | 14,275 (−2,363) |
 | 3c | Distance Calculator tab into `distance_calculator_tab.py` | Done 23 Nov 2026 (`6719590`); checks OK | 13,831 (−444 from the move) |
 | 4 | `prospector_panel.py`, `ring_finder.py` | Later | — |
+| 4a | Best Minerals to Mine and Auto Prices into `best_minerals_view.py` (`BestMineralsMixin`) | Done 23 Nov 2026; checks OK | ring_finder.py 8,181 (−1,015) |
 
 Line counts are physical lines, including blank lines.
 
