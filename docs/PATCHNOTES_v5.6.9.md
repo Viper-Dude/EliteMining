@@ -4,7 +4,7 @@
 ## New Features & Improvements
 - General code optimalization.
 - Commodity Market searches are faster and find more stations with fresh prices, both nearby and galaxy-wide.
-- Low Temperature Diamonds is now named consistently across the app.
+- Low Temperature Diamonds is now named LTD consistently across the app.
 - Commodity Market results now show System and Station in separate columns, with full station names.
 
 ## Bug Fixes

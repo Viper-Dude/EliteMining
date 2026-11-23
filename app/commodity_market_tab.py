@@ -336,7 +336,7 @@ class CommodityMarketTabMixin:
         self.marketplace_best_label.pack(side="right", padx=(0, 10))
 
         if _mkt_cb_theme in ("modern", "modern_slate", "modern_orange"):
-            self.marketplace_total_label = ttk.Label(results_header, text='', anchor="w",
+            self.marketplace_total_label = ttk.Label(results_header, text='', anchor="w", width=1,
                 font=self._scaled_font(9, "bold"), foreground=modern_color("#E6EAF0"))
             self.marketplace_total_label.pack(side="left", fill="x", expand=True, padx=(10, 0))
 
@@ -624,7 +624,7 @@ class CommodityMarketTabMixin:
         self.trade_best_label.pack(side="right", padx=(0, 10))
 
         if _trade_cb_theme in ("modern", "modern_slate", "modern_orange"):
-            self.trade_total_label = ttk.Label(results_header, text='', anchor="w",
+            self.trade_total_label = ttk.Label(results_header, text='', anchor="w", width=1,
                 font=self._scaled_font(9, "bold"), foreground=modern_color("#E6EAF0"))
             self.trade_total_label.pack(side="left", fill="x", expand=True, padx=(10, 0))
 
@@ -2036,7 +2036,7 @@ class CommodityMarketTabMixin:
             if pp_power == '~none~':
                 label.config(text=t('ring_finder.pp_fetch_no_power').format(system=system_name))
             else:
-                label.config(text=t('ring_finder.pp_fetch_success').format(system=system_name, power=pp_str))
+                label.config(text=t('marketplace.pp_updated').format(system=system_name))
         else:
             label.config(text=t('ring_finder.pp_fetch_none').format(system=system_name))
 
