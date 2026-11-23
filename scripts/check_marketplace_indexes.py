@@ -44,6 +44,7 @@ class CacheIndexChecks(unittest.TestCase):
         coordinates.start()
         self.addCleanup(coordinates.stop)
         self.now = datetime.now(timezone.utc).isoformat()
+        self.later = (datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat()  # an update newer than the seed rows
         self.old = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
         with closing(sqlite3.connect(self.path)) as conn:
             conn.execute('INSERT INTO system_coords(name,x,y,z,updated_at) VALUES (?,?,?,?,?)',
@@ -187,7 +188,7 @@ class CacheIndexChecks(unittest.TestCase):
     def test_incoming_prices_and_powerplay_replace_existing_records(self):
         self.listener._update_commodity_prices('Sol', 'Station 1', 'Coriolis', 1, [
             dict(name='platinum', sellPrice=250000, buyPrice=200000, demand=500, stock=25),
-        ], self.now)
+        ], self.later)
         self.listener._process_powerplay_from_event(
             dict(StarSystem='Unoccupied', ControllingPower='New Power', PowerplayState='Stronghold'), self.now)
         rows = MarketplaceAPI._fetch_eddn_cache('platinum', 'Sol', 'buy', max_days_ago=7)
@@ -262,7 +263,7 @@ class CacheIndexChecks(unittest.TestCase):
     def test_saved_prices_keep_their_original_source(self):
         self.listener._update_commodity_prices('Sol', 'Station 1', 'Coriolis', 1, [
             dict(name='platinum', sellPrice=250000, buyPrice=200000, demand=500, stock=25),
-        ], self.now)
+        ], self.later)
         MarketplaceAPI._backfill_eddn_cache([dict(
             marketId=2, systemName='Sol', stationName='Station 2', stationType='Outpost',
             commodityName='platinum', sellPrice=300, updatedAt=self.now, _source='Ardent')])

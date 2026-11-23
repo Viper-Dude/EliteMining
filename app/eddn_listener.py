@@ -19,6 +19,36 @@ import system_info_cache
 log = logging.getLogger('EliteMining.EDDN')
 
 
+def _build_price_upsert_sql() -> str:
+    """Shared by every price writer: a late or replayed report must never overwrite a fresher price.
+
+    julianday() because stored dates mix '...Z', '....000Z' and '+00:00'; equal dates keep the stored price,
+    and a stored row with no readable date is always replaced. Station details are not prices: any report
+    may fill a missing type, coordinates or arrival distance (search write-backs carry them merged in from
+    Ardent/Spansh), and a report without a type never erases a known one.
+    """
+    newer = ('(julianday(commodity_prices_data.updated_at) IS NULL '
+             'OR julianday(excluded.updated_at) > julianday(commodity_prices_data.updated_at))')
+    unknown = "({0} IS NULL OR {0} IN ('', 'Unknown'))"
+    price_cols = ', '.join(f'{c} = CASE WHEN {newer} THEN excluded.{c} ELSE {c} END'
+                           for c in ('sell_price', 'buy_price', 'demand', 'stock', 'market_id', 'updated_at', 'source'))
+    detail_cols = ', '.join(f'{c} = COALESCE(excluded.{c}, {c})'
+                            for c in ('system_x', 'system_y', 'system_z', 'distance_to_arrival'))
+    return f'''
+        INSERT INTO commodity_prices_data
+        (system_name, system_x, system_y, system_z, station_name, station_type,
+         commodity_name, sell_price, buy_price, demand, stock, distance_to_arrival,
+         market_id, updated_at, source)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(system_name, station_name, commodity_name) DO UPDATE SET
+            {price_cols}, {detail_cols},
+            station_type = CASE
+                WHEN {unknown.format('excluded.station_type')} THEN COALESCE(station_type, excluded.station_type)
+                WHEN {unknown.format('station_type')} OR {newer} THEN excluded.station_type
+                ELSE station_type END
+    '''
+
+
 class EDDNListener:
     """
     Listens to EDDN stream and updates local commodity price database.
@@ -67,7 +97,9 @@ class EDDNListener:
         "bertrandite",
         "lithium",
     })
-    
+
+    PRICE_UPSERT_SQL = _build_price_upsert_sql()
+
     def __init__(self, database_path: str):
         """
         Initialize EDDN listener
@@ -572,14 +604,7 @@ class EDDNListener:
                     demand = commodity.get('demand', 0)
                     stock = commodity.get('stock', 0)
                     
-                    # Insert/update in data table
-                    cursor.execute('''
-                        INSERT OR REPLACE INTO commodity_prices_data
-                        (system_name, system_x, system_y, system_z, station_name, station_type,
-                         commodity_name, sell_price, buy_price, demand, stock, distance_to_arrival,
-                         market_id, updated_at, source)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (system_name, system_x, system_y, system_z, station_name, station_type,
+                    cursor.execute(self.PRICE_UPSERT_SQL, (system_name, system_x, system_y, system_z, station_name, station_type,
                           commodity_name, sell_price, buy_price, demand, stock, None,
                           market_id, timestamp, 'EDDN'))
                 

@@ -1043,13 +1043,7 @@ class MarketplaceAPI:
             with sqlite3.connect(MarketplaceAPI.EDDN_CACHE_PATH) as conn:
                 cursor = conn.cursor()
                 for r in to_write:
-                    cursor.execute('''
-                        INSERT OR REPLACE INTO commodity_prices_data
-                        (system_name, system_x, system_y, system_z, station_name, station_type,
-                         commodity_name, sell_price, buy_price, demand, stock, distance_to_arrival,
-                         market_id, updated_at, source)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (r.get("systemName"), r.get("systemX"), r.get("systemY"), r.get("systemZ"),
+                    cursor.execute(EDDNListener.PRICE_UPSERT_SQL, (r.get("systemName"), r.get("systemX"), r.get("systemY"), r.get("systemZ"),
                           r.get("stationName"), r.get("stationType"), r.get("commodityName", "").lower(),
                           r.get("sellPrice", 0), r.get("buyPrice", 0), r.get("demand", 0), r.get("stock", 0),
                           r.get("distanceToArrival"), r.get("marketId"), r.get("updatedAt"), r.get("_source")))

@@ -299,12 +299,21 @@ class MarketplaceFinder(ColumnVisibilityMixin):
                     
                     # Insert into data table
                     cursor.execute('''
-                        INSERT OR REPLACE INTO commodity_prices_data 
+                        INSERT INTO commodity_prices_data
                         (system_name, system_x, system_y, system_z, station_name, station_type,
                          commodity_name, sell_price, buy_price, demand, stock, distance_to_arrival,
                          market_id, updated_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-                    ''', (system_name, system_coords.get('x'), system_coords.get('y'), system_coords.get('z'),
+                        ON CONFLICT(system_name, station_name, commodity_name) DO UPDATE SET
+                            system_x = excluded.system_x, system_y = excluded.system_y,
+                            system_z = excluded.system_z, station_type = excluded.station_type,
+                            sell_price = excluded.sell_price, buy_price = excluded.buy_price,
+                            demand = excluded.demand, stock = excluded.stock,
+                            distance_to_arrival = excluded.distance_to_arrival,
+                            market_id = excluded.market_id, updated_at = excluded.updated_at
+                        WHERE julianday(commodity_prices_data.updated_at) IS NULL
+                           OR julianday(excluded.updated_at) > julianday(commodity_prices_data.updated_at)
+                    ''',(system_name, system_coords.get('x'), system_coords.get('y'), system_coords.get('z'),
                           station_name, station_type, commodity_name, sell_price, buy_price,
                           demand, stock, distance_to_arrival, market_id))
                     
