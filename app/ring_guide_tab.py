@@ -32,10 +32,10 @@ class RingGuideTab(tk.Frame):
     # Ring data - minerals by ring type and mining method
     RING_DATA = {
         "Icy": {
-            "laser_high": ["Low Temp.Diamonds"],
+            "laser_high": ["Low Temperature Diamonds"],
             "laser_low": ["Bromellite", "Hydrogen Peroxide", "Liquid Oxygen", "Lithium Hydroxide", 
                          "Methane Clathrate", "Methanol Monohydrate Crystals", "Tritium", "Water"],
-            "core_high": ["Alexandrite", "Grandidierite", "Low Temp.Diamonds", "Void Opals"],
+            "core_high": ["Alexandrite", "Grandidierite", "Low Temperature Diamonds", "Void Opals"],
             "core_low": ["Bromellite"]
         },
         "Metallic": {

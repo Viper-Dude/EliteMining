@@ -524,7 +524,7 @@ class SessionStatisticsPanel(ColumnVisibilityMixin):
         tree.delete(*tree.get_children())
         totals = defaultdict(int)
         for index, (mineral, group) in enumerate(sorted(groups.items())):
-            values = dict(mineral=t('statistics_expanded.low_temp_diamonds') if mineral == 'Low Temperature Diamonds' else get_material(mineral), hotspots=group['hotspots'],
+            values = dict(mineral=get_material(mineral), hotspots=group['hotspots'],
                           mined=len(group['rings'] & mineral_mined[mineral.casefold()]))
             values.update({key: len(group[key]) for key in ('rings', 'double', 'triple', 'res_low', 'res_normal', 'res_high', 'haz')})
             values['coverage'] = f"{100 * values['mined'] / values['rings'] if values['rings'] else 0:.1f}%"

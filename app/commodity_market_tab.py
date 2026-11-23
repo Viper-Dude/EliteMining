@@ -9,7 +9,7 @@ from app_utils import create_action_button
 from column_visibility_helper import displayed_column
 from config import _load_cfg
 from core.constants import MENU_COLORS
-from localization import t, get_station_types, get_sort_options, get_age_options, get_material
+from localization import t, get_station_types, get_sort_options, get_age_options, get_material, get_abbr
 from marketplace_api import MarketplaceAPI
 from ui.search_control import SearchControl
 from ui.striped_treeview import StripedTreeview
@@ -170,18 +170,16 @@ class CommodityMarketTabMixin:
         from core.constants import MINING_COMMODITY_ORDER
         self._commodity_order = list(MINING_COMMODITY_ORDER)
         
-        # Helper to format commodity display names (abbreviate long names)
+        # Low Temperature Diamonds is too long for the dropdown, so it uses its short form
         def format_commodity_display(name):
-            localized = get_material(name)
-            # Use abbreviated display for Low Temperature Diamonds
-            if name == "Low Temperature Diamonds" or localized == "Low Temperature Diamonds":
-                return "Low Temp. Diamonds"
-            return localized
+            if name == "Low Temperature Diamonds":
+                return get_abbr(name)
+            return get_material(name)
         
         self._commodity_map = {k: format_commodity_display(k) for k in self._commodity_order}
         self._commodity_rev_map = {v: k for k, v in self._commodity_map.items()}
-        # Also map the full name for reverse lookup
-        self._commodity_rev_map["Low Temperature Diamonds"] = "Low Temperature Diamonds"
+        for old_display in ("Low Temperature Diamonds", "Low Temp. Diamonds"):
+            self._commodity_rev_map.setdefault(old_display, "Low Temperature Diamonds")
         
         saved_commodity = cfg.get('marketplace_commodity', 'Alexandrite')
         self.marketplace_commodity = tk.StringVar(value=self._commodity_map.get(saved_commodity, saved_commodity))

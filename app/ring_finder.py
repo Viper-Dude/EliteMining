@@ -1572,7 +1572,7 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         
         # Abbreviate long names for dropdown display
         if canonical_name == 'Low Temperature Diamonds':
-            return 'Low Temp.Diamonds'
+            return get_abbr(canonical_name)
         
         # Get localized display name
         try:
@@ -2908,10 +2908,8 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
                 material_name = hotspot.get("type", "Unknown Material")
                 
                 # Convert database format to display format for special cases
-                if material_name == "LowTemperatureDiamond":
-                    material_name = "Low Temp Diamonds"  # Show dropdown format
-                elif material_name == "Low Temperature Diamonds":
-                    material_name = "Low Temp Diamonds"  # Show dropdown format
+                if material_name in ("LowTemperatureDiamond", "Low Temperature Diamonds"):
+                    material_name = get_material("Low Temperature Diamonds")
                 
                 # Check if material_name already contains counts (from RingFinder.ALL_MINERALS GROUP_CONCAT)
                 # Format: "Material (X)" or "Material1 (X), Material2 (Y)"

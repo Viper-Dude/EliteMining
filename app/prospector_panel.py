@@ -4100,7 +4100,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin, MiningCardMixin):
         # Localized display names for dropdown (abbreviate long names like LTD)
         def _display_name(m):
             if m == 'Low Temperature Diamonds':
-                return 'Low Temp Diamonds'
+                return get_abbr(m)
             return get_material(m)
         self._mining_commodities_display = [_display_name(m) for m in self._mining_commodities_english]
         # Reverse map: localized display name → English key
@@ -7045,8 +7045,6 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin, MiningCardMixin):
         # Abbreviations for long material names in Prospector Reports table
         material_abbreviations = {
             'Methanol Monohydrate Crystals': 'Methanol Cryst',
-            'Low Temperature Diamonds': 'Low Temp Diamonds',
-            'Low-Temperature Diamonds': 'Low Temp Diamonds',
             'Lithium Hydroxide': 'Lithium Hydro',
             'Hydrogen Peroxide': 'H. Peroxide',
             'Methane Clathrate': 'Methane Clath',
@@ -7148,10 +7146,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin, MiningCardMixin):
         localized_name = get_material(material_name)
 
         # Then abbreviate for display
+        if material_name in ('Low Temperature Diamonds', 'Low-Temperature Diamonds'):
+            return get_abbr('Low Temperature Diamonds')
         abbreviations = {
             'Methanol Monohydrate Crystals': 'Methanol Cryst',
-            'Low Temperature Diamonds': 'Low Temp. Diamonds',
-            'Low-Temperature Diamonds': 'Low Temp. Diamonds',
             'Lithium Hydroxide': 'Lithium Hydro',
             'Hydrogen Peroxide': 'H. Peroxide',
             'Methane Clathrate': 'Methane Clath',

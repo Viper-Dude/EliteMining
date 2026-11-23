@@ -235,7 +235,7 @@
     "density_high": "High",
     "density_very_dense": "Very Dense",
     "density_clear": "Clear",
-    "tooltip_ring_type": "Filter by ring type:\n- Metallic: Platinum, Gold, Silver\n- Icy: LTDs, Tritium, Bromellite\n- Rocky: Alexandrite, Benitoite, Opals\n- Metal Rich: Painite, Osmium",
+    "tooltip_ring_type": "Filter by ring type:\n- Metallic: Platinum, Gold, Silver\n- Icy: LTD, Tritium, Bromellite\n- Rocky: Alexandrite, Benitoite, Opals\n- Metal Rich: Painite, Osmium",
     "tooltip_reserve": "Filter by reserve level:\n- Pristine: Best yields\n- Major/Common/Low: Decreasing yields\n- No data: Not yet checked on Spansh",
     "tooltip_mineral": "Filter by specific material:\nAutomatically shows only confirmed hotspots\n(no theoretical ring data)",
     "tooltip_overlaps": "When checked, only shows rings with known overlaps\n(ignores distance limit)",
@@ -1884,7 +1884,6 @@
     "quick_sale": "Quick sale"
   },
   "statistics_expanded": {
-    "low_temp_diamonds": "Low Temp Diamonds",
     "col_coverage": "Coverage",
     "coverage_tip": "Percentage of saved rings where you have mined this mineral, based on saved mining sessions.",
     "total": "Total",
