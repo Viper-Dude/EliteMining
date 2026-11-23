@@ -459,7 +459,8 @@ class EDDNListener:
                     station_name = msg_data.get('StationName', '')
                     system_name = msg_data.get('StarSystem', '')
                     distance_to_arrival = msg_data.get('DistFromStarLS') or msg_data.get('DistanceFromArrivalLS')
-                    max_pad = self._infer_max_pad(station_type)
+                    max_pad = (self._pad_from_landing_pads(msg_data.get('LandingPads'))
+                               or self._infer_max_pad(station_type))
                     try:
                         with sqlite3.connect(self.database_path) as conn:
                             conn.execute('''
@@ -544,10 +545,23 @@ class EDDNListener:
             log.debug(f"EDDN: system_info write error: {e}")
 
     @staticmethod
+    def _pad_from_landing_pads(pads) -> int:
+        """Largest pad from a Docked event's LandingPads counts; 0 when the report has none."""
+        if not isinstance(pads, dict):
+            return 0
+        for size, key in ((3, 'Large'), (2, 'Medium'), (1, 'Small')):
+            try:
+                if int(pads.get(key) or 0) > 0:
+                    return size
+            except (TypeError, ValueError):
+                continue
+        return 0
+
+    @staticmethod
     def _infer_max_pad(station_type: str) -> int:
         """Infer max landing pad size from station type string."""
         large_pad_types = {
-            'Coriolis', 'Orbis', 'Ocellus', 'Dodec', 'DodecahedronBay',
+            'Coriolis', 'Orbis', 'Ocellus', 'Bernal', 'Dodec', 'DodecahedronBay',
             'AsteroidBase', 'MegaShip', 'FleetCarrier', 'DrakeClass',
             'StrongholdCarrier', 'CraterPort',
             'OrbitalStation', 'SpaceConstructionDepot',

@@ -209,6 +209,8 @@ class MarketplaceAPI:
                 "Dodecahedron Starport": "Dodec",
                 "Outpost":             "Outpost",
                 "Asteroid Base":       "AsteroidBase",
+                "Asteroid base":       "AsteroidBase",
+                "Dodec Starport":      "Dodec",
                 "Mega Ship":           "MegaShip",
                 "Odyssey Settlement":  "OnFootSettlement",
             }
@@ -497,7 +499,22 @@ class MarketplaceAPI:
                            c.market_id, c.updated_at, c.source,
                            c.station_type                                                     AS cached_type,
                            m.station_type                                                     AS meta_type,
-                           COALESCE(c.distance_to_arrival, m.distance_to_arrival)             AS distance_to_arrival,
+                           CASE WHEN COALESCE(c.station_type, 'Unknown') IN ('', 'Unknown')
+                                     AND m.station_type IS NULL AND c.market_id > 0 THEN
+                               (SELECT s.station_type FROM commodity_prices_data s
+                                WHERE s.market_id = c.market_id AND s.system_name = c.system_name
+                                  AND s.station_type NOT IN ('', 'Unknown')
+                                ORDER BY s.updated_at DESC LIMIT 1)
+                           END                                                                AS sibling_type,
+                           -- Live price reports never carry LS; the station's other commodity rows often do.
+                           -- Same system only, so a carrier's LS never follows it after a jump.
+                           COALESCE(c.distance_to_arrival, m.distance_to_arrival,
+                               CASE WHEN c.market_id > 0 THEN
+                                   (SELECT s.distance_to_arrival FROM commodity_prices_data s
+                                    WHERE s.market_id = c.market_id AND s.system_name = c.system_name
+                                      AND s.distance_to_arrival IS NOT NULL
+                                    ORDER BY s.updated_at DESC LIMIT 1)
+                               END)                                                           AS distance_to_arrival,
                            COALESCE(m.max_landing_pad_size, 0)                                AS meta_pad_size
                     FROM commodity_prices_data c
                     LEFT JOIN station_metadata m ON c.market_id = m.market_id
@@ -563,6 +580,8 @@ class MarketplaceAPI:
                 mid = row["market_id"] or 0
                 stype = MarketplaceAPI._resolve_cached_station_type(
                     row["cached_type"], row["meta_type"], mid)
+                if stype == "Unknown":
+                    stype = MarketplaceAPI._resolve_cached_station_type(row["sibling_type"], None, mid)
                 is_stronghold = "Stronghold" in stype
                 is_carrier = (not is_stronghold) and (
                     "Carrier" in stype or "Drake" in stype
@@ -584,6 +603,9 @@ class MarketplaceAPI:
                     "Coriolis": "Coriolis",
                     "Orbis": "Orbis",
                     "Ocellus": "Ocellus",
+                    "Bernal": "Ocellus",  # the journal's name for an Ocellus
+                    "Dodec Starport": "Dodec",
+                    "Asteroid base": "AsteroidBase",
                     "Dodec": "Dodec",
                     "Outpost": "Outpost",
                     "CraterOutpost": "CraterOutpost",
@@ -790,6 +812,8 @@ class MarketplaceAPI:
                 "Dodecahedron Starport": "Dodec",
                 "Outpost":             "Outpost",
                 "Asteroid Base":       "AsteroidBase",
+                "Asteroid base":       "AsteroidBase",
+                "Dodec Starport":      "Dodec",
                 "Mega Ship":           "MegaShip",
                 "Odyssey Settlement":  "OnFootSettlement",
             }

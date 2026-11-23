@@ -260,6 +260,41 @@ class CacheIndexChecks(unittest.TestCase):
         rows = {r['marketId']: r for r in MarketplaceAPI._fetch_eddn_cache('platinum', 'Sol', 'buy', max_days_ago=7)}
         self.assertEqual((rows[20]['distance'], rows[21]['distance']), (10, 10))
 
+    def test_missing_station_details_come_from_the_same_stations_other_rows(self):
+        def row(system, station, commodity, station_type, ls, market_id):
+            conn.execute('''INSERT INTO commodity_prices_data
+                (system_name,system_x,system_y,system_z,station_name,station_type,commodity_name,
+                 sell_price,buy_price,demand,stock,distance_to_arrival,market_id,updated_at)
+                VALUES (?,0,0,0,?,?,?,100,50,1000,2000,?,?,?)''',
+                (system, station, station_type, commodity, ls, market_id, self.now))
+
+        with closing(sqlite3.connect(self.path)) as conn:
+            row('Sol', 'Lam City', 'lowtemperaturediamond', 'Unknown', None, 30)
+            row('Sol', 'Lam City', 'painite', 'Coriolis', 160.6, 30)
+            row('Sol', 'Bernal Hub', 'lowtemperaturediamond', 'Bernal', 12.0, 31)
+            # A carrier's other rows from an earlier system must not lend it their LS
+            row('Sol', 'K0F-21L', 'lowtemperaturediamond', 'FleetCarrier', None, 3700000032)
+            row('Achenar', 'K0F-21L', 'painite', 'FleetCarrier', 999.0, 3700000032)
+            conn.commit()
+        rows = {r['marketId']: r for r in MarketplaceAPI._fetch_eddn_cache(
+            'lowtemperaturediamond', 'Sol', 'buy', max_days_ago=7)}
+        self.assertEqual((rows[30]['stationType'], rows[30]['distanceToArrival'], rows[30]['maxLandingPadSize']),
+                         ('Coriolis', 160.6, 3))
+        self.assertEqual((rows[31]['stationType'], rows[31]['maxLandingPadSize']), ('Ocellus', 3))
+        self.assertIsNone(rows[3700000032]['distanceToArrival'])
+
+    def test_docked_report_landing_pads_set_the_pad_size(self):
+        for market_id, pads, station_type in ((40, {'Small': 2, 'Medium': 1, 'Large': 0}, 'OnFootSettlement'),
+                                              (41, None, 'Outpost'), (42, {'Small': 1}, 'Bernal')):
+            self.listener._process_journal_message({'message': dict(
+                event='Docked', MarketID=market_id, StationType=station_type, StationName=f'S{market_id}',
+                StarSystem='Sol', StarPos=[0, 0, 0], timestamp=self.now,
+                **({'LandingPads': pads} if pads else {}))})
+        with closing(sqlite3.connect(self.path)) as conn:
+            pads = dict(conn.execute('SELECT market_id, max_landing_pad_size FROM station_metadata '
+                                     'WHERE market_id >= 40').fetchall())
+        self.assertEqual(pads, {40: 2, 41: 2, 42: 1})
+
     def test_saved_prices_keep_their_original_source(self):
         self.listener._update_commodity_prices('Sol', 'Station 1', 'Coriolis', 1, [
             dict(name='platinum', sellPrice=250000, buyPrice=200000, demand=500, stock=25),
