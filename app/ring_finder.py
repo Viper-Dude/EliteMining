@@ -588,7 +588,8 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, ColumnVisibilityMixin
         self.system_entry.grid(row=0, column=1, sticky="w", padx=(5, 10), pady=5)
         # Clear selection only on focus out to prevent unwanted text selection
         self.system_entry.bind('<FocusOut>', lambda e: (self.system_entry.selection_clear(), self._save_filter_settings()))
-        self.system_entry.bind('<Return>', lambda e: (self._system_ac.hide(), self._save_filter_settings(), self.search_hotspots()))
+        self.system_entry.bind('<Return>', lambda e: (self._system_ac.hide(), self._save_filter_settings(),
+                                                      self._show_results_view('hotspots'), self.search_hotspots()))
 
         # --- Autocomplete (shared module) ---
         from system_autocomplete import SystemAutocomplete
@@ -639,6 +640,8 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, ColumnVisibilityMixin
         self.prefetch_prices_var = tk.BooleanVar(value=self._load_prefetch_prices_state())
         # Shown on the in-game text overlay instead of the popup; set from the Auto Prices Options submenu (and General Settings).
         self.prices_overlay_var = tk.BooleanVar(value=self._load_prices_overlay_state())
+        from config import _load_cfg
+        self.prices_return_var = tk.BooleanVar(value=bool(_load_cfg().get("auto_prices_return_to_hotspots", True)))
 
         self.auto_options_btn = self._rf_button(buttons_frame, text=t('ring_finder.auto_options') + " ▾",
                                    command=self._show_auto_options_menu,
@@ -1034,13 +1037,26 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, ColumnVisibilityMixin
                                  cursor="hand2", font=scaled_font(10))
         results_info.pack(side="left", padx=(6, 2))
         ToolTip(results_info, t('ring_finder.right_click_help'))
+        from ui.segmented_selector import SegmentedSelector
+        self._results_view_var = tk.StringVar(value='hotspots')
+        results_view_switch = SegmentedSelector(
+            results_header,
+            [('hotspots', t('ring_finder.view_hotspots')), ('best_prices', t('ring_finder.view_best_prices'))],
+            self._results_view_var, bg=_cb_bg, accent=slider_colors(_cb_theme)["accent"],
+            font=scaled_font(8), scale=scaled_px(100) / 100, gap=scaled_px(4))
+        results_view_switch.pack(side="left", padx=(10, 0))
+        # Runs after the switch's own click handler has set the view
+        results_view_switch.bind('<Button-1>', lambda e: self._on_results_view_click(), add='+')
         self._columns_btn = self._cv_add_columns_button(results_header, 'ring_finder')
+        self._bp_columns_btn = self._cv_add_columns_button(results_header, 'rank_minerals')
+        self._bp_columns_btn.pack_forget()
         if _modern_form:
             self._more_btn = self._rf_button(results_header, text="", command=self._toggle_more_filters)
             self._more_btn.pack(side="right", padx=(0, 8))
             self._refresh_more_btn()
-            ttk.Label(results_header, textvariable=self.status_var, font=scaled_font(9, "bold"),
-                      foreground=modern_color("#E6EAF0")).pack(side="left", padx=(6, 0))
+            self._results_status_label = ttk.Label(results_header, textvariable=self.status_var, font=scaled_font(9, "bold"),
+                                                   foreground=modern_color("#E6EAF0"))
+            self._results_status_label.pack(side="left", padx=(6, 0))
 
         results_frame = ttk.Frame(self.scrollable_frame)
         results_frame.pack(fill="both", expand=True, padx=10, pady=(2, 2))
@@ -1048,6 +1064,7 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, ColumnVisibilityMixin
         # Create frame for treeview with scrollbars
         tree_frame = ttk.Frame(results_frame, relief="solid", borderwidth=1)
         tree_frame.pack(fill="both", expand=True, padx=5, pady=(5, 2))
+        self._hotspots_tree_frame = tree_frame
         
         # Configure RingFinder Treeview style based on theme
         from config import load_theme, scaled_px
@@ -1354,6 +1371,9 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, ColumnVisibilityMixin
         self._search_overlay_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
         self._search_overlay_index = 0
         self._search_overlay_active = False
+
+        self._build_best_prices_view(results_frame, _cb_bg, _cb_select, tree_bg, tree_fg)
+        self._results_view_var.trace_add('write', lambda *_: self._apply_results_view())
         
         # Configure style for the treeview to allow tag colors
         style = ttk.Style()
@@ -2800,6 +2820,7 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, ColumnVisibilityMixin
             # Search cleared the hint; the previous rows stay until partial results arrive
             self._update_new_entries_label()
         else:
+            self._show_results_view('hotspots')
             self.search_hotspots()
 
     def _update_results(self, hotspots: List[Dict]):
@@ -4062,24 +4083,28 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, ColumnVisibilityMixin
         main_app.after(100, tab.start_search)
         self.status_var.set(f"Searching sell stations near {system_name}...")
     
-    def _find_sell_station_impl(self, mineral_override: str = None):
+    def _find_sell_station_impl(self, mineral_override: str = None, system_override: str = None):
         """Implementation of find sell station - gets system name and calls Commodity Market
 
         Args:
             mineral_override: If given, use this mineral instead of the filter dropdown
-                (used by the mineral-ranking popup to jump to a specific mineral).
+                (used by the Best Prices view to jump to a specific mineral).
+            system_override: If given, search near this system instead of the selected row's system.
         """
-        selection = self.results_tree.selection()
-        if not selection:
-            return None
+        if system_override:
+            system_name = system_override
+        else:
+            selection = self.results_tree.selection()
+            if not selection:
+                return None
 
-        item = selection[0]
-        values = self.results_tree.item(item, 'values')
-        if not values or len(values) < 3:
-            return None
+            item = selection[0]
+            values = self.results_tree.item(item, 'values')
+            if not values or len(values) < 3:
+                return None
 
-        # Get system name from the selected row
-        system_name = values[2]  # System is column index 2
+            # Get system name from the selected row
+            system_name = values[2]  # System is column index 2
 
         if mineral_override:
             mineral = mineral_override
@@ -4202,10 +4227,6 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, ColumnVisibilityMixin
         delivery) system, search nearby mining systems, rank by each candidate's own
         best hotspot mineral sell price (or, in PowerPlay mode, price at the target)."""
         from config import scaled_font, load_theme
-
-        # Close any open non-modal Auto Prices popup first, so opening this dialog
-        # doesn't leave two unrelated popups stacked on screen.
-        self._close_auto_ranking_dialog()
 
         # Hide the main Reference System autocomplete dropdown if it's open - it's a
         # separate always-on-top Toplevel that would otherwise render behind this dialog.
@@ -4967,8 +4988,6 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, ColumnVisibilityMixin
         the field with it - the user still has to click Search (or press Enter) to run it,
         so they can change the mineral picker first if the local-DB default isn't right."""
         from config import scaled_font, load_theme
-
-        self._close_auto_ranking_dialog()
 
         if hasattr(self, '_system_ac'):
             self._system_ac.hide()
@@ -6540,6 +6559,8 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, ColumnVisibilityMixin
                             command=self._save_prices_overlay_state)
         sub.add_checkbutton(label=t('settings.overlay_auto_prices_in_system'), variable=in_system_var,
                             command=on_in_system_toggle)
+        sub.add_checkbutton(label=t('ring_finder.prices_return_to_hotspots'), variable=self.prices_return_var,
+                            command=self._save_prices_return_state)
 
         menu.add_checkbutton(label=t('ring_finder.auto_search'), variable=self.auto_search_var,
                              command=self._on_auto_search_toggle)
@@ -6657,6 +6678,10 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, ColumnVisibilityMixin
             from config import update_config_value
             update_config_value("auto_prices_overlay", enabled)
 
+    def _save_prices_return_state(self):
+        from config import update_config_value
+        update_config_value("auto_prices_return_to_hotspots", bool(self.prices_return_var.get()))
+
     def _load_auto_search_state(self) -> bool:
         """Load auto-search enabled state from Variables folder"""
         try:
@@ -6716,9 +6741,6 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, ColumnVisibilityMixin
             _atomic_write_text(prefetch_file, "1" if self.prefetch_prices_var.get() else "0")
         except Exception:
             log.exception("Saving prefetch prices state failed")
-
-        if not self.prefetch_prices_var.get():
-            self._close_auto_ranking_dialog()
 
     def _load_auto_switch_tabs_state(self):
         """Load auto-switch tabs state from main app config"""

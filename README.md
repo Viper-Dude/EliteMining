@@ -310,8 +310,8 @@ Search saved hotspots and Spansh ring data by mineral, ring type, and distance. 
 
 #### Prices and PowerPlay
 
-- **Best Minerals to Mine** — Right-click a ring or system to compare sell prices for its hotspot minerals. Use **+ add** to include minerals without hotspots, such as Osmium.
-- **Auto Prices** — With Auto-Search enabled, fetch prices after arriving in a system with known hotspots. Use **Auto Options > Auto Prices Options** to choose in-system prices or [overlay results](#text-overlay).
+- **Best Minerals to Mine** — Right-click a ring or system to compare sell prices for its hotspot minerals. The prices appear in the **Best Prices** view of the search results; switch back with **Hotspots**. Use **+ Add Minerals** to include minerals without hotspots, such as Osmium.
+- **Auto Prices** — With Auto-Search enabled, fetch prices after arriving in a system with known hotspots and switch the results to **Best Prices**. They switch back to Hotspots after the Auto Prices display time unless you use the app (turn this off with **Return to Hotspots**). Use **Auto Options > Auto Prices Options** to choose in-system prices or [overlay results](#text-overlay).
 - **Find Acquisition Systems** — Right-click a Fortified/Stronghold system to find nearby Unoccupied systems buying your mineral. See [PowerPlay Merit Mining](#powerplay-merit-mining).
 
 #### Saving and Automatic Updates
@@ -335,7 +335,7 @@ Search saved hotspots and Spansh ring data by mineral, ring type, and distance. 
 *Hotspot Finder showing search results with mineral filters, the second mineral box and distance calculations.*
 
 <details>
-<summary>View acquisition searches and mineral price examples</summary>
+<summary>View acquisition searches and Best Prices examples</summary>
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/find_acquisition_targets.png" width="900"><br>
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/find_acquisition_targets_results.png" width="900"><br>
@@ -344,7 +344,7 @@ Search saved hotspots and Spansh ring data by mineral, ring type, and distance. 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/best_minerals_ring.png" width="900"><br>
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/best_minerals_add_ring.png" width="900"><br>
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/best_minerals_system.png" width="900"><br>
-*Best Minerals to Mine for a ring or the entire system.*
+*Best Prices view: prices for one ring or the whole system, and + Add Minerals for minerals without hotspots.*
 
 </details>
 
@@ -773,9 +773,9 @@ Open **Settings → Announcements** to choose which minerals trigger alerts and 
 **Auto Prices on the overlay:**
 
 - In Hotspots Finder, open **Auto Options > Auto Prices Options** and tick **Show on overlay**, or enable it in General Settings.
-- Requires **Enable Text Overlay**. If that is off, results open in the Best Mineral to Mine window.
+- Requires **Enable Text Overlay**. The prices also appear in the **Best Prices** view of the Hotspots Finder either way.
 - Appears only in supercruise, ignores **Hide in Supercruise**, and uses its own display duration (10–60 seconds).
-- Use **+ Also Check** in Best Mineral to Mine to include minerals without hotspots.
+- Use **+ Add Minerals** in the Best Prices view to include minerals without hotspots.
 
 <img src="Screenshot/text_overlay_auto_prices.png" width="900"><br>
 *Auto Prices on the text overlay: best sell price, demand, station and distance for each mineral.*

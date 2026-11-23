@@ -257,17 +257,6 @@ def save_rank_minerals_column_widths(widths: Dict[str, int]) -> None:
     cfg["rank_minerals_column_widths"] = widths
     _save_cfg(cfg)
 
-def load_rank_minerals_window_geometry() -> Dict[str, Any]:
-    """Load Rank Minerals popup window size from config"""
-    cfg = _load_cfg()
-    return cfg.get("rank_minerals_window", {})
-
-def save_rank_minerals_window_geometry(geom: Dict[str, Any]) -> None:
-    """Save Rank Minerals popup window size to config"""
-    cfg = _load_cfg()
-    cfg["rank_minerals_window"] = geom
-    _save_cfg(cfg)
-
 def load_also_check_minerals() -> List[str]:
     """Load the user's persisted "Also Check" mineral picks (e.g. Osmium) - so they stay
     ticked across jumps/sessions instead of resetting every time the ranking popup opens."""

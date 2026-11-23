@@ -3953,17 +3953,7 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
         r += 1
         self.auto_prices_duration_scale = _slider_row(r, t('settings.overlay_auto_prices_duration'),
                                                       self.auto_prices_overlay_duration, 10, 60, t('settings.seconds'), indent=24)
-
-        def _apply_auto_prices_duration_state(*a):
-            # Only meaningful when Auto Prices is shown on the overlay and the text overlay is on
-            enabled = bool(self.auto_prices_overlay.get()) and bool(self.text_overlay_enabled.get())
-            self.auto_prices_duration_scale.config(state="normal" if enabled else "disabled")
-            for child in self.auto_prices_duration_scale.master.winfo_children():
-                if isinstance(child, tk.Label):
-                    child.config(fg="#ffffff" if enabled else "#666666")
-        self._apply_auto_prices_duration_state = _apply_auto_prices_duration_state
-        self.auto_prices_overlay.trace('w', _apply_auto_prices_duration_state)
-        _apply_auto_prices_duration_state()
+        # Always enabled: it also sets when Auto Prices returns the Hotspots Finder to Hotspots
         r += 1
 
         # Apply initial greyed-out state for overlay sub-controls if master toggle is off
@@ -7870,8 +7860,6 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
             self.color_menu.config(state=state)
         if hasattr(self, 'size_combo'):
             self.size_combo.config(state="normal" if enabled else "disabled")
-        if hasattr(self, '_apply_auto_prices_duration_state'):
-            self._apply_auto_prices_duration_state()
 
     def _on_text_overlay_toggle(self, *args) -> None:
         """Called when text overlay checkbox is toggled (master toggle for all overlays)"""
