@@ -29,10 +29,10 @@ class _BMOverlayStatus(_OverlayStatus):
 
 
 class BestMiningMixin:
-    BM_COLUMNS = ("System", "Dist", "Mineral", "Price", "Station", "Type", "LS", "PowerPlay", "Updated")
-    BM_DEFAULT_WIDTHS = {"System": 200, "Dist": 80, "Mineral": 130, "Price": 110, "Station": 260,
+    BM_COLUMNS = ("System", "Dist", "Mineral", "Price", "Station", "SellDist", "Type", "LS", "PowerPlay", "Updated")
+    BM_DEFAULT_WIDTHS = {"System": 200, "Dist": 80, "Mineral": 130, "Price": 110, "Station": 260, "SellDist": 90,
                          "Type": 110, "LS": 70, "PowerPlay": 200, "Updated": 90}
-    BM_NUMERIC_COLUMNS = ("Dist", "LS", "Price")
+    BM_NUMERIC_COLUMNS = ("Dist", "SellDist", "LS", "Price")
     BM_DISTANCES = ("10", "20", "30", "50", "100", "150", "200")
     BM_MAX_CANDIDATES = 20
 
@@ -108,6 +108,7 @@ class BestMiningMixin:
             "Mineral": t('ring_finder.col_best_mineral'),
             "Price": t('ring_finder.col_price'),
             "Station": t('ring_finder.col_sell_here'),
+            "SellDist": t('ring_finder.merit_miner_col_sell_dist'),
             "Type": t('ring_finder.col_station_type'),
             "LS": t('ring_finder.col_ls'),
             "PowerPlay": t('ring_finder.col_powerplay'),
@@ -225,7 +226,7 @@ class BestMiningMixin:
         bm = self._bm
         if not bm['busy']:
             self._bm_name_label.config(text=t('ring_finder.where_to_mine_found').format(
-                count=bm['count'], system=bm['system']) if bm.get('count') else '')
+                count=bm['count']) if bm.get('count') else '')
         self._bm_update_overlay()
 
     def _bm_update_overlay(self):
@@ -451,6 +452,7 @@ class BestMiningMixin:
         for sys_name, entry in candidate_list:
             best_mat = None
             best_price = None
+            coords = candidate_coords.get(sys_name)
             for mat in entry['materials']:
                 priced = best_for(sys_name, mat)
                 if priced and (best_price is None or priced.get('sellPrice', 0) > best_price.get('sellPrice', 0)):
@@ -461,6 +463,8 @@ class BestMiningMixin:
                 'distance': entry['distance'],
                 'mineral': best_mat,
                 'best': best_price,
+                # Mining system to buyer; Max Distance caps it, so it explains hidden systems
+                'sell_distance': dist_from_candidate(coords, best_price) if coords and best_price else None,
             })
 
         results.sort(key=lambda r: r['best'].get('sellPrice', 0) if r['best'] else -1, reverse=True)
@@ -487,17 +491,16 @@ class BestMiningMixin:
             cache['target_system'], cache['candidates'], cache['rows_by_material'],
             cache['candidate_coords'], cache['max_distance'], pp_mode)
         bm['hint'] = ''
-        if pp_mode and results and all(not r['best'] for r in results):
-            # The Reference System has no known market: say so instead of a table of No data
-            bm['hint'] = t('ring_finder.reverse_search_no_market_data').format(system=cache['target_system'])
-            results = []
-        # Say why a row has no price: nothing in the Reference System, nothing within range,
-        # or (rarely) no coordinates to measure from
-        for r in results:
+        # A system with nowhere to sell nearby is no answer to "where to mine", so only
+        # priced rows are listed; the hint says why when none are left
+        priced = [r for r in results if r['best']]
+        if results and not priced:
             if pp_mode:
-                r['no_price'] = t('ring_finder.no_data_in_system')
-            elif r['system'] in cache['candidate_coords']:
-                r['no_price'] = t('ring_finder.where_to_mine_no_buyer').format(distance=int(cache['max_distance']))
+                bm['hint'] = t('ring_finder.reverse_search_no_market_data').format(system=cache['target_system'])
+            else:
+                bm['hint'] = t('ring_finder.where_to_mine_no_buyers').format(
+                    count=len(results), distance=int(cache['max_distance']))
+        results = priced
         bm['count'] = len(results)
         self._bm_fill(results, pp_mode)
 
@@ -528,11 +531,13 @@ class BestMiningMixin:
                 updated = self._format_data_age(best.get('updatedAt', ''))
                 powerplay = self._bp_pp_text(pp_data.get(station_system, {}))
             else:
-                price = r.get('no_price') or t('ring_finder.no_data')
+                price = t('ring_finder.no_data')
                 station = station_type = ls = updated = powerplay = "-"
+            sell_distance = r.get('sell_distance')
+            sell_dist = f"{sell_distance:.1f}" if sell_distance is not None else "-"
             mineral_display = self._format_material_for_display(r['mineral']) if r['mineral'] else "-"
             row_id = tree.insert("", "end", values=(
-                r['system'], f"{r['distance']:.1f}", mineral_display, price, station,
+                r['system'], f"{r['distance']:.1f}", mineral_display, price, station, sell_dist,
                 station_type, ls, powerplay, updated))
             bm['system_by_row'][row_id] = r['system']
             bm['sell_system_by_row'][row_id] = station_system

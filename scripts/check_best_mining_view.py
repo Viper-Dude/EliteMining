@@ -152,8 +152,8 @@ class RenderTests(unittest.TestCase):
         v._bm['busy'] = True
         with patch('system_finder_api.SystemFinderAPI._batch_get_powerplay', return_value={}):
             v._bm_show_results(cache({'Platinum': [buyer('Near A', 100, x=2)]}))
-        self.assertEqual(len(v._bm_tree.order), 2)
-        self.assertEqual(v._bm['count'], 2)
+        self.assertEqual(len(v._bm_tree.order), 1)  # MineB has no buyer within 50 Ly
+        self.assertEqual(v._bm['count'], 1)
 
     def test_pp_mode_without_a_market_shows_hint_not_empty_rows(self):
         v = make_view(pp_mode=True)
@@ -164,20 +164,23 @@ class RenderTests(unittest.TestCase):
         self.assertIn('Sol', v._bm['hint'])
         self.assertEqual(v._bm['count'], 0)
 
-    def test_rows_without_price_say_why(self):
+    def test_systems_without_a_buyer_in_range_are_hidden(self):
         v = make_view()
-        # MineA has a buyer 2 Ly away; MineB's only buyer is 100 Ly away
+        # MineA has a buyer 2 Ly away; MineB's only buyer is 98 Ly away
         v._bm['cache'] = cache({'Platinum': [buyer('Near A', 100, x=2)]})
         with patch('system_finder_api.SystemFinderAPI._batch_get_powerplay', return_value={}):
             v._bm_rerender()
-        prices = {v._bm['system_by_row'][r]: v._bm_tree.values(r, 'Price') for r in v._bm_tree.order}
-        self.assertEqual(prices['MineA'], '100 CR')
-        self.assertIn('50', prices['MineB'])
-        v._bm['cache']['candidate_coords'].pop('MineB')
+        self.assertEqual(list(v._bm['system_by_row'].values()), ['MineA'])
+        self.assertEqual(v._bm['count'], 1)
+        self.assertEqual(v._bm['hint'], '')
+
+    def test_no_buyer_anywhere_gives_hint(self):
+        v = make_view()
+        v._bm['cache'] = cache({'Platinum': [buyer('Far', 100, x=500)]})
         with patch('system_finder_api.SystemFinderAPI._batch_get_powerplay', return_value={}):
             v._bm_rerender()
-        prices = {v._bm['system_by_row'][r]: v._bm_tree.values(r, 'Price') for r in v._bm_tree.order}
-        self.assertNotIn('50', prices['MineB'])  # no coordinates: plain No data
+        self.assertEqual(v._bm_tree.order, [])
+        self.assertIn('50', v._bm['hint'])
 
     def test_row_formatting(self):
         v = make_view()
@@ -190,6 +193,7 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(v._bm_tree.values(row, 'Price'), '123,456 CR')
         self.assertEqual(v._bm_tree.values(row, 'LS'), '1,234')
         self.assertEqual(v._bm_tree.values(row, 'Dist'), '5.0')
+        self.assertEqual(v._bm_tree.values(row, 'SellDist'), '2.0')  # MineA at x=0, buyer at x=2
         self.assertEqual(v._bm_tree.values(row, 'PowerPlay'), 'Unoccupied')
         self.assertEqual(v._bm['sell_system_by_row'][row], 'Near A')
         self.assertEqual(v._bm['system_by_row'][row], 'MineA')
