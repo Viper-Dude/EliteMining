@@ -29,7 +29,7 @@ from ui.striped_treeview import StripedTreeview
 
 Panel = load_methods('app/prospector_panel.py', 'ProspectorPanel', {
     '_save_bookmarks', '_bookmark_location_key', '_find_bookmark', '_bookmark_ring_type',
-    '_bookmark_yield', '_bookmark_material_key', '_bookmark_screenshot_folder', '_bookmark_screenshot_paths',
+    '_bookmark_yield', '_bookmark_material_key', '_canonical_material_name', '_bookmark_materials_display', '_bookmark_screenshot_folder', '_bookmark_screenshot_paths',
     '_cleanup_bookmark_screenshots', '_commit_bookmark', '_refresh_bookmarks',
     '_sort_bookmarks', '_bookmark_note_text', '_edit_bookmark_dialog', '_delete_bookmark',
     '_on_bookmark_search_changed', '_on_bookmark_filter_changed', '_sync_bookmark_last_mined',

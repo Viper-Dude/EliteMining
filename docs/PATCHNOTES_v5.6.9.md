@@ -2,7 +2,7 @@
 **Release Date:** 2026-November-23
 
 ## New Features & Improvements
-
+- General code optimalization.
 - Commodity Market searches are faster and find more stations with fresh prices, both nearby and galaxy-wide.
 - Low Temperature Diamonds is now named consistently across the app.
 
@@ -14,9 +14,5 @@
 ### Voiceattack Profile - no update (V5.6.8)
 
 
-
-### Important Notes 
-
-- Remember to always check all your key and joystick bindings after every profile update.
 
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)

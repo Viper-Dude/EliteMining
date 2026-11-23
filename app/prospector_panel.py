@@ -3936,9 +3936,10 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin, MiningCardMixin):
                         tonnage_text = parts[1].strip()
                         
                         # Get localized material name, then abbreviate for display
-                        localized_name = get_material(material_name)
+                        canonical_name = self._canonical_material_name(material_name)
+                        localized_name = get_material(canonical_name)
                         # Use abbreviated name for display (compact UI)
-                        display_name = display_abbreviations.get(material_name, localized_name)
+                        display_name = display_abbreviations.get(canonical_name, localized_name)
                         
                         # Build enhanced display with abbreviated name
                         display_parts = [f"{display_name}: {tonnage_text}"]
@@ -9016,6 +9017,27 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin, MiningCardMixin):
         canonical = JournalParser.normalize_material_name(to_english(value).replace('-', ' '))
         return get_abbr(canonical).casefold()
 
+    @staticmethod
+    def _canonical_material_name(value):
+        """Map any saved spelling (old abbreviations, other languages) to the English key.
+        Unknown names pass through unchanged, unlike normalize_material_name's capitalize()."""
+        english = to_english(value.strip())
+        name_map = JournalParser.MATERIAL_NAME_MAP
+        for candidate in (english, english.replace('-', ' ')):
+            canonical = name_map.get(candidate) or name_map.get(candidate.lower())
+            if canonical:
+                return canonical
+        return english
+
+    def _bookmark_materials_display(self, materials):
+        names = []
+        for name in materials.split(','):
+            if not name.strip():
+                continue
+            canonical = self._canonical_material_name(name)
+            names.append(get_abbr(canonical) if canonical == 'Low Temperature Diamonds' else get_material(canonical))
+        return ', '.join(names)
+
     def _bookmark_yield(self, bookmark, mineral=''):
         value = bookmark.get('avg_yield', '')
         if mineral:
@@ -9168,7 +9190,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin, MiningCardMixin):
         ttk.Label(filter_frame, text=t('bookmarks.mineral')).pack(side="left", padx=(10, 5))
         self.bookmark_mineral_var = tk.StringVar(value=t('bookmarks.all_minerals'))
         mineral_combo = ttk.Combobox(filter_frame, textvariable=self.bookmark_mineral_var,
-                                     values=[t('bookmarks.all_minerals')] + MINING_COMMODITY_ORDER,
+                                     values=[t('bookmarks.all_minerals')] + [self._bookmark_materials_display(m) for m in MINING_COMMODITY_ORDER],
                                      state="readonly", width=22)
         mineral_combo.pack(side="left", padx=(0, 10))
         mineral_combo.bind("<<ComboboxSelected>>", self._on_bookmark_filter_changed)
@@ -9506,9 +9528,9 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin, MiningCardMixin):
         filter_value = self._bookmark_filter_display_to_key.get(filter_display, "all_locations") if hasattr(self, '_bookmark_filter_display_to_key') else "all_locations"
         search_text = self.bookmark_search_var.get().lower() if hasattr(self, 'bookmark_search_var') else ""
         mineral_sel = self.bookmark_mineral_var.get() if hasattr(self, 'bookmark_mineral_var') else ""
-        mineral_filter = "" if mineral_sel == t('bookmarks.all_minerals') else mineral_sel
+        mineral_filter = "" if mineral_sel == t('bookmarks.all_minerals') else self._canonical_material_name(mineral_sel)
 
-        yield_header = t('bookmarks.avg_yield_mineral').format(mineral=get_material(mineral_filter)) if mineral_filter else t('bookmarks.avg_yield_best')
+        yield_header = t('bookmarks.avg_yield_mineral').format(mineral=mineral_sel) if mineral_filter else t('bookmarks.avg_yield_best')
         self.bookmarks_tree.heading("avg_yield", text=yield_header)
         import tkinter.font as _tkfont
         yield_header_width = _tkfont.Font(font=scaled_font(9, "bold")).measure(yield_header) + scaled_px(24)
@@ -9602,9 +9624,11 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin, MiningCardMixin):
                 if self._bookmark_material_key(mineral_filter) not in materials:
                     continue
 
+            materials_display = self._bookmark_materials_display(bookmark.get('materials', ''))
+
             # Apply search filter
             if search_text:
-                searchable_text = f"{bookmark.get('system', '')} {bookmark.get('body', '')} {bookmark.get('hotspot', '')} {bookmark.get('materials', '')} {bookmark.get('last_mined', '')} {bookmark.get('notes', '')}".lower()
+                searchable_text = f"{bookmark.get('system', '')} {bookmark.get('body', '')} {bookmark.get('hotspot', '')} {bookmark.get('materials', '')} {materials_display} {bookmark.get('last_mined', '')} {bookmark.get('notes', '')}".lower()
                 if search_text not in searchable_text:
                     continue
             
@@ -9681,7 +9705,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin, MiningCardMixin):
                 translate_ring_type(self._bookmark_ring_type(bookmark.get('hotspot', ''))),
                 reserve_display,
                 density_display,
-                bookmark.get('materials', ''),
+                materials_display,
                 yield_display,
                 overlap_display,
                 res_display,
