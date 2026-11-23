@@ -228,6 +228,7 @@ App = type('App', (
         '_search_marketplace', '_search_trade_market',
         '_display_marketplace_search_results', '_display_trade_search_results',
         '_galaxy_market_limit', '_next_commodity_pp_generation',
+        '_found_stations_text',
     }),
     load_methods('app/main.py', 'App', {'_search_systems', '_search_material_traders'}),
 ), {})
@@ -500,9 +501,9 @@ class CommodityPowerplayFillInTests(unittest.TestCase):
         self.parent = Widget()
         self.app.after = self.parent.after
         self.tree = Mock()
-        self.tree.__getitem__ = Mock(return_value=('location', 'powerstate'))
+        self.tree.__getitem__ = Mock(return_value=('system', 'station', 'powerstate'))
         self.tree.get_children.return_value = ('row',)
-        self.tree.item.return_value = (' Sol / Station ', ' ? ')
+        self.tree.item.return_value = (' Sol ', ' Station ', ' ? ')
         self.entry = dict(controlling_power='Aisling Duval', power_state='Fortified', updated_at='2026-11-22')
 
     def run_fill_in(self, during_lookup=None):
