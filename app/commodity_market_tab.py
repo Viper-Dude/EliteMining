@@ -1616,7 +1616,8 @@ class CommodityMarketTabMixin:
                     else:
                         results_sorted = MarketplaceAPI.sort_results(results, trade_order_by, is_buy_mode)
                     control.complete(results_sorted, self._display_trade_search_results,
-                                     search_mode, is_buy_mode, original_count, matched_count, order_label)
+                                     search_mode, is_buy_mode, original_count, matched_count, order_label,
+                                     commodity, reference_system)
                 except Exception as e:
                     log.error(f"trade search failed: {e}")
                     control.failed(str(e))
@@ -1628,8 +1629,13 @@ class CommodityMarketTabMixin:
             log.error(f"Trade search failed: {e}")
             control.failed(str(e))
     
+    @staticmethod
+    def _found_stations_text(count, is_buy_mode, commodity, reference_system):
+        key = 'found_stations_selling' if is_buy_mode else 'found_stations_buying'
+        return t('marketplace.' + key).format(count=count, commodity=commodity, system=reference_system)
+
     def _display_trade_search_results(self, results_sorted: list, search_mode: str, is_buy_mode: bool, original_count: int,
-                                      matched_count=None, order_label=''):
+                                      matched_count=None, order_label='', commodity='', reference_system=''):
         """Display pre-filtered/sorted trade results on the main thread (UI only)"""
         control = getattr(self, '_trade_search_control', None)
         enrich_powerplay = not (control and control.is_cancelled())
@@ -1647,7 +1653,7 @@ class CommodityMarketTabMixin:
             self.trade_total_label.config(text=t('marketplace.showing_matches').format(
                 shown=len(results_sorted), total=matched_count, sort=order_label))
         else:
-            self.trade_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results_sorted)))
+            self.trade_total_label.config(text=self._found_stations_text(len(results_sorted), is_buy_mode, commodity, reference_system))
 
     def _create_trade_results_table(self, parent_frame):
         """Create results table for trade commodities - separate from mining table"""
@@ -2028,7 +2034,8 @@ class CommodityMarketTabMixin:
                     else:
                         results_sorted = MarketplaceAPI.sort_results(results, order_by, is_buy_mode)
                     control.complete(results_sorted, self._display_marketplace_search_results,
-                                     search_mode, reference_system, is_buy_mode, exclude_carriers, original_count, matched_count, order_label)
+                                     search_mode, reference_system, is_buy_mode, exclude_carriers, original_count, matched_count, order_label,
+                                     commodity_display)
                 except Exception as e:
                     log.error(f"marketplace search failed: {e}")
                     control.failed(str(e))
@@ -2041,7 +2048,7 @@ class CommodityMarketTabMixin:
 
     def _display_marketplace_search_results(self, results_sorted: list, search_mode: str, reference_system: str,
                                              is_buy_mode: bool, exclude_carriers: bool, original_count: int,
-                                             matched_count=None, order_label=''):
+                                             matched_count=None, order_label='', commodity=''):
         """Display pre-filtered/sorted marketplace results on the main thread (UI only)"""
         control = getattr(self, '_marketplace_search_control', None)
         enrich_powerplay = not (control and control.is_cancelled())
@@ -2062,7 +2069,7 @@ class CommodityMarketTabMixin:
             self.marketplace_total_label.config(text=t('marketplace.showing_matches').format(
                 shown=len(results_sorted), total=matched_count, sort=order_label))
         else:
-            self.marketplace_total_label.config(text=t('marketplace.found_stations_top30_price').format(count=len(results_sorted)))
+            self.marketplace_total_label.config(text=self._found_stations_text(len(results_sorted), is_buy_mode, commodity, reference_system))
 
     def _on_commodity_tree_double_click(self, event, tree, refresh_powerplay=True):
         """Open Inara from a System/Station or Powerplay cell, refreshing Powerplay when supported."""

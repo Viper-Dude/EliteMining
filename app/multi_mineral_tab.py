@@ -2,6 +2,7 @@
 from ui.striped_treeview import StripedTreeview
 from ui.themed_checkbox import ThemedCheckbutton
 from ui.theme import modern_color
+from ui.tooltip import ToolTip
 import threading
 import tkinter as tk
 from concurrent.futures import ThreadPoolExecutor
@@ -109,6 +110,10 @@ class MultiMineralTab:
         results_header.pack(fill="x", pady=(10, 0))
         ttk.Label(results_header, text=t('marketplace.search_results'),
                   font=app._scaled_font(10, "bold")).pack(side="left")
+        results_info = ttk.Label(results_header, text="ⓘ", foreground=modern_color("#8A94A3"),
+                                 cursor="hand2", font=app._scaled_font(10))
+        results_info.pack(side="left", padx=(6, 2))
+        ToolTip(results_info, t('marketplace.multi_results_info') + "\n\n" + t('marketplace.fc_docking_note'))
         app._cv_add_columns_button(results_header, 'multiple_prices')
         self.toggle_btn = create_action_button(results_header, text=t('marketplace.multi_collapse_all'),
                                                command=self._toggle_all)

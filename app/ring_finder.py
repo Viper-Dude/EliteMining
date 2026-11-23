@@ -3171,7 +3171,12 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
 
     def _finish_update_results(self, count, search_term, material_filter, green_entries, generation=None):
         """Finalise results display after all rows are inserted."""
-        all_types = self._ring_type_rev_map.get(material_filter, material_filter) == 'All'
+        mineral = self.specific_material_var.get()
+        if mineral != t('ring_finder.all_minerals'):
+            material_filter = mineral
+            all_types = False
+        else:
+            all_types = self._ring_type_rev_map.get(material_filter, material_filter) == 'All'
         if search_term:
             if not all_types:
                 if count > 0:
