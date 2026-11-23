@@ -170,6 +170,58 @@ class StartTests(unittest.TestCase):
         v._acq_start.assert_called_once_with('Sol')
 
 
+class PowerAndMenuTests(unittest.TestCase):
+    def test_row_eligibility_from_powerplay_cell(self):
+        self.assertTrue(View._acq_row_eligible('Aisling Duval / Fortified (3d)'))
+        self.assertTrue(View._acq_row_eligible('Zemina Torval / Stronghold'))
+        self.assertTrue(View._acq_row_eligible('No data \u2197'))  # unknown: let the search decide
+        self.assertTrue(View._acq_row_eligible(''))
+        self.assertFalse(View._acq_row_eligible('Unoccupied (2d)'))
+        self.assertFalse(View._acq_row_eligible('Zemina Torval / Exploited'))
+        self.assertFalse(View._acq_row_eligible('Felicia Winters / Contested'))
+
+    def test_worker_passes_controlling_power(self):
+        v = make_view('Sol')
+        v._acquisition_reference_materials = Mock(return_value=['Platinum'])
+        render = v._show_acquisition_search_results = Mock()
+        pp = {'Sol': {'power_state': 'Fortified', 'controlling_power': 'Zemina Torval'}}
+        with patch.object(SystemFinderAPI, '_batch_get_powerplay', return_value=pp), \
+                patch.object(SystemFinderAPI, '_fetch_spansh_powerplay_systems', return_value={}), \
+                patch.object(SystemFinderAPI, '_store_powerplay_batch'):
+            v._acquisition_search_worker('Sol', None, Control())
+        self.assertEqual(render.call_args.args[8], 'Zemina Torval')
+
+    def test_other_power_note_in_name(self):
+        v = make_view('Sol')
+        v._acq.update(state='Fortified', radius=20.0, count=2, owner='Zemina Torval')
+        for my_power, shown in (('Aisling Duval', True), ('Zemina Torval', False),
+                                ('Select your pledge...', False), ('Not pledged', False)):
+            with patch('config.load_player_power', return_value=my_power):
+                self.assertEqual('Zemina Torval' in v._acq_name_text(), shown, my_power)
+        v._acq['owner'] = '~none~'
+        with patch('config.load_player_power', return_value='Aisling Duval'):
+            self.assertNotIn('~none~', v._acq_name_text())
+
+    def test_start_keeps_mineral_handed_over(self):
+        v = make_view('Sol')
+        v._acq_mineral_combo = Mock()
+        v._acq_mineral_combo.cget.return_value = ('All Minerals', 'Platinum')
+        with patch('acquisition_view.threading.Thread') as thread:
+            v._acq_start('LTT 4835', 'Platinum')
+        self.assertEqual(thread.call_args.kwargs['args'][2], 'Platinum')
+        with patch('acquisition_view.threading.Thread') as thread:
+            v._acq_start('Wolf 359', 'Not a mineral')
+        self.assertIsNone(thread.call_args.kwargs['args'][2])
+
+    def test_hotspot_menu_groups_view_items(self):
+        src = (ROOT / 'app' / 'ring_finder.py').read_text(encoding='utf-8')
+        rank = src.index("add('rank_minerals', 'context_menu.best_minerals_to_mine'")
+        acq = src.index("add('acquisition', 'context_menu.find_acquisition_targets'")
+        self.assertLess(rank, acq)
+        self.assertEqual(src[rank:acq].count('\n'), 1)  # the very next menu line
+        self.assertIn("self._ctx_idx['acquisition'], state=", src)
+
+
 class ViewClickTests(unittest.TestCase):
     def make(self, shown='', selected=None, reference=''):
         v = make_view(shown)

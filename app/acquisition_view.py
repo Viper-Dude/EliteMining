@@ -3,6 +3,7 @@
 Acquisition view of the Hotspots Finder: nearby Unoccupied systems buying the minerals
 mined at a Fortified/Stronghold system. Mixed into RingFinder (ring_finder.py).
 """
+import re
 import threading
 import tkinter as tk
 from tkinter import ttk
@@ -37,6 +38,8 @@ class AcquisitionMixin:
     # PowerPlay Acquisition-mining sell radius: mine in a Fortified (20 Ly) or
     # Stronghold (30 Ly) system, sell in a nearby Unoccupied system within that radius.
     ACQUISITION_RADIUS_BY_STATE = {'Fortified': 20.0, 'Stronghold': 30.0}
+    # PowerPlay states with no acquisition range
+    ACQ_OTHER_STATES = ('Unoccupied', 'Exploited', 'Expansion', 'Contested')
 
     ACQ_COLUMNS = ("System", "Station", "Type", "Pad", "Dist", "Power", "Mineral", "Demand", "Price", "Updated")
     ACQ_DEFAULT_WIDTHS = {"System": 200, "Station": 200, "Type": 120, "Pad": 50, "Dist": 80, "Power": 150,
@@ -56,7 +59,7 @@ class AcquisitionMixin:
         current_theme = load_theme()
 
         self._acq = {
-            'system': '', 'state': '', 'radius': None, 'mineral': None, 'busy': False, 'count': 0,
+            'system': '', 'state': '', 'radius': None, 'mineral': None, 'busy': False, 'count': 0, 'owner': '',
             'status': '', 'hint': '', 'spin': 0, 'spinning': False,
             'system_by_row': {}, 'station_by_row': {}, 'source_by_row': {},
         }
@@ -165,15 +168,14 @@ class AcquisitionMixin:
             sel = tree.selection()
             return mapping.get(sel[0], '') if sel else ''
 
+        self._acq_row_menu.add_command(label=t('context_menu.copy_system'),
+                                       command=lambda: self._acq_copy_system(tree.selection()[0]) if tree.selection() else None)
         self._acq_row_menu.add_command(label=t('context_menu.open_inara'), command=lambda: self._bp_open_url(
             "https://inara.cz/elite/stations/?search={}", selected(self._acq['station_by_row'])))
         self._acq_row_menu.add_command(label=t('context_menu.open_edsm'), command=lambda: self._bp_open_url(
             "https://www.edsm.net/en/search/stations/index/name/{}/", selected(self._acq['station_by_row'])))
         self._acq_row_menu.add_command(label=t('context_menu.open_spansh'), command=lambda: self._bp_open_url(
             "https://spansh.co.uk/search/{}", selected(self._acq['system_by_row'])))
-        self._acq_row_menu.add_separator()
-        self._acq_row_menu.add_command(label=t('context_menu.copy_system'),
-                                       command=lambda: self._acq_copy_system(tree.selection()[0]) if tree.selection() else None)
 
         tree.bind("<Button-1>", self._acq_on_click)
         if not hasattr(self, '_context_handlers'):
@@ -202,8 +204,25 @@ class AcquisitionMixin:
                 system=acq['system'], state=acq['state'], radius=int(acq['radius']))
             if acq.get('count'):
                 name += ' · ' + t('ring_finder.acquisition_search_found').format(count=acq['count'])
+            if self._acq_other_power():
+                name += ' · ' + t('ring_finder.acquisition_not_my_power').format(power=acq['owner'])
             return name
         return acq['system']
+
+    def _acq_other_power(self) -> bool:
+        """True when the searched system is controlled by a power other than My Power."""
+        from config import load_player_power
+        from system_finder_api import ELITE_POWERS
+        owner = self._acq.get('owner', '')
+        my_power = load_player_power()
+        return bool(owner) and owner != '~none~' and my_power in ELITE_POWERS[1:] and owner != my_power
+
+    @classmethod
+    def _acq_row_eligible(cls, pp_text: str) -> bool:
+        """False when a hotspot row's PowerPlay cell shows a state with no acquisition
+        range; unknown states stay allowed (the search looks them up)."""
+        words = re.findall(r'[A-Za-z]+', pp_text or '')
+        return not any(state in words for state in cls.ACQ_OTHER_STATES)
 
     def _acq_refresh_controls(self):
         acq = self._acq
@@ -255,14 +274,17 @@ class AcquisitionMixin:
         mineral = self._to_english(display)
         return "Low Temperature Diamonds" if mineral == "Low Temp Diamonds" else mineral
 
-    def _acq_start(self, system_name: str):
+    def _acq_start(self, system_name: str, mineral_display: str = None):
         """Search system_name and switch to the Acquisition view. A new system starts on
-        All Minerals; Refresh and the mineral picker keep the chosen mineral."""
+        All Minerals unless mineral_display (a mineral picker label) is given; Refresh and
+        the mineral picker keep the chosen mineral."""
         acq = self._acq
-        if system_name.lower() != acq['system'].lower():
+        if mineral_display and mineral_display in self._acq_mineral_combo.cget('values'):
+            self._acq_mineral_var.set(mineral_display)
+        elif system_name.lower() != acq['system'].lower():
             self._acq_mineral_var.set(self._acq_all_label)
         mineral_filter = self._acq_mineral_filter()
-        acq.update(system=system_name, state='', radius=None, mineral=mineral_filter, busy=True, hint='', count=0,
+        acq.update(system=system_name, state='', radius=None, mineral=mineral_filter, busy=True, hint='', count=0, owner='',
                    status=t('ring_finder.acquisition_search_checking').format(system=system_name))
         self._acq_fill([], mineral_filter, {}, {}, {})
         self._show_results_view('acquisition')
@@ -329,6 +351,7 @@ class AcquisitionMixin:
         pp_cache = SystemFinderAPI._batch_get_powerplay([reference_system])
         entry = pp_cache.get(reference_system, {})
         power_state = entry.get('power_state', '')
+        owner = entry.get('controlling_power', '')
 
         if power_state not in self.ACQUISITION_RADIUS_BY_STATE:
             # Cache had no usable state - ask Spansh directly for this one system before
@@ -338,6 +361,7 @@ class AcquisitionMixin:
                     reference_system, 5.0, 'Any', state, is_cancelled=control.is_cancelled)
                 if reference_system in spansh_pp:
                     power_state = state
+                    owner = spansh_pp[reference_system].get('controlling_power', '')
                     SystemFinderAPI._store_powerplay_batch({reference_system: spansh_pp[reference_system]})
                     break
 
@@ -354,7 +378,7 @@ class AcquisitionMixin:
             reference_system, radius, minerals_to_check, control.is_cancelled)
 
         control.complete(results, lambda rows: self._show_acquisition_search_results(
-            reference_system, power_state, radius, rows, mineral_filter, sell_prices, best_mineral, best_rows))
+            reference_system, power_state, radius, rows, mineral_filter, sell_prices, best_mineral, best_rows, owner))
 
     def _acq_find_sell_targets(self, mine_system: str, radius: float, minerals: list, is_cancelled,
                                nearby: dict = None):
@@ -418,9 +442,10 @@ class AcquisitionMixin:
 
     def _show_acquisition_search_results(self, reference_system: str, power_state: str, radius: float,
                                          results: list, mineral_filter: Optional[str], sell_prices: dict,
-                                         best_mineral: dict, best_rows: dict = None):
+                                         best_mineral: dict, best_rows: dict = None, owner: str = ''):
         acq = self._acq
         acq['state'] = power_state
+        acq['owner'] = owner
         acq['radius'] = radius
         mineral_display = self._format_material_for_display(mineral_filter) if mineral_filter else t('ring_finder.all_minerals')
         acq['count'] = len(results)

@@ -187,6 +187,21 @@ class InputTests(unittest.TestCase):
         v._mm_start.assert_called_once()
 
 
+class MenuTests(unittest.TestCase):
+    def test_show_all_buyers_opens_acquisition_for_mining_system(self):
+        v = make_view(mineral='Platinum')
+        v._acq_start = Mock()
+        v._mm_menu_target = {'system': 'U1', 'station': 'Port', 'mine': 'Fort'}
+        v._mm_show_all_buyers()
+        v._acq_start.assert_called_once_with('Fort', 'Platinum')
+
+    def test_strings_in_both_languages(self):
+        for lang in ('en', 'de'):
+            data = json.loads((ROOT / 'app' / 'localization' / f'strings_{lang}.json').read_text(encoding='utf-8'))
+            self.assertIn('show_all_buyers', data['context_menu'], lang)
+            self.assertIn('acquisition_not_my_power', data['ring_finder'], lang)
+
+
 class FillTests(unittest.TestCase):
     def test_demand_column_follows_buyer(self):
         v = make_view()

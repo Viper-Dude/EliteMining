@@ -3433,6 +3433,7 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Mer
         # Market
         add('find_sell_station', 'context_menu.find_sell_station', self._find_sell_station)
         add('rank_minerals', 'context_menu.best_minerals_to_mine', self._rank_minerals_for_system)
+        add('acquisition', 'context_menu.find_acquisition_targets', self._find_acquisition_targets_for_system)
         self.context_menu.add_separator()
         # Database
         add('save', 'context_menu.save_to_local_database', self._save_to_database)
@@ -3448,9 +3449,8 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Mer
         add('bookmark', 'context_menu.bookmark_location', self._bookmark_selected)
         add('comment', 'context_menu.edit_comment', self._show_comment_dialog)
         self.context_menu.add_separator()
-        # Reports / PowerPlay / Export
+        # Reports / Export
         add('mining_report', 'context_menu.open_mining_report', self._open_mining_report_selected)
-        add('acquisition', 'context_menu.find_acquisition_targets', self._find_acquisition_targets_for_system)
         add('export', 'context_menu.export_results_csv', self._export_results_to_csv)
 
     DENSITY_KEYS = ('low', 'medium', 'high', 'very_dense')
@@ -3607,6 +3607,9 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Mer
                         self.context_menu.entryconfig(self._ctx_idx['find_sell_station'], state="normal")
                     else:
                         self.context_menu.entryconfig(self._ctx_idx['find_sell_station'], state="disabled")
+
+                    acq_ok = bool(sel) and self._acq_row_eligible(self.results_tree.set(sel[0], 'PowerPlay'))
+                    self.context_menu.entryconfig(self._ctx_idx['acquisition'], state="normal" if acq_ok else "disabled")
 
                     # Show/hide "Save to Database" option (index 9, after separator) based on Source column.
                     # Both save options are disabled outright in Ring Search mode - that mode is for

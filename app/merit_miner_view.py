@@ -171,16 +171,17 @@ class MeritMinerMixin:
         if current_theme == "elite_orange":
             menu_colors = dict(bg="#1e1e1e", fg="#ff8c00", activebackground="#ff6600", activeforeground="#000000")
         self._mm_row_menu = tk.Menu(frame, tearoff=0, font=scaled_font(9), **menu_colors)
-        self._mm_menu_target = {'system': '', 'station': ''}
+        self._mm_menu_target = {'system': '', 'station': '', 'mine': ''}
         target = self._mm_menu_target
+        self._mm_row_menu.add_command(label=t('context_menu.show_all_buyers'), command=self._mm_show_all_buyers)
+        self._mm_row_menu.add_separator()
+        self._mm_row_menu.add_command(label=t('context_menu.copy_system'),
+                                      command=lambda: self._mm_copy(target['system']))
         self._mm_row_menu.add_command(label=t('context_menu.open_inara'), command=lambda: self._mm_open_inara())
         self._mm_row_menu.add_command(label=t('context_menu.open_edsm'), command=lambda: self._bp_open_url(
             "https://www.edsm.net/en/system/id/0/name/{}", target['system']))
         self._mm_row_menu.add_command(label=t('context_menu.open_spansh'), command=lambda: self._bp_open_url(
             "https://spansh.co.uk/search/{}", target['system']))
-        self._mm_row_menu.add_separator()
-        self._mm_row_menu.add_command(label=t('context_menu.copy_system'),
-                                      command=lambda: self._mm_copy(target['system']))
 
         tree.bind("<Button-1>", self._mm_on_click)
         if not hasattr(self, '_context_handlers'):
@@ -460,6 +461,12 @@ class MeritMinerMixin:
             self.parent.clipboard_append(system)
             self.parent.update_idletasks()
 
+    def _mm_show_all_buyers(self):
+        """Every Unoccupied buyer around the row's mining system, in the Acquisition view."""
+        mine = self._mm_menu_target.get('mine')
+        if mine:
+            self._acq_start(mine, self._mm_mineral_var.get())
+
     def _mm_open_inara(self):
         target = self._mm_menu_target
         if target['station']:
@@ -477,7 +484,8 @@ class MeritMinerMixin:
         row_id = self._mm_tree.identify_row(event.y)
         if row_id and self._mm['mine_by_row'].get(row_id):
             self._mm_tree.selection_set(row_id)
-            self._mm_menu_target.update(self._mm_row_target(row_id, self._mm_tree.identify_column(event.x)))
+            self._mm_menu_target.update(self._mm_row_target(row_id, self._mm_tree.identify_column(event.x)),
+                                        mine=self._mm['mine_by_row'].get(row_id, ''))
             try:
                 self._mm_row_menu.tk_popup(event.x_root, event.y_root)
             finally:
