@@ -20,7 +20,7 @@ class DistanceCalculatorTabMixin:
         from system_autocomplete import SystemAutocomplete
         from ui.help_link import create_labelframe_title
 
-        _dc_colors = get_theme_colors(load_theme())
+        _dc_colors = self._dc_colors = get_theme_colors(load_theme())
         _dc_bg = _dc_colors["bg"]
         px = self._scaled_px
 
@@ -51,19 +51,20 @@ class DistanceCalculatorTabMixin:
         def location_row(row, label_key, widget, tooltip_key, bold=False):
             ttk.Label(config_frame, text=t(label_key), font=self._scaled_font(9, "bold" if bold else "normal")).grid(row=row, column=0, sticky="w", pady=3)
             widget.grid(row=row, column=1, padx=(5, 5), pady=3, sticky="ew")
-            ToolTip(widget, t(tooltip_key))
+            # Narrow so the Fleet Carrier tip doesn't cover the Refresh Locations button
+            ToolTip(widget, t(tooltip_key), wraplength=px(220))
             info_frame = tk.Frame(config_frame, bg=_dc_bg)
             info_frame.grid(row=row, column=2, sticky="w", padx=(5, 0), pady=3)
-            distance_label = tk.Label(info_frame, text="", font=self._scaled_font(9), fg="#ffcc00", bg=_dc_bg, anchor="w")
+            distance_label = tk.Label(info_frame, text="", font=self._scaled_font(9), fg=_dc_colors["value"], bg=_dc_bg, anchor="w")
             distance_label.pack(side="left")
             sol_label = tk.Label(info_frame, text="", font=self._scaled_font(9), fg=_dc_colors["fg_muted"], bg=_dc_bg, anchor="w")
             sol_label.pack(side="left", padx=(10, 0))
-            visits_label = tk.Label(config_frame, text="", font=self._scaled_font(9), fg="#ffcc00", bg=_dc_bg, anchor="e")
+            visits_label = tk.Label(config_frame, text="", font=self._scaled_font(9), fg=_dc_colors["fg_muted"], bg=_dc_bg, anchor="e")
             visits_label.grid(row=row, column=3, sticky="e", padx=(5, 0), pady=3)
             return distance_label, sol_label, visits_label
 
         self.distance_current_system = tk.StringVar(value="---")
-        current_display = tk.Label(config_frame, textvariable=self.distance_current_system, fg="#00ff00", bg=_dc_bg,
+        current_display = tk.Label(config_frame, textvariable=self.distance_current_system, fg=_dc_colors["fg_bright"], bg=_dc_bg,
                                    font=self._scaled_font(9, "bold"), anchor="w", padx=px(3))
         self.current_sol_label, _, self.distance_visits_label = location_row(
             0, 'distance_calculator.current_system', current_display, 'tooltips.current_system', bold=True)
@@ -73,20 +74,20 @@ class DistanceCalculatorTabMixin:
                               bg="#2d2d2d", fg="#ffffff", font=self._scaled_font(9), insertbackground="#ffffff")
         self.distance_to_home_label, self.home_sol_label, self.home_visits_label = location_row(
             1, 'distance_calculator.home_system', home_entry, 'tooltips.home_system')
-        self._ac_home = SystemAutocomplete(home_entry, self.distance_home_system, self)
+        self._ac_home = SystemAutocomplete(home_entry, self.distance_home_system, self,
+                                           on_select=lambda name: self._distance_set_home())
         home_entry.bind("<Return>", lambda e: (self._ac_home.hide(), self._distance_set_home(e)))
-        home_entry.bind('<FocusOut>', lambda e: (e.widget.selection_clear(), self._distance_set_home(e)))
+        # add='+' keeps the suggestion list's own FocusOut handler
+        home_entry.bind('<FocusOut>', self._distance_home_focus_out, add='+')
 
         self.distance_fc_system = tk.StringVar(value="")
-        fc_display = tk.Label(config_frame, textvariable=self.distance_fc_system, fg="#ffffff", bg=_dc_bg,
+        fc_display = tk.Label(config_frame, textvariable=self.distance_fc_system, fg=_dc_colors["fg"], bg=_dc_bg,
                               font=self._scaled_font(9), anchor="w", padx=px(3))
         self.distance_to_fc_label, self.fc_sol_label, self.fc_visits_label = location_row(
             2, 'distance_calculator.fleet_carrier', fc_display, 'tooltips.fleet_carrier')
 
         self.distance_refresh_btn = create_action_button(config_frame, text=t('distance_calculator.refresh_locations'),
-                               command=self._distance_refresh_locations,
-                               bg="#2a3a4a", fg="#e0e0e0", activebackground="#3a4a5a",
-                               activeforeground="#ffffff", relief="ridge", bd=1, cursor="hand2")
+                               command=self._distance_refresh_locations)
         self.distance_refresh_btn.grid(row=3, column=0, columnspan=4, pady=(8, 0))
         ToolTip(self.distance_refresh_btn, t('tooltips.refresh_locations'))
 
@@ -109,9 +110,7 @@ class DistanceCalculatorTabMixin:
             buttons_frame = tk.Frame(calc_frame, bg=_dc_bg)
             buttons_frame.grid(row=row, column=2, pady=3, padx=(5, 0), sticky="w")
             for text_key, tooltip_key, command in buttons:
-                btn = create_action_button(buttons_frame, text=t('distance_calculator.' + text_key), command=command,
-                                           bg="#2a4a2a", fg="#e0e0e0", activebackground="#3a5a3a",
-                                           activeforeground="#ffffff", relief="ridge", bd=1, cursor="hand2")
+                btn = create_action_button(buttons_frame, text=t('distance_calculator.' + text_key), command=command)
                 btn.pack(side="left", padx=(0, 2))
                 ToolTip(btn, t('tooltips.' + tooltip_key))
             return var, autocomplete
@@ -139,22 +138,22 @@ class DistanceCalculatorTabMixin:
         dist_row = tk.Frame(results_frame, bg=_dc_bg)
         dist_row.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
         self.distance_ab_label = tk.Label(dist_row, text='➤ ' + t('distance_calculator.distance'),
-                                         font=self._scaled_font(11, "bold"), fg="#ffcc00", bg=_dc_bg, anchor="w")
+                                         font=self._scaled_font(11, "bold"), fg=_dc_colors["fg"], bg=_dc_bg, anchor="w")
         self.distance_ab_label.pack(side="left")
         self.distance_ab_value_label = tk.Label(dist_row, text="---",
-                                         font=self._scaled_font(11, "bold"), fg="#66ff99", bg=_dc_bg, anchor="w")
+                                         font=self._scaled_font(14, "bold"), fg=_dc_colors["value"], bg=_dc_bg, anchor="w")
         self.distance_ab_value_label.pack(side="left", padx=(15, 0))
 
-        tk.Frame(results_frame, height=1, bg="#444444").grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 10))
+        tk.Frame(results_frame, height=1, bg=_dc_colors.get("border", "#444444")).grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 10))
 
         for column, side in enumerate(('a', 'b')):
             name_label = tk.Label(results_frame, text=t('distance_calculator.system_' + side + '_info') + " ---",
-                                  font=self._scaled_font(9, "bold"), fg="#ffaa00", bg=_dc_bg, anchor="w")
+                                  font=self._scaled_font(9, "bold"), fg=_dc_colors["fg"], bg=_dc_bg, anchor="w")
             name_label.grid(row=2, column=column, sticky="w", padx=(0, 20) if side == 'a' else 0, pady=(5, 0))
             setattr(self, 'distance_system_' + side + '_name', name_label)
             for row, (field, key) in enumerate(self._DISTANCE_RESULT_FIELDS, start=3):
                 label = tk.Label(results_frame, text=t('distance_calculator.' + key) + " ---",
-                                 font=self._scaled_font(9), fg="#ffffff", bg=_dc_bg, anchor="w")
+                                 font=self._scaled_font(9), fg=_dc_colors["fg_dim"], bg=_dc_bg, anchor="w")
                 label.grid(row=row, column=column, sticky="w", padx=(10, 20) if side == 'a' else (10, 0))
                 setattr(self, 'distance_' + side + '_' + field + '_label', label)
 
@@ -181,23 +180,23 @@ class DistanceCalculatorTabMixin:
         current_system = self.get_current_system()
         if current_system:
             self._distance_fill(self._ac_system_a, self.distance_system_a, current_system)
-            self._show_notice(self.distance_status_label, t('distance_calculator.using_current').format(system=current_system), fg="#4da6ff")
+            self._show_notice(self.distance_status_label, t('distance_calculator.using_current').format(system=current_system), fg=self._dc_colors['info'])
         else:
-            self._show_notice(self.distance_status_label, t('distance_calculator.no_current'), fg="#ffaa00")
+            self._show_notice(self.distance_status_label, t('distance_calculator.no_current'), fg=self._dc_colors['warning'])
 
     def _distance_use_home(self):
         home = self.distance_home_system.get().strip()
         if home:
             self._distance_fill(self._ac_system_b, self.distance_system_b, home)
         else:
-            self._show_notice(self.distance_status_label, t('distance_calculator.no_home'), fg="#ffaa00")
+            self._show_notice(self.distance_status_label, t('distance_calculator.no_home'), fg=self._dc_colors['warning'])
 
     def _distance_use_fc(self):
         fc = self.distance_fc_system.get().strip()
         if fc:
             self._distance_fill(self._ac_system_b, self.distance_system_b, fc)
         else:
-            self._show_notice(self.distance_status_label, t('distance_calculator.no_carrier'), fg="#ffaa00")
+            self._show_notice(self.distance_status_label, t('distance_calculator.no_carrier'), fg=self._dc_colors['warning'])
 
     def _distance_set_home(self, event=None):
         from config import load_home_system, save_home_system
@@ -205,15 +204,21 @@ class DistanceCalculatorTabMixin:
         if home != load_home_system():
             save_home_system(home)
             key = 'distance_calculator.home_saved' if home else 'distance_calculator.home_cleared'
-            self._show_notice(self.distance_status_label, t(key).format(system=home), fg="#4da6ff")
+            self._show_notice(self.distance_status_label, t(key).format(system=home), fg=self._dc_colors['info'])
             self._update_home_fc_distances()
+
+    def _distance_home_focus_out(self, event):
+        event.widget.selection_clear()
+        # Clicking a suggestion moves focus first; saving now would store the half-typed name.
+        if not self._ac_home._mouse_over:
+            self._distance_set_home(event)
 
     def _distance_refresh_locations(self):
         if self._distance_refresh_running:
             return
         parser = getattr(getattr(self, 'cargo_monitor', None), 'journal_parser', None)
         if not parser:
-            self._show_notice(self.distance_status_label, t('distance_calculator.no_journal'), fg="#ffaa00")
+            self._show_notice(self.distance_status_label, t('distance_calculator.no_journal'), fg=self._dc_colors['warning'])
             return
         self._distance_refresh_running = True
         self.distance_refresh_btn.config(state='disabled', text=t('distance_calculator.refreshing'))
@@ -234,7 +239,7 @@ class DistanceCalculatorTabMixin:
             return
         self.after(350, self._finish_distance_location_refresh, generation)
         if error:
-            self._show_notice(self.distance_status_label, t('distance_calculator.scan_failed').format(error=error), fg="#ff6666")
+            self._show_notice(self.distance_status_label, t('distance_calculator.scan_failed').format(error=error), fg=self._dc_colors['error'])
             return
         if current and current != initial_current and getattr(self, 'current_system', None) == initial_current:
             self.update_current_system(current, count_visit=False)
@@ -242,7 +247,7 @@ class DistanceCalculatorTabMixin:
         self.distance_fc_system.set(carrier.get('system') or '')
         self._update_home_fc_distances()
         key = 'distance_calculator.locations_refreshed' if current or carrier.get('system') else 'distance_calculator.locations_missing'
-        self._show_notice(self.distance_status_label, t(key), fg="#4da6ff" if current or carrier.get('system') else "#ffaa00")
+        self._show_notice(self.distance_status_label, t(key), fg=self._dc_colors['info' if current or carrier.get('system') else 'warning'])
 
     def _finish_distance_location_refresh(self, generation):
         if generation == self._distance_refresh_generation:
@@ -261,6 +266,10 @@ class DistanceCalculatorTabMixin:
 
     def _invalidate_distance_calculation(self, *args):
         self._distance_calculation_generation += 1
+        # The running result is now dropped, so its "Calculating..." notice would never clear.
+        label = getattr(self, 'distance_status_label', None)
+        if label is not None and label.cget('text') == t('distance_calculator.calculating'):
+            label.config(text='')
 
     def _distance_coordinate_lookup(self, system_name, current_system, current_coords):
         from edsm_distance import SOL_COORDS
@@ -317,12 +326,12 @@ class DistanceCalculatorTabMixin:
         for side, name in zip(('a', 'b'), names):
             getattr(self, 'distance_system_' + side + '_name').config(text=t('distance_calculator.system_' + side + '_info') + ' ' + (name or '---'))
             for field, key in self._DISTANCE_RESULT_FIELDS:
-                getattr(self, 'distance_' + side + '_' + field + '_label').config(text=t('distance_calculator.' + key) + ' ---', fg='#ffffff')
-        self.distance_ab_value_label.config(text='---', fg='#66ff99')
+                getattr(self, 'distance_' + side + '_' + field + '_label').config(text=t('distance_calculator.' + key) + ' ---', fg=self._dc_colors['fg_dim'])
+        self.distance_ab_value_label.config(text='---')
         if not any(names):
-            self._show_notice(self.distance_status_label, t('distance_calculator.enter_system'), fg='#ffaa00')
+            self._show_notice(self.distance_status_label, t('distance_calculator.enter_system'), fg=self._dc_colors['warning'])
             return
-        self._show_notice(self.distance_status_label, t('distance_calculator.calculating'), clear_after=0, fg='#4da6ff')
+        self._show_notice(self.distance_status_label, t('distance_calculator.calculating'), clear_after=0, fg=self._dc_colors['info'])
         current_system = getattr(self, 'current_system', None)
         current_coords = getattr(self, 'current_system_coords', None)
 
@@ -351,7 +360,7 @@ class DistanceCalculatorTabMixin:
             coords = info['coords']
             if coords is None:
                 key = 'distance_calculator.lookup_failed' if info['error'] else 'distance_calculator.coordinates_unavailable'
-                getattr(self, 'distance_' + side + '_sol_label').config(text=t(key).format(system=name, error=info['error']), fg='#ff6666')
+                getattr(self, 'distance_' + side + '_sol_label').config(text=t(key).format(system=name, error=info['error']), fg=self._dc_colors['error'])
                 failed = failed or bool(info['error'])
                 continue
             found += 1
@@ -364,16 +373,16 @@ class DistanceCalculatorTabMixin:
             distance = self.distance_calculator.calculate_distance(*(results[name.casefold()]['coords'] for name in names))
             self.distance_ab_value_label.config(text=f'{distance:.2f} LY')
         if failed:
-            key, color = 'distance_calculator.lookup_error', '#ff6666'
+            key, color = 'distance_calculator.lookup_error', 'error'
         elif found == sum(bool(name) for name in names):
-            key, color = 'distance_calculator.calculation_complete', '#00ff00'
+            key, color = 'distance_calculator.calculation_complete', 'success'
         else:
-            key, color = 'distance_calculator.coordinates_missing', '#ffaa00'
-        self._show_notice(self.distance_status_label, t(key), fg=color)
+            key, color = 'distance_calculator.coordinates_missing', 'warning'
+        self._show_notice(self.distance_status_label, t(key), fg=self._dc_colors[color])
 
     def _show_distance_error(self, error_msg: str):
         logging.getLogger('EliteMining').error('Distance calculation failed: %s', error_msg)
-        self._show_notice(self.distance_status_label, t('distance_calculator.calculation_failed').format(error=error_msg), fg='#ff6666')
+        self._show_notice(self.distance_status_label, t('distance_calculator.calculation_failed').format(error=error_msg), fg=self._dc_colors['error'])
 
     def _refresh_visit_count(self, system_name=None):
         """Refresh the Configuration visit counts after a visit is recorded"""

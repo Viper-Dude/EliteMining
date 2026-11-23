@@ -10,7 +10,17 @@ Centralized color definitions for the Elite Orange and Dark Gray themes.
 # Adjust these values to customize the Elite Orange theme appearance.
 # All orange/accent colors throughout the app will use these values.
 
+# Status text (inline notices); same soft set as the footer's service indicator.
+STATUS_COLORS = {
+    "success": "#4FB87A",
+    "warning": "#D9A441",
+    "error": "#D06A6A",
+    "info": "#5B9BD5",
+}
+
 THEME_ELITE_ORANGE = {
+    **STATUS_COLORS,
+    "value": "#ffcc00",           # Key numbers and results
     # Main background colors
     "bg": "#000000",              # Pure black background
     "bg_dark": "#0a0a0a",         # Slightly lighter black for contrast
@@ -47,6 +57,8 @@ THEME_ELITE_ORANGE = {
 }
 
 THEME_DARK_GRAY = {
+    **STATUS_COLORS,
+    "value": "#ffcc00",
     # Main background colors
     "bg": "#1e1e1e",              # Dark gray background
     "bg_dark": "#1e1e1e",         # Same as bg
@@ -84,6 +96,8 @@ THEME_DARK_GRAY = {
 
 
 THEME_MODERN = {
+    **STATUS_COLORS,
+    "value": "#FF9A32",
     "bg": "#14171B",
     "bg_dark": "#14171B",
     "bg_accent": "#1D2228",       # Panels
@@ -140,6 +154,7 @@ THEME_MODERN_SLATE = {
     "border": "#343434",
     "accent": "#D8D8D8",
     "accent_fg": "#101010",
+    "value": "#D8D8D8",
     "row_alt": "#212121",
 }
 

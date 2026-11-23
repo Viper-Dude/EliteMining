@@ -27,6 +27,7 @@ Make `app/main.py` (and later `prospector_panel.py` and `ring_finder.py`) smalle
 | 3 | Tabs and dialogs, when they're touched | In progress (only alongside other work) | — |
 | 3a | VoiceAttack Controls tab into `voiceattack_controls_tab.py` | Done 22 Nov 2026; checks OK, app test pending | 16,734 (−1,116) |
 | 3b | Commodity Market tab into `commodity_market_tab.py` | Done 22 Nov 2026; checks OK, user-tested | 14,275 (−2,363) |
+| 3c | Distance Calculator tab into `distance_calculator_tab.py` | Done 23 Nov 2026 (`6719590`); checks OK | 13,831 (−444 from the move) |
 | 4 | `prospector_panel.py`, `ring_finder.py` | Later | — |
 
 Line counts are physical lines, including blank lines.
@@ -54,6 +55,8 @@ Line counts are physical lines, including blank lines.
 ## Step 3 — Candidates in App (move when touched)
 
 The largest builder methods, by size: `_build_interface_options_tab` (710), `_build_announcements_tab` (530), `_create_main_sidebar` (450), `_build_system_finder_tab` (375), `_build_mining_commodities_tab` (305), `_build_trade_commodities_tab` (285), and backup/restore (`_create_backup`, `_show_restore_options_dialog`, about 500 together).
+
+Step 3c: `DistanceCalculatorTabMixin` holds the builder and all Distance Calculator methods (build, fills, home save, location refresh, calculation and live Home/Carrier updates, `get_distance_info_text`). `_check_market_api_status` and `_queue_search_service_status`, which sat in that section, stay in `main.py`. `check_distance_calculator.py` loads the mixin from the new module.
 
 Step 3b: `CommodityMarketTabMixin` holds the Mining and Trade Commodities builders, tables, context menus, preferences, searches, display, Powerplay fill-in and sorting (55 methods). Star Systems and `_check_market_api_status` stay in `main.py`; Multiple Prices and Sell My Hold were already separate modules. `check_marketplace.py` and `check_search_stop.py` load these methods from the new module. It imports `localization.t` directly, like step 3a, instead of `main.py`'s error-swallowing wrapper.
 

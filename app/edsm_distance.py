@@ -17,29 +17,49 @@ class EDSMDistanceCalculator:
     def __init__(self):
         self.api_base_url = 'https://www.edsm.net/api-v1/system'
         self.timeout = 15
+        # Found coordinates never change, so they stay for the session; misses are re-checked later.
         self.cache = {}
-        self.cache_expiry = 300
+        self.miss_expiry = 600
         self.last_request_time = 0
         self.min_request_interval = 0.5
         self.headers = {'User-Agent': f'EliteMining/{__version__} (+https://github.com/Viper-Dude/EliteMining)'}
-        self._lookup_lock = threading.Lock()
+        self._rate_lock = threading.Lock()
+        self._locks_guard = threading.Lock()
+        self._lookup_locks = {}
 
     def _rate_limit(self):
-        elapsed = time.monotonic() - self.last_request_time
-        if elapsed < self.min_request_interval:
-            time.sleep(self.min_request_interval - elapsed)
-        self.last_request_time = time.monotonic()
+        with self._rate_lock:
+            elapsed = time.monotonic() - self.last_request_time
+            if elapsed < self.min_request_interval:
+                time.sleep(self.min_request_interval - elapsed)
+            self.last_request_time = time.monotonic()
+
+    def _lookup_lock(self, key):
+        with self._locks_guard:
+            return self._lookup_locks.setdefault(key, threading.Lock())
+
+    def _cached(self, key):
+        cached = self.cache.get(key)
+        if cached is None:
+            return False, None
+        if cached['data'] is None and time.monotonic() - cached['timestamp'] >= self.miss_expiry:
+            return False, None
+        return True, cached['data']
+
+    def _store(self, key, data):
+        self.cache[key] = {'data': data, 'timestamp': time.monotonic()}
+        return data
 
     def get_system_coordinates(self, system_name: str) -> Optional[Dict]:
         if not system_name or not system_name.strip():
             return None
         system_name = system_name.strip()
         key = system_name.casefold()
-        # Concurrent calculations share the lookup and its cache entry.
-        with self._lookup_lock:
-            cached = self.cache.get(key)
-            if cached and time.monotonic() - cached['timestamp'] < self.cache_expiry:
-                return cached['data']
+        # Concurrent lookups of the same system share one request; other systems don't wait.
+        with self._lookup_lock(key):
+            hit, data = self._cached(key)
+            if hit:
+                return data
             for attempt in range(3):
                 if attempt:
                     time.sleep(attempt * 2)
@@ -53,20 +73,20 @@ class EDSMDistanceCalculator:
                         raise ValueError('Empty response from EDSM')
                     data = response.json()
                     if not data:
-                        return None
+                        return self._store(key, None)
                     if not isinstance(data, dict):
                         raise ValueError('Invalid system response from EDSM')
                     if not data.get('coords'):
-                        return None
+                        return self._store(key, None)
                     result = {'name': data.get('name', system_name),
                               **{axis: float(data['coords'][axis]) for axis in ('x', 'y', 'z')}}
-                    self.cache[key] = {'data': result, 'timestamp': time.monotonic()}
-                    return result
+                    return self._store(key, result)
                 except (requests.RequestException, ValueError, KeyError, TypeError) as exc:
                     response = getattr(exc, 'response', None)
                     if response is not None and 400 <= response.status_code < 500:
                         raise
-                    if attempt == 2:
+                    # A timed-out server rarely answers a retry; waiting 3 x 15 s only stalls the tab.
+                    if attempt == 2 or isinstance(exc, requests.Timeout):
                         logger.warning('Coordinate lookup failed for %s: %s', system_name, exc)
                         raise
         return None

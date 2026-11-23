@@ -122,6 +122,7 @@ def app():
     obj._distance_refresh_running = False
     obj.distance_refresh_btn = Widget()
     obj._distance_values = {}
+    obj._dc_colors = get_theme_colors('dark_gray')
     obj._set_status = Mock()
     obj._show_notice = lambda label, msg, clear_after=6000, fg=None: label.config(text=msg)
     obj._save_distance_systems = Mock()
@@ -160,6 +161,19 @@ class CalculationChecks(unittest.TestCase):
         obj.queue.flush()
         self.assertEqual(obj.distance_system_a_name.cget('text'), current)
         self.assertIn('New', current)
+
+    def test_editing_during_calculation_clears_calculating_notice(self):
+        obj = app()
+        workers = []
+        obj._resolve_distance_systems = Mock(return_value={})
+        with patch('threading.Thread', side_effect=lambda **kw: SimpleNamespace(start=lambda: workers.append(kw['target']))):
+            obj._calculate_distances()
+        self.assertEqual(obj.distance_status_label.cget('text'), translate('en')('distance_calculator.calculating'))
+        obj.distance_system_a.set('Edited')
+        obj._invalidate_distance_calculation()
+        workers[0]()
+        obj.queue.flush()
+        self.assertEqual(obj.distance_status_label.cget('text'), '')
 
     def test_deferred_exception_keeps_original_message(self):
         obj = app()
@@ -282,6 +296,17 @@ class RefreshChecks(unittest.TestCase):
             obj._distance_set_home(SimpleNamespace())
         save.assert_called_once_with('')
 
+    def test_clicking_a_home_suggestion_does_not_save_the_partial_name(self):
+        obj = app()
+        obj._distance_set_home = Mock()
+        event = SimpleNamespace(widget=SimpleNamespace(selection_clear=Mock()))
+        obj._ac_home = SimpleNamespace(_mouse_over=True)
+        obj._distance_home_focus_out(event)
+        obj._distance_set_home.assert_not_called()
+        obj._ac_home._mouse_over = False
+        obj._distance_home_focus_out(event)
+        obj._distance_set_home.assert_called_once_with(event)
+
 
 class LookupChecks(unittest.TestCase):
     def response(self, payload):
@@ -297,17 +322,58 @@ class LookupChecks(unittest.TestCase):
         get.assert_called_once()
         self.assertIn(__version__, calc.headers['User-Agent'])
 
-    def test_timeout_retries_then_propagates(self):
+    def test_timeout_propagates_without_retry(self):
         calc = EDSMDistanceCalculator()
         with patch('edsm_distance.requests.get', side_effect=requests.Timeout('offline')) as get, \
                 patch('edsm_distance.time.sleep'), patch('edsm_distance.logger.warning'):
             with self.assertRaises(requests.Timeout):
+                calc.get_system_coordinates('A')
+        self.assertEqual(get.call_count, 1)
+
+    def test_connection_error_retries_then_propagates(self):
+        calc = EDSMDistanceCalculator()
+        with patch('edsm_distance.requests.get', side_effect=requests.ConnectionError('offline')) as get, \
+                patch('edsm_distance.time.sleep'), patch('edsm_distance.logger.warning'):
+            with self.assertRaises(requests.ConnectionError):
                 calc.get_system_coordinates('A')
         self.assertEqual(get.call_count, 3)
 
     def test_unknown_system_is_not_a_network_error(self):
         with patch('edsm_distance.requests.get', return_value=self.response({})):
             self.assertIsNone(EDSMDistanceCalculator().get_system_coordinates('Unknown'))
+
+    def test_unknown_system_is_remembered_until_expiry_and_found_coords_stay(self):
+        calc = EDSMDistanceCalculator()
+        clock = [1000.0]
+        with patch('edsm_distance.time.monotonic', side_effect=lambda: clock[0]), \
+                patch('edsm_distance.requests.get', return_value=self.response({})) as get:
+            calc.get_system_coordinates('Typo')
+            calc.get_system_coordinates('typo')
+            self.assertEqual(get.call_count, 1)
+            clock[0] += calc.miss_expiry + 1
+            calc.get_system_coordinates('Typo')
+            self.assertEqual(get.call_count, 2)
+            get.return_value = self.response(dict(name='A', coords=dict(x=1, y=0, z=0)))
+            calc.get_system_coordinates('A')
+            clock[0] += 100000
+            calc.get_system_coordinates('A')
+            self.assertEqual(get.call_count, 3)
+
+    def test_slow_lookup_does_not_block_another_system(self):
+        calc = EDSMDistanceCalculator()
+        calc.min_request_interval = 0
+        started, release = threading.Event(), threading.Event()
+        def fetch(url, params, **kwargs):
+            if params['systemName'] == 'Slow':
+                started.set()
+                self.assertTrue(release.wait(3))
+            return self.response(dict(name=params['systemName'], coords=dict(x=1, y=0, z=0)))
+        with patch('edsm_distance.requests.get', side_effect=fetch), ThreadPoolExecutor(max_workers=2) as pool:
+            slow = pool.submit(calc.get_system_coordinates, 'Slow')
+            self.assertTrue(started.wait(3))
+            self.assertEqual(pool.submit(calc.get_system_coordinates, 'Fast').result(timeout=2)['name'], 'Fast')
+            release.set()
+            slow.result(timeout=3)
 
     def test_concurrent_same_system_lookup_is_shared(self):
         calc = EDSMDistanceCalculator()
@@ -326,6 +392,23 @@ class LookupChecks(unittest.TestCase):
 
 
 class BuildChecks(unittest.TestCase):
+    def test_every_theme_has_the_tab_colours(self):
+        from ui.theme import THEME_ORDER
+        for theme in THEME_ORDER:
+            colors = get_theme_colors(theme)
+            for key in ('bg', 'fg', 'fg_bright', 'fg_dim', 'fg_muted', 'value', 'success', 'warning', 'error', 'info'):
+                self.assertIn(key, colors, (theme, key))
+
+    def test_modern_recolor_leaves_tab_colours_alone(self):
+        # The once-per-tab Modern pass rewrites exact yellows (and whites in Modern Orange); none may match.
+        for theme in ('modern', 'modern_slate', 'modern_orange'):
+            colors = get_theme_colors(theme)
+            for key in ('fg', 'fg_bright', 'fg_dim', 'fg_muted', 'value'):
+                self.assertNotIn(colors[key].lower(), ('#ffcc00', '#ffd700'), (theme, key))
+            if theme == 'modern_orange':
+                for key in ('fg', 'fg_bright', 'fg_dim'):
+                    self.assertNotIn(colors[key].lower(), ('white', '#ffffff', '#e0e0e0', '#e6e6e6', '#e6eaf0'))
+
     def test_tab_builds_in_both_languages_and_scaled_fonts(self):
         for language in ('en', 'de'):
             for scale in (1, 1.5):
