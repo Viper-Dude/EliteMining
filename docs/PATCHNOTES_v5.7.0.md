@@ -3,8 +3,9 @@
 
 ## New Features & Improvements
 
-- Best mineral prices and Find Acquisition Systems now show in the Hotspots Finder search results instead of popups, and Auto Prices switches to the prices after each jump.
-- New Merit Miner view in the Hotspots Finder finds the nearest systems of your power where you can mine your chosen minerals for merits, and where to sell them.
+- The Hotspots Finder search results now have four views to switch between: Hotspots, Best Prices, Acquisition and Merit Miner, so prices and acquisition systems no longer open in popups.
+- Auto Prices switches to Best Prices after each jump.
+- New Merit Miner finds the nearest systems of your power where you can mine a chosen mineral for merits, and where to sell it.
 - My Power is now set automatically from the game each time you log in.
 
 

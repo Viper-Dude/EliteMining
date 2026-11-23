@@ -67,6 +67,7 @@
 
 - **Find mining spots** — Search 80,000+ hotspots and galaxy-wide ring data, including overlaps and RES sites.
 - **Find buyers** — Compare mineral prices, trade goods, or sale options for your whole cargo hold.
+- **Mine for Powerplay merits** — [Merit Miner](#powerplay-merit-mining) finds the nearest systems of your power where you can mine a mineral for merits, and where to sell it.
 - **Track mining** — Live prospector reports, cargo and engineering materials, session history, charts, and reports.
 - **Hear announcements** — Choose minerals and thresholds, with optional in-game text overlays.
 - **Manage your setup** — Mining missions, bookmarks, ship presets, and backup/restore.
