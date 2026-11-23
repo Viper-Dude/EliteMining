@@ -211,7 +211,7 @@ class CarrierUIChecks(unittest.TestCase):
         self.tab._refresh(self.cd)
         self.assertNotEqual(self.tab._sv['cargo_used'].get(), '-')
         self.assertNotEqual(self.tab._sv['cargo_crew'].get(), '-')
-        self.assertEqual(self.tab._sv['cargo_used_total'].get(), '0 / 25,000')
+        self.assertEqual(self.tab._sv['cargo_used_total'].get(), '0 of 25,000')
         self.cd['space_cargo'] = None
         self.tab._refresh(self.cd)
         self.assertEqual(self.tab._sv['cargo_used'].get(), '-')
@@ -222,7 +222,27 @@ class CarrierUIChecks(unittest.TestCase):
     def test_used_space_includes_reserved_space_and_packs(self):
         self.cd.update(space_cargo=10000, space_crew=1000, space_free=9000)
         self.tab._refresh(self.cd)
-        self.assertEqual(self.tab._sv['cargo_used_total'].get(), '16,000 / 25,000')
+        self.assertEqual(self.tab._sv['cargo_used_total'].get(), '16,000 of 25,000')
+
+    def test_docking_tax_and_service_colours(self):
+        self.cd.update(docking_access='squadronfriends', tax_rearm=5, crew=[
+            dict(CrewRole='Refuel', Activated=True, Enabled=True)])
+        self.tab._refresh(self.cd)
+        self.assertEqual(self.tab._sv['status_docking'].get(), 'Squadron and friends')
+        self.assertIn('Rearm 5%  Refuel -%', self.tab._tax_lbl.cget('text'))
+        dot = self.tab._service_labels['Refuel'][0]
+        self.assertEqual(str(dot.cget('fg')), self.tab.fg_active)
+        self.assertEqual(str(self.tab._service_labels['Repair'][0].cget('fg')), self.tab.fg_inactive)
+        self.cd.update(docking_access='mystery', tax_rearm=None)
+        self.tab._refresh(self.cd)
+        self.assertEqual(self.tab._sv['status_docking'].get(), 'Mystery')
+        self.assertEqual(self.tab._tax_lbl.cget('text'), '-')
+
+    def test_small_wheel_steps_accumulate(self):
+        self.tab._canvas.yview_scroll = Mock()
+        for _ in range(3):
+            self.tab._on_mousewheel(SimpleNamespace(delta=-40))
+        self.tab._canvas.yview_scroll.assert_called_once_with(1, 'units')
 
     def test_messages_sit_under_help_banner(self):
         self.tab._refresh(dict(system='Sol'))

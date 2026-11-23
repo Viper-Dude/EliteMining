@@ -10,7 +10,7 @@ from tkinter import ttk
 import logging
 from datetime import datetime, timezone
 
-from config import scaled_font
+from config import scaled_font, scaled_px
 from app_utils import bind_mousewheel_recursive
 from copy import deepcopy
 
@@ -83,7 +83,7 @@ def _countdown(departure_str: str) -> str:
 class FleetCarrierTab(tk.Frame):
     """Fleet Carrier information tab widget."""
 
-    _COUNTDOWN_INTERVAL = 5000
+    _COUNTDOWN_INTERVAL = 1000
 
     def __init__(self, parent, **kwargs):
         try:
@@ -100,12 +100,14 @@ class FleetCarrierTab(tk.Frame):
         self.fg_inactive = colors["btn_fg_disabled"]
         self.sect_bg     = colors["bg_accent"]
         self.hdr_bg      = colors["btn_bg"]
+        self.fg_active   = colors["value"]
 
         super().__init__(parent, bg=self.bg, **kwargs)
         self._tracker = None
         self._countdown_job = None
         self._sv = {}
         self._history_snapshot = None
+        self._wheel_remainder = 0
         self._build_ui()
 
     # ------------------------------------------------------------------
@@ -162,6 +164,7 @@ class FleetCarrierTab(tk.Frame):
             copy_info = tk.Label(row, text="\u24d8", bg=self.sect_bg, fg=self.fg_dim,
                                  cursor="hand2", font=scaled_font(10))
             copy_info.pack(side="left", padx=(6, 2))
+            self._make_copyable(copy_info, lambda: self._sv[sv_key].get())
             ToolTip(copy_info, t("fleet_carrier.copy_location_hint"))
 
     def _make_copyable(self, widget, get_text):
@@ -218,7 +221,7 @@ class FleetCarrierTab(tk.Frame):
             help_frame,
             text=t("fleet_carrier.help_banner"),
             bg=self.hdr_bg, fg=self.fg_dim,
-            font=scaled_font(8, family="Helvetica"), justify="left", anchor="w", wraplength=600
+            font=scaled_font(8, family="Helvetica"), justify="left", anchor="w", wraplength=scaled_px(600)
         ).pack(fill="x", padx=10, ipady=4)
 
         self._no_data_lbl = tk.Label(
@@ -306,8 +309,8 @@ class FleetCarrierTab(tk.Frame):
         self._service_labels = {}
         grid = tk.Frame(sect, bg=self.sect_bg)
         grid.pack(anchor="w", padx=8, pady=4)
-        grid.columnconfigure(0, minsize=200)
-        grid.columnconfigure(1, minsize=200)
+        grid.columnconfigure(0, minsize=scaled_px(200))
+        grid.columnconfigure(1, minsize=scaled_px(200))
 
         for i, (role, loc_key) in enumerate(_CREW_ROLES):
             col = i % 2
@@ -364,7 +367,10 @@ class FleetCarrierTab(tk.Frame):
         self._sv["status_name"].set(f"{name}  ({cs})" if cs else name)
         self._sv["status_system"].set(cd.get("system") or "-")
 
-        docking = (cd.get("docking_access") or "-").capitalize()
+        access = cd.get("docking_access")
+        docking = t(f"fleet_carrier.docking_{access}") if access else "-"
+        if access and docking.endswith(f"docking_{access}"):
+            docking = str(access).capitalize()
         if cd.get("allow_notorious"):
             docking += f"  {t('fleet_carrier.notorious_allowed')}"
         self._sv["status_docking"].set(docking)
@@ -403,9 +409,12 @@ class FleetCarrierTab(tk.Frame):
         rearm  = cd.get("tax_rearm")
         refuel = cd.get("tax_refuel")
         repair = cd.get("tax_repair")
-        if rearm is not None:
-            self._tax_lbl.config(
-                text=t("fleet_carrier.tax_fmt", rearm=rearm, refuel=refuel, repair=repair))
+        if rearm is None and refuel is None and repair is None:
+            self._tax_lbl.config(text="-")
+        else:
+            fmt = lambda v: "-" if v is None else v
+            self._tax_lbl.config(text=t("fleet_carrier.tax_fmt",
+                                        rearm=fmt(rearm), refuel=fmt(refuel), repair=fmt(repair)))
 
         # Services — orange/white if active, grey if inactive
         crew_map = {c.get("CrewRole"): c for c in (cd.get("crew") or [])}
@@ -414,8 +423,8 @@ class FleetCarrierTab(tk.Frame):
             activated = info.get("Activated", False)
             enabled   = info.get("Enabled", False)
             active    = activated and enabled
-            dot.config(fg=self.fg if active else self.fg_inactive)
-            name_lbl.config(fg=self.fg if active else self.fg_inactive)
+            dot.config(fg=self.fg_active if active else self.fg_inactive)
+            name_lbl.config(fg=self.fg_active if active else self.fg_inactive)
 
         # Cargo
         total   = cd.get("space_total")
@@ -429,7 +438,8 @@ class FleetCarrierTab(tk.Frame):
         self._sv["cargo_free"].set(t("fleet_carrier.units_fmt", n=free)  if free is not None else "-")
         self._sv["cargo_crew"].set(t("fleet_carrier.units_fmt", n=crew_sp) if crew_sp is not None else "-")
         self._sv["cargo_used_total"].set(
-            f"{used:,} / {total:,}" if total is not None and used is not None else "-")
+            t("fleet_carrier.used_of_fmt", used=used, total=total)
+            if total is not None and used is not None else "-")
 
         # Jump history
         history = cd.get("jump_history") or []
@@ -501,7 +511,11 @@ class FleetCarrierTab(tk.Frame):
             self._countdown_job = None
 
     def _on_mousewheel(self, event):
-        self._canvas.yview_scroll(int(-event.delta / 120), 'units')
+        self._wheel_remainder += -event.delta / 120
+        steps = int(self._wheel_remainder)
+        if steps:
+            self._wheel_remainder -= steps
+            self._canvas.yview_scroll(steps, 'units')
         return 'break'
 
     def destroy(self):
