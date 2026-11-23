@@ -67,14 +67,21 @@ class SegmentedSelector(tk.Canvas):
                 color = c["track"] if selected else c["disabled"]
             self.create_text(x0 + self._seg_w / 2, m + self._h / 2, text=label, fill=color, font=self._font)
 
+    def segment_at(self, x):
+        """Key of the segment under canvas x, or None (outside or in a gap)."""
+        index = int((x - self._m) // self._step)
+        if self._gap and (x - self._m) - index * self._step > self._seg_w:
+            return None
+        if 0 <= index < len(self._choices):
+            return self._choices[index][0]
+        return None
+
     def _on_click(self, event):
         if not self._enabled:
             return
-        index = int((event.x - self._m) // self._step)
-        if self._gap and (event.x - self._m) - index * self._step > self._seg_w:
-            return  # click landed in the gap
-        if 0 <= index < len(self._choices):
-            self._var.set(self._choices[index][0])
+        key = self.segment_at(event.x)
+        if key is not None:
+            self._var.set(key)
 
     def configure(self, cnf=None, **kw):
         # outline: border colour around the control (e.g. "changed since preset save"); "" for none

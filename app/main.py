@@ -3954,6 +3954,9 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
         self.auto_prices_duration_scale = _slider_row(r, t('settings.overlay_auto_prices_duration'),
                                                       self.auto_prices_overlay_duration, 10, 60, t('settings.seconds'), indent=24)
         # Always enabled: it also sets when Auto Prices returns the Hotspots Finder to Hotspots
+        _dur_frame = self.auto_prices_duration_scale.master
+        for _w in (_dur_frame, *_dur_frame.winfo_children()):
+            ToolTip(_w, t('settings.overlay_auto_prices_duration_tooltip'), wraplength=360)
         r += 1
 
         # Apply initial greyed-out state for overlay sub-controls if master toggle is off

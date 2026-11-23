@@ -227,6 +227,10 @@ class BestMineralsMixin:
             self._bp_scope_var, bg=bg, accent=slider_colors(current_theme)["accent"],
             font=scaled_font(8), scale=scaled_px(100) / 100, gap=scaled_px(4))
         self._bp_scope_var.trace_add('write', lambda *_: self._bp_on_scope_switch())
+        from ui.tooltip import add_segment_tooltips
+        add_segment_tooltips(self._bp_scope_switch, {
+            'ring': t('ring_finder.rank_scope_ring_tooltip'),
+            'system': t('ring_finder.rank_scope_system_tooltip')})
         self._bp_scope_label = ttk.Label(top_row, text="", font=scaled_font(9, "bold"))
         self._bp_scope_label.pack(side="left")
 

@@ -1047,6 +1047,11 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Col
             self._results_view_var, bg=_cb_bg, accent=slider_colors(_cb_theme)["accent"],
             font=scaled_font(8), scale=scaled_px(100) / 100, gap=scaled_px(4))
         results_view_switch.pack(side="left", padx=(10, 0))
+        from ui.tooltip import add_segment_tooltips
+        add_segment_tooltips(results_view_switch, {
+            'hotspots': t('ring_finder.view_hotspots_tooltip'),
+            'best_prices': t('ring_finder.view_best_prices_tooltip'),
+            'acquisition': t('ring_finder.view_acquisition_tooltip')})
         # Runs after the switch's own click handler has set the view
         results_view_switch.bind('<Button-1>', lambda e: self._on_results_view_click(), add='+')
         self._columns_btn = self._cv_add_columns_button(results_header, 'ring_finder')

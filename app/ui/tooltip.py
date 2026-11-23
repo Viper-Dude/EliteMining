@@ -61,6 +61,23 @@ def add_header_tooltips(tree, text_for_column):
     return tooltip
 
 
+def add_segment_tooltips(selector, texts):
+    """Per-segment tooltips for a SegmentedSelector; texts maps segment key -> text."""
+    tooltip = ToolTip(selector, '', follow_pointer=True)
+
+    def hover(event):
+        text = texts.get(selector.segment_at(event.x), '')
+        if text != tooltip.text:
+            tooltip.on_leave()
+            tooltip.text = text
+            if text:
+                tooltip.on_enter()
+
+    selector.bind('<Motion>', hover, add='+')
+    selector.bind('<ButtonPress-1>', tooltip.on_leave, add='+')
+    return tooltip
+
+
 class ToolTip:
     """Tooltip widget that displays help text when hovering over a widget."""
     
