@@ -162,13 +162,20 @@ class MarketplaceAPI:
 
             page_errors = [0]
 
+            # Spansh ignores buying_/selling_commodities filters; only "market" filters the commodity.
+            volume_field = "supply" if filter_type == "selling_commodities" else "demand"
+            filters = {"market": [{"name": spansh_name,
+                                   volume_field: {"comparison": "<=>", "value": [1, 999999999]}}]}
+            if max_distance:
+                filters["distance"] = {"min": 0, "max": max_distance}
+
             # Parallel paginated fetch — 3 pages x 100 results
             def _fetch_page(page_num):
                 if is_cancelled and is_cancelled():
                     return []
                 try:
                     body = {
-                        "filters": {filter_type: {"value": [spansh_name]}},
+                        "filters": filters,
                         "sort": [{"market_updated_at": {"direction": "desc"}}],
                         "size": 100,
                         "page": page_num,
