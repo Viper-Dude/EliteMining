@@ -83,7 +83,7 @@ class MarketplaceAPI:
     # Map normalized commodity names -> Spansh display names
     SPANSH_COMMODITY_MAP = {
         "opal":                   "Void Opal",
-        "lowtemperaturediamond":  "Low Temperature Diamond",
+        "lowtemperaturediamond":  "Low Temperature Diamonds",
         "painite":                "Painite",
         "platinum":               "Platinum",
         "bromellite":             "Bromellite",
@@ -710,9 +710,9 @@ class MarketplaceAPI:
         is_cancelled=None,
     ) -> List[Dict]:
         """
-        Spansh nearby search using parallel paginated queries sorted by
-        market_updated_at desc.  Fetches 3 pages of 100 results concurrently
-        (300 total) then filters by 3-D distance from reference_system.
+        Spansh nearby search: the 300 most recently updated stations within
+        max_distance of reference_system that trade the commodity (3 pages of
+        100 fetched concurrently).
         """
         if is_cancelled and is_cancelled():
             return []
@@ -734,16 +734,25 @@ class MarketplaceAPI:
 
             page_errors = [0]
 
+            # Spansh ignores buying_/selling_commodities filters; only "market" filters the commodity.
+            volume_field = "supply" if filter_type == "selling_commodities" else "demand"
+            filters = {"market": [{"name": spansh_name,
+                                   volume_field: {"comparison": "<=>", "value": [1, 999999999]}}]}
+            if max_distance:
+                filters["distance"] = {"min": 0, "max": max_distance}
+
             # Parallel paginated fetch — 3 pages x 100 results
             def _fetch_page(page_num):
                 if is_cancelled and is_cancelled():
                     return []
                 try:
                     body = {
-                        "filters": {filter_type: {"value": [spansh_name]}},
+                        "filters": filters,
                         "sort": [{"market_updated_at": {"direction": "desc"}}],
                         "size": 100,
                         "page": page_num,
+                        # Coordinates, not the name: Spansh rejects systems it doesn't know
+                        "reference_coords": {"x": rx, "y": ry, "z": rz},
                     }
                     resp = tracked_request('spansh', requests.post,
                         f"{MarketplaceAPI.SPANSH_URL}/api/stations/search",
@@ -765,8 +774,8 @@ class MarketplaceAPI:
                 print(f"[SPANSH NEARBY] fetched {len(pages)} stations from 3 pages")
                 return pages
 
-            # Query has no reference system, so consecutive jumps can share the raw rows
-            raw_results = _short_cached(("spansh_nearby", filter_type, spansh_name), _fetch_all_pages, is_cancelled)
+            raw_results = _short_cached(("spansh_nearby", filter_type, spansh_name, rx, ry, rz, max_distance),
+                                        _fetch_all_pages, is_cancelled)
 
             cutoff = datetime.now(timezone.utc) - timedelta(days=max_days_ago + 0.5)
 

@@ -150,6 +150,33 @@ class MarketTests(unittest.TestCase):
                 for source in sources:
                     self.assertEqual(source.call_args.args[3], 50)
 
+    def test_spansh_nearby_filters_commodity_and_radius_around_the_reference_system(self):
+        now = datetime.now(timezone.utc).isoformat()
+        station = dict(market_id=7, system_name='Near', name='Port', type='Coriolis Starport',
+                       system_x=10, system_y=0, system_z=0, market_updated_at=now, has_large_pad=True,
+                       market=[dict(commodity='Low Temperature Diamonds', sell_price=900, demand=5)])
+        response = Mock(json=Mock(return_value={'results': [station]}), raise_for_status=Mock())
+        _short_cache.clear()
+        _short_cache_key_locks.clear()
+        with patch('marketplace_api.tracked_request', return_value=response) as request,                 patch.object(MarketplaceAPI, '_get_system_coords', side_effect=lambda name: (0, 0, 0) if name == 'Sol' else (5, 0, 0)):
+            rows = MarketplaceAPI._fetch_spansh_nearby('lowtemperaturediamond', 'Sol', 'buying_commodities', 50, 1)
+            body = request.call_args.kwargs['json']
+            self.assertEqual(body['filters']['market'][0]['name'], 'Low Temperature Diamonds')
+            self.assertIn('demand', body['filters']['market'][0])
+            self.assertEqual(body['filters']['distance'], {'min': 0, 'max': 50})
+            self.assertEqual(body['reference_coords'], {'x': 0, 'y': 0, 'z': 0})
+            self.assertNotIn('buying_commodities', body['filters'])
+            self.assertEqual([(r['marketId'], r['distance'], r['sellPrice']) for r in rows], [(7, 10, 900)])
+            calls = request.call_count
+            MarketplaceAPI._fetch_spansh_nearby('lowtemperaturediamond', 'Sol', 'buying_commodities', 50, 1)
+            self.assertEqual(request.call_count, calls)
+            MarketplaceAPI._fetch_spansh_nearby('lowtemperaturediamond', 'Other', 'buying_commodities', 50, 1)
+            self.assertEqual(request.call_count, calls * 2)
+            MarketplaceAPI._fetch_spansh_nearby('gold', 'Sol', 'selling_commodities', 50, 1)
+            self.assertIn('supply', request.call_args.kwargs['json']['filters']['market'][0])
+        _short_cache.clear()
+        _short_cache_key_locks.clear()
+
     def test_distance_calculation_reuses_coordinate_lookup_and_preserves_zero(self):
         rows = [market(1, systemX=0, systemY=0, systemZ=0),
                 market(2, systemName='Other system', systemX=3, systemY=4, systemZ=0)]
