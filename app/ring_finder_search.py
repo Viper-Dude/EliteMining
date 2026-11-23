@@ -312,28 +312,8 @@ class RingFinderSearchMixin:
             
             # Perform coordinate lookup in background thread to prevent UI freeze
             if not reference_coords:
-                # Try galaxy database first
-                galaxy_coords = self._get_system_coords_from_galaxy_db(reference_system)
-                if galaxy_coords:
-                    reference_coords = galaxy_coords
-                    print(f" DEBUG: Using galaxy database coordinates for '{reference_system}'")
-                else:
-                    # Try visited_systems table in user database
-                    try:
-                        visited_coords = self.user_db._get_coordinates_from_visited_systems(reference_system)
-                        if visited_coords:
-                            # Convert tuple (x, y, z) to dict {'x': ..., 'y': ..., 'z': ...}
-                            reference_coords = {'x': visited_coords[0], 'y': visited_coords[1], 'z': visited_coords[2]}
-                    except Exception:
-                        pass
-                    
-                    if not reference_coords:
-                        # Use EDSM as final fallback
-                        edsm_coords = self._get_system_coords_from_edsm(
-                            reference_system, is_cancelled=lambda: search_generation != self._search_generation)
-                        if edsm_coords:
-                            reference_coords = edsm_coords
-                
+                reference_coords = self._lookup_system_coords(
+                    reference_system, is_cancelled=lambda: search_generation != self._search_generation)
                 if not reference_coords:
                     # Update UI with error message
                     self.parent.after(0, self._run_search_callback, search_generation,
@@ -1843,6 +1823,20 @@ class RingFinderSearchMixin:
         
         return math.sqrt(dx*dx + dy*dy + dz*dz)
     
+    def _lookup_system_coords(self, system_name: str, is_cancelled=None) -> Optional[Dict]:
+        """Coordinates for system_name from the galaxy database, then visited systems,
+        then EDSM. Runs on a worker thread; None when nothing knows the system."""
+        galaxy_coords = self._get_system_coords_from_galaxy_db(system_name)
+        if galaxy_coords:
+            return galaxy_coords
+        try:
+            visited_coords = self.user_db._get_coordinates_from_visited_systems(system_name)
+            if visited_coords:
+                return {'x': visited_coords[0], 'y': visited_coords[1], 'z': visited_coords[2]}
+        except Exception:
+            pass
+        return self._get_system_coords_from_edsm(system_name, is_cancelled=is_cancelled) or None
+
     def _get_system_coords_from_galaxy_db(self, system_name: str) -> Optional[Dict]:
         """Get system coordinates from galaxy_systems.db with retry logic"""
         try:

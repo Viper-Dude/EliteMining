@@ -313,6 +313,7 @@ Search saved hotspots and Spansh ring data by mineral, ring type, and distance. 
 - **Best Minerals to Mine** — Right-click a ring or system to compare sell prices for its hotspot minerals. The prices appear in the **Best Prices** view of the search results; switch back with **Hotspots**. Use **+ Add Minerals** to include minerals without hotspots, such as Osmium.
 - **Auto Prices** — With Auto-Search enabled, fetch prices after arriving in a system with known hotspots and switch the results to **Best Prices**. They switch back to Hotspots after the Auto Prices display time unless you use the app (turn this off with **Return to Hotspots**). Use **Auto Options > Auto Prices Options** to choose in-system prices or [overlay results](#text-overlay).
 - **Find Acquisition Systems** — Right-click a Fortified/Stronghold system, or select one and click **Acquisition**, to list nearby Unoccupied systems buying the minerals mined there in the **Acquisition** view of the search results. Pick one mineral in the view to check only that one. See [PowerPlay Merit Mining](#powerplay-merit-mining).
+- **Merit Miner** — Pick your power and a mineral, then click **Search** in the **Merit Miner** view. It lists the nearest Fortified or Stronghold systems of your power with hotspots for that mineral, measured from the Reference System, and the best-paying Unoccupied system within 20 ly (Fortified) or 30 ly (Stronghold) to sell it for merits, with station, pad, demand and price. Your power is read from your game journal each time you log in; you can also pick it in the view.
 
 #### Saving and Automatic Updates
 
@@ -335,10 +336,12 @@ Search saved hotspots and Spansh ring data by mineral, ring type, and distance. 
 *Hotspot Finder showing search results with mineral filters, the second mineral box and distance calculations.*
 
 <details>
-<summary>View acquisition searches and Best Prices examples</summary>
+<summary>View Merit Miner, acquisition searches and Best Prices examples</summary>
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/merit_miner.png" width="900"><br>
+*Merit Miner view: the nearest mining systems of your power and where to sell for merits.*
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/find_acquisition_targets.png" width="900"><br>
-<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/find_acquisition_targets_results.png" width="900"><br>
 *Acquisition view: nearby Unoccupied systems and their buyers.*
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/best_minerals_ring.png" width="900"><br>
@@ -364,6 +367,7 @@ How the app helps (all in the [Hotspot Finder](#hotspot-finder)):
 1. **Power/State filter** – find Fortified or Stronghold systems to mine in.
 2. **Best Minerals to Mine / Auto Prices** – see the best sell prices for your minerals.
 3. **Find Acquisition Systems** – right-click a Fortified or Stronghold system to list nearby Unoccupied systems buying your mineral in the **Acquisition** view.
+4. **Merit Miner** – pick your power and a mineral to find the nearest Fortified or Stronghold system of your power to mine it in, and the Unoccupied system to sell it in.
 
 [Back to Top](#top)
 
@@ -453,6 +457,7 @@ Search for nearby star systems with detailed status information. Perfect for fin
 - **Current System Info** – View detailed status of your current system (security, allegiance, government, state, economy, population)
 - **Nearby System Search** – Find systems within range of your reference system
 - **Server-Side Filtering** – Filter by Security, Allegiance, Government, State, Economy, Population
+- **My Power** – Your pledged power, set automatically from your game journal each time you log in. It is shared with the Merit Miner view in the Hotspots Finder
 - **Nearest Material Trader** – Find the closest Encoded, Manufactured, or Raw material trader, showing station name, type, landing pad size, and distance to arrival
 - **Distance Sorting** – Results sorted by distance from reference system
 - **Quick Actions:**

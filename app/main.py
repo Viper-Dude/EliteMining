@@ -666,6 +666,7 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
                                         app_dir=app_dir)
         # Set the main app reference so cargo monitor can access prospector panel later
         self.cargo_monitor.main_app_ref = self
+        self.cargo_monitor.add_journal_listener(self._on_journal_pledge_events)
         self._set_splash_status("Preparing interface...")
 
         # Centralized current system tracking (single source of truth)
@@ -885,6 +886,17 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
                     log.warning(f"[WARN] Journal PP backfill failed: {e}")
 
             threading.Thread(target=_backfill_pp, daemon=True).start()
+
+            def _lookup_pledge():
+                try:
+                    pledge = self.cargo_monitor.journal_parser.latest_pledged_power()
+                    if pledge:
+                        self.after(0, self._apply_journal_pledge, *pledge)
+                except Exception as e:
+                    log.warning(f"[WARN] Journal pledge lookup failed: {e}")
+
+            # Started from the event loop: a worker can't hand results to Tk before mainloop runs
+            self.after(0, lambda: threading.Thread(target=_lookup_pledge, daemon=True).start())
 
         # Initialize API uploader for session/hotspot sharing
         from api_uploader import APIUploader
@@ -11601,6 +11613,35 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
 
     def _sysfinder_option_value(self, value):
         return getattr(self, '_sysfinder_option_values', {}).get(value, value)
+
+    def _on_journal_pledge_events(self, events):
+        for event in events:
+            power = JournalParser.pledged_power_from_event(event)
+            if power:
+                self._apply_journal_pledge(power, event.get('timestamp', ''))
+
+    def _apply_journal_pledge(self, power, timestamp):
+        """Set My Power from a journal pledge event. Only an event newer than the last
+        one applied changes it, so a manual pick stays until the next login."""
+        from config import (load_player_power, save_player_power,
+                            load_player_power_journal_time, save_player_power_journal_time)
+        if timestamp and timestamp <= load_player_power_journal_time():
+            return
+        if timestamp:
+            save_player_power_journal_time(timestamp)
+        if power == load_player_power():
+            return
+        save_player_power(power)
+        log.info(f"Pledged power from journal: {power}")
+        var = getattr(self, 'sysfinder_my_power_var', None)
+        if var is not None:
+            shown = 'Select your pledge...' if power == JournalParser.NOT_PLEDGED else power
+            var.set(self._sysfinder_option_label(shown))
+            if getattr(self, '_sysfinder_ref_status', None):
+                self._update_sysfinder_ref_labels(self._sysfinder_ref_status)
+        ring_finder = getattr(self, 'ring_finder', None)
+        if ring_finder is not None and hasattr(ring_finder, '_mm_sync_power'):
+            ring_finder._mm_sync_power()
 
     def _save_player_power(self):
         """Persist the My Power dropdown selection to config"""

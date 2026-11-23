@@ -51,6 +51,7 @@ log = logging.getLogger(__name__)
 from ring_finder_search import RingFinderSearchMixin, translate_reserve_level, translate_ring_type
 from best_minerals_view import BestMineralsMixin
 from acquisition_view import AcquisitionMixin
+from merit_miner_view import MeritMinerMixin
 
 # ToolTip class for showing helpful information
 class ToolTip:
@@ -126,7 +127,7 @@ class ToolTip:
 from column_visibility_helper import ColumnVisibilityMixin, displayed_column
 
 
-class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, ColumnVisibilityMixin):
+class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, MeritMinerMixin, ColumnVisibilityMixin):
     """Mining hotspot finder with EDDB API integration"""
     
     ALL_MINERALS = "All Minerals"  # Constant for "All Minerals" filter (internal key)
@@ -1043,7 +1044,8 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Col
         results_view_switch = SegmentedSelector(
             results_header,
             [('hotspots', t('ring_finder.view_hotspots')), ('best_prices', t('ring_finder.view_best_prices')),
-             ('acquisition', t('ring_finder.view_acquisition'))],
+             ('acquisition', t('ring_finder.view_acquisition')),
+             ('merit_miner', t('ring_finder.view_merit_miner'))],
             self._results_view_var, bg=_cb_bg, accent=slider_colors(_cb_theme)["accent"],
             font=scaled_font(8), scale=scaled_px(100) / 100, gap=scaled_px(4))
         results_view_switch.pack(side="left", padx=(10, 0))
@@ -1051,21 +1053,27 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Col
         add_segment_tooltips(results_view_switch, {
             'hotspots': t('ring_finder.view_hotspots_tooltip'),
             'best_prices': t('ring_finder.view_best_prices_tooltip'),
-            'acquisition': t('ring_finder.view_acquisition_tooltip')})
+            'acquisition': t('ring_finder.view_acquisition_tooltip'),
+            'merit_miner': t('ring_finder.view_merit_miner_tooltip')})
         # Runs after the switch's own click handler has set the view
         results_view_switch.bind('<Button-1>', lambda e: self._on_results_view_click(), add='+')
-        self._columns_btn = self._cv_add_columns_button(results_header, 'ring_finder')
-        self._bp_columns_btn = self._cv_add_columns_button(results_header, 'rank_minerals')
-        self._bp_columns_btn.pack_forget()
-        self._acq_columns_btn = self._cv_add_columns_button(results_header, 'acquisition_search')
-        self._acq_columns_btn.pack_forget()
+        # Modern: status text, More filters and Columns get their own row under the view switch
+        tools_row = results_header
+        self._results_header = results_header
+        self._results_tools_row = None
         if _modern_form:
-            self._more_btn = self._rf_button(results_header, text="", command=self._toggle_more_filters)
+            tools_row = ttk.Frame(self.scrollable_frame)
+            tools_row.pack(fill="x", padx=(10, 15), pady=(6, 0))
+            self._results_tools_row = tools_row  # only shown with the Hotspots view
+        # The other views put their Columns button in their own control row
+        self._columns_btn = self._cv_add_columns_button(tools_row, 'ring_finder')
+        if _modern_form:
+            self._more_btn = self._rf_button(tools_row, text="", command=self._toggle_more_filters)
             self._more_btn.pack(side="right", padx=(0, 8))
             self._refresh_more_btn()
-            self._results_status_label = ttk.Label(results_header, textvariable=self.status_var, font=scaled_font(9, "bold"),
+            self._results_status_label = ttk.Label(tools_row, textvariable=self.status_var, font=scaled_font(9, "bold"),
                                                    foreground=modern_color("#E6EAF0"))
-            self._results_status_label.pack(side="left", padx=(6, 0))
+            self._results_status_label.pack(side="left")
 
         results_frame = ttk.Frame(self.scrollable_frame)
         results_frame.pack(fill="both", expand=True, padx=10, pady=(2, 2))
@@ -1383,6 +1391,7 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Col
 
         self._build_best_prices_view(results_frame, _cb_bg, _cb_select, tree_bg, tree_fg)
         self._build_acquisition_view(results_frame, _cb_bg, tree_bg, tree_fg)
+        self._build_merit_miner_view(results_frame, _cb_bg, tree_bg, tree_fg)
         self._results_view_var.trace_add('write', lambda *_: self._apply_results_view())
         
         # Configure style for the treeview to allow tag colors

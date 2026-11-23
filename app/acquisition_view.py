@@ -57,7 +57,7 @@ class AcquisitionMixin:
         fg = "#ff8c00" if current_theme == "elite_orange" else "#e6e6e6"
 
         self._acq = {
-            'system': '', 'state': '', 'radius': None, 'mineral': None, 'busy': False,
+            'system': '', 'state': '', 'radius': None, 'mineral': None, 'busy': False, 'count': 0,
             'status': '', 'hint': '', 'spin': 0, 'spinning': False,
             'system_by_row': {}, 'station_by_row': {}, 'source_by_row': {},
         }
@@ -69,6 +69,7 @@ class AcquisitionMixin:
         # the system name on the left, never the controls.
         top_row = tk.Frame(frame, bg=bg)
         top_row.pack(fill="x", padx=5, pady=(5, 4))
+        self._acq_columns_btn = self._cv_add_columns_button(top_row, 'acquisition_search')
 
         btn_style = dict(bg="#3a3a3a", fg=fg, activebackground="#4a4a4a", activeforeground=fg,
                          relief="raised", bd=1, cursor="hand2", padx=15, pady=2, font=scaled_font(8, "normal"))
@@ -199,8 +200,11 @@ class AcquisitionMixin:
     def _acq_name_text(self) -> str:
         acq = self._acq
         if acq['system'] and acq['state'] and acq['radius'] and not acq['busy']:
-            return t('ring_finder.acquisition_view_name').format(
+            name = t('ring_finder.acquisition_view_name').format(
                 system=acq['system'], state=acq['state'], radius=int(acq['radius']))
+            if acq.get('count'):
+                name += ' · ' + t('ring_finder.acquisition_search_found').format(count=acq['count'])
+            return name
         return acq['system']
 
     def _acq_refresh_controls(self):
@@ -260,7 +264,7 @@ class AcquisitionMixin:
         if system_name.lower() != acq['system'].lower():
             self._acq_mineral_var.set(self._acq_all_label)
         mineral_filter = self._acq_mineral_filter()
-        acq.update(system=system_name, state='', radius=None, mineral=mineral_filter, busy=True, hint='',
+        acq.update(system=system_name, state='', radius=None, mineral=mineral_filter, busy=True, hint='', count=0,
                    status=t('ring_finder.acquisition_search_checking').format(system=system_name))
         self._acq_fill([], mineral_filter, {}, {}, {})
         self._show_results_view('acquisition')
@@ -344,25 +348,39 @@ class AcquisitionMixin:
             control.complete([], lambda rows: self._acquisition_search_not_eligible(reference_system, power_state))
             return
 
-        nearby = SystemFinderAPI._fetch_spansh_powerplay_systems(reference_system, radius, 'Any', 'Unoccupied', is_cancelled=control.is_cancelled)
-        SystemFinderAPI._store_powerplay_batch(nearby)
-
-        all_candidates = sorted(nearby.items(), key=lambda kv: kv[1].get('distance', 999999))
-
         # mineral_filter=None ("All Minerals") means: check every mineral known to be
         # mined at reference_system, and keep whichever prices best per candidate -
         # a Fortified/Stronghold system often mines more than one commodity.
         minerals_to_check = [mineral_filter] if mineral_filter else self._acquisition_reference_materials(reference_system)
+        results, sell_prices, best_mineral, best_rows = self._acq_find_sell_targets(
+            reference_system, radius, minerals_to_check, control.is_cancelled)
 
-        # Only candidates with an actual buy order for one of minerals_to_check are useful
-        # here - ring/hotspot data at the Unoccupied system is irrelevant (you mine at
-        # reference_system, you only sell at the Unoccupied one), so there's no reason to
+        control.complete(results, lambda rows: self._show_acquisition_search_results(
+            reference_system, power_state, radius, rows, mineral_filter, sell_prices, best_mineral, best_rows))
+
+    def _acq_find_sell_targets(self, mine_system: str, radius: float, minerals: list, is_cancelled,
+                               nearby: dict = None):
+        """Unoccupied systems within radius of mine_system that buy one of minerals:
+        (results [(system, pp entry)] nearest first, sell_prices, best_mineral, best_rows),
+        the last three keyed by system name. Runs on a worker thread. nearby: the
+        Unoccupied systems around mine_system if already fetched."""
+        from system_finder_api import SystemFinderAPI
+
+        if nearby is None:
+            nearby = SystemFinderAPI._fetch_spansh_powerplay_systems(mine_system, radius, 'Any', 'Unoccupied', is_cancelled=is_cancelled)
+            SystemFinderAPI._store_powerplay_batch(nearby)
+
+        all_candidates = sorted(nearby.items(), key=lambda kv: kv[1].get('distance', 999999))
+
+        # Only candidates with an actual buy order for one of minerals are useful here -
+        # ring/hotspot data at the Unoccupied system is irrelevant (you mine at
+        # mine_system, you only sell at the Unoccupied one), so there's no reason to
         # list systems that can't even buy what you're selling.
         sell_prices = {}
         best_mineral = {}
         best_rows = {}
-        if all_candidates and minerals_to_check:
-            # One live buyer-search per mineral, centered on reference_system, covers every
+        if all_candidates and minerals:
+            # One live buyer-search per mineral, centered on mine_system, covers every
             # candidate in the same radius (same pattern as _reverse_search_worker) - cheap
             # regardless of how many Unoccupied systems came back.
             from marketplace_api import MarketplaceAPI
@@ -370,15 +388,15 @@ class AcquisitionMixin:
             candidate_names = {sys_name for sys_name, _ in all_candidates}
 
             def fetch(mineral):
-                if control.is_cancelled():
+                if is_cancelled():
                     return mineral, []
                 try:
-                    return mineral, MarketplaceAPI.search_buyers(mineral, reference_system, int(radius), 7, False, is_cancelled=control.is_cancelled)
+                    return mineral, MarketplaceAPI.search_buyers(mineral, mine_system, int(radius), 7, False, is_cancelled=is_cancelled)
                 except Exception:
                     return mineral, []
 
-            with ThreadPoolExecutor(max_workers=min(len(minerals_to_check), 4)) as pool:
-                for mineral, rows in pool.map(fetch, minerals_to_check):
+            with ThreadPoolExecutor(max_workers=min(len(minerals), 4)) as pool:
+                for mineral, rows in pool.map(fetch, minerals):
                     for row in rows:
                         sys_name = row.get('systemName', '')
                         if sys_name not in candidate_names:
@@ -390,9 +408,7 @@ class AcquisitionMixin:
                             best_rows[sys_name] = row
 
         results = [(sys_name, sys_entry) for sys_name, sys_entry in all_candidates if sys_name in sell_prices]
-
-        control.complete(results, lambda rows: self._show_acquisition_search_results(
-            reference_system, power_state, radius, rows, mineral_filter, sell_prices, best_mineral, best_rows))
+        return results, sell_prices, best_mineral, best_rows
 
     def _acquisition_search_not_eligible(self, reference_system: str, power_state: str):
         if power_state:
@@ -409,9 +425,8 @@ class AcquisitionMixin:
         acq['state'] = power_state
         acq['radius'] = radius
         mineral_display = self._format_material_for_display(mineral_filter) if mineral_filter else t('ring_finder.all_minerals')
-        if results:
-            self.status_var.set(t('ring_finder.acquisition_search_found').format(count=len(results)))
-        else:
+        acq['count'] = len(results)
+        if not results:
             acq['hint'] = t('ring_finder.acquisition_search_no_candidates').format(
                 system=reference_system, state=power_state, radius=int(radius), mineral=mineral_display)
         self._acq_fill(results, mineral_filter, sell_prices, best_mineral, best_rows or {})

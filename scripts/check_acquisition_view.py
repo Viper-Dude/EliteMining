@@ -107,13 +107,13 @@ class WorkerTests(unittest.TestCase):
         v._show_acquisition_search_results('Sol', 'Fortified', 20.0, [], 'Platinum', {}, {}, {})
         self.assertIn('20', v._acq['hint'])
         self.assertEqual(v._acq['state'], 'Fortified')
-        v.status_var.set.assert_not_called()
+        self.assertEqual(v._acq['count'], 0)
 
     def test_results_fill_table_and_report_count(self):
         v = make_view('Sol')
         rows = [('Buyer', {'distance': 5})]
         v._show_acquisition_search_results('Sol', 'Fortified', 20.0, rows, None, {'Buyer': 1}, {}, {})
-        v.status_var.set.assert_called_once()
+        self.assertEqual(v._acq['count'], 1)
         self.assertIs(v._acq_fill.call_args.args[0], rows)
         self.assertEqual(v._acq['radius'], 20.0)
 
@@ -211,8 +211,7 @@ class ApplyViewTests(unittest.TestCase):
     def make(self, view):
         v = BestMineralsMixin()
         v._results_view_var = Var(view)
-        for name in ('_hotspots_tree_frame', '_bp_frame', '_acq_frame',
-                     '_columns_btn', '_bp_columns_btn', '_acq_columns_btn', '_more_btn'):
+        for name in ('_hotspots_tree_frame', '_bp_frame', '_acq_frame', '_columns_btn', '_more_btn'):
             setattr(v, name, Mock(name=name))
         v._results_status_label = None
         v._bp_close_extra_picker = Mock()
@@ -221,18 +220,17 @@ class ApplyViewTests(unittest.TestCase):
         return v
 
     def shown(self, v):
-        names = ('_hotspots_tree_frame', '_bp_frame', '_acq_frame',
-                 '_columns_btn', '_bp_columns_btn', '_acq_columns_btn', '_more_btn')
+        names = ('_hotspots_tree_frame', '_bp_frame', '_acq_frame', '_columns_btn', '_more_btn')
         return {n for n in names if getattr(v, n).pack.called}
 
     def test_acquisition_shows_only_its_frame_and_columns_button(self):
         v = self.make('acquisition')
-        self.assertEqual(self.shown(v), {'_acq_frame', '_acq_columns_btn'})
+        self.assertEqual(self.shown(v), {'_acq_frame'})  # its Columns button sits in its own row
         v._bp_close_extra_picker.assert_called_once()
 
     def test_best_prices_unchanged(self):
         v = self.make('best_prices')
-        self.assertEqual(self.shown(v), {'_bp_frame', '_bp_columns_btn'})
+        self.assertEqual(self.shown(v), {'_bp_frame'})
         v._bp_close_extra_picker.assert_not_called()
 
     def test_hotspots_unchanged(self):

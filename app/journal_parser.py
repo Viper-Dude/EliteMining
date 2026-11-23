@@ -1230,6 +1230,52 @@ class JournalParser:
             log.error(f"[SYSTEM_INFO] Journal cache write failed for {info['system_name']}: {e}")
             return None
 
+    # Value saved as the pledged power after a PowerplayLeave event
+    NOT_PLEDGED = 'Not pledged'
+
+    @classmethod
+    def pledged_power_from_event(cls, event: Dict[str, Any]) -> Optional[str]:
+        """Pledged power named by a Powerplay/Join/Defect/Leave journal event, or None
+        for any other event. Powerplay is written at every login while pledged."""
+        kind = event.get('event')
+        if kind in ('Powerplay', 'PowerplayJoin'):
+            power = event.get('Power')
+        elif kind == 'PowerplayDefect':
+            power = event.get('ToPower')
+        elif kind == 'PowerplayLeave':
+            return cls.NOT_PLEDGED
+        else:
+            return None
+        if not power:
+            return None
+        from system_finder_api import SystemFinderAPI
+        return SystemFinderAPI._normalize_power_name(power)
+
+    def latest_pledged_power(self, max_files: int = 20) -> Optional[Tuple[str, str]]:
+        """(power, timestamp) from the newest pledge event in the newest max_files journals,
+        or None when none of them has one."""
+        files = sorted(glob.glob(os.path.join(self.journal_dir, 'Journal.*.log')),
+                       key=os.path.getmtime, reverse=True)[:max_files]
+        for fpath in files:
+            latest = None
+            try:
+                with open(fpath, 'r', encoding='utf-8', errors='replace') as f:
+                    for line in f:
+                        if '"Powerplay' not in line:
+                            continue
+                        try:
+                            event = json.loads(line)
+                        except ValueError:
+                            continue
+                        power = self.pledged_power_from_event(event)
+                        if power:
+                            latest = (power, event.get('timestamp', ''))
+            except OSError:
+                continue
+            if latest:
+                return latest
+        return None
+
     def scan_recent_journals_for_powerplay(self, max_age_hours: int = 24) -> int:
         """Scan recent journal files for FSDJump/Location events with PowerPlay data
         and write them to the EDDN cache. Events older than max_age_hours are skipped

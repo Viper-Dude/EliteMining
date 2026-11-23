@@ -195,6 +195,7 @@ class BestMineralsMixin:
         # clips the ring/system name on the left, never the buttons.
         top_row = tk.Frame(frame, bg=bg)
         top_row.pack(fill="x", padx=5, pady=(5, 4))
+        self._bp_columns_btn = self._cv_add_columns_button(top_row, 'rank_minerals')
 
         btn_style = dict(bg="#3a3a3a", fg=fg, activebackground="#4a4a4a", activeforeground=fg,
                          relief="raised", bd=1, cursor="hand2", padx=15, pady=2, font=scaled_font(8, "normal"))
@@ -436,7 +437,6 @@ class BestMineralsMixin:
         self._bp_sync_extra_vars()
         self._bp_refresh_controls()
         self._bp_populate()
-        self.status_var.set(t('ring_finder.ranking_complete').format(system=system_name))
         if switch:
             self._show_results_view('best_prices')
 
@@ -643,7 +643,6 @@ class BestMineralsMixin:
             pass
         if bp['extra_vars'][mat].get():
             if not any(r[0] == mat for r in bp['results']):
-                self.status_var.set(t('ring_finder.ranking_minerals').format(system=bp['system']))
                 threading.Thread(target=self._bp_fetch_extra_mineral, args=(mat, bp['system'], self._bp_req), daemon=True).start()
         else:
             bp['results'][:] = [r for r in bp['results'] if r[0] != mat]
@@ -667,7 +666,6 @@ class BestMineralsMixin:
             return  # unchecked again before the fetch finished
         bp['results'].append((mat, best, priced_rows))
         bp['results'].sort(key=lambda r: r[1].get('sellPrice', 0) if r[1] else -1, reverse=True)
-        self.status_var.set(t('ring_finder.ranking_complete').format(system=bp['system']))
         self._bp_populate()
 
     def _bp_show_extra_picker(self):
@@ -843,7 +841,6 @@ class BestMineralsMixin:
                                    scope=scope, ring_name=ring_name, req=req)
             return
 
-        self.status_var.set(t('ring_finder.ranking_minerals').format(system=system_name))
         self._show_results_view('best_prices')
         self._bp_set_busy(True, system_name)
         threading.Thread(target=self._rank_minerals_worker,
@@ -893,7 +890,6 @@ class BestMineralsMixin:
         self._bp_close_extra_picker()
         req = self._bp_new_request()
         self._bp_set_busy(True, system_name)
-        self.status_var.set(t('ring_finder.ranking_minerals').format(system=system_name))
         threading.Thread(target=self._rank_minerals_worker,
                          args=(system_name, fetch_materials, new_extras, new_ring_types, new_scope, ring_name, req, force),
                          daemon=True).start()
@@ -909,6 +905,9 @@ class BestMineralsMixin:
         the shown prices are for another system; otherwise it only switches."""
         if self._results_view_var.get() == 'acquisition':
             self._acq_on_view_click()
+            return
+        if self._results_view_var.get() == 'merit_miner':
+            self._mm_on_view_click()
             return
         bp = self._bp
         if self._results_view_var.get() != 'best_prices' or bp['busy']:
@@ -927,31 +926,39 @@ class BestMineralsMixin:
         self._rank_minerals_for_system('ring')
 
     def _apply_results_view(self):
-        """Show the hotspot table, the Best Prices view or the Acquisition view, each with
-        its own Columns button."""
+        """Show the hotspot table, the Best Prices, Acquisition or Merit Miner view, each
+        with its own Columns button."""
         from config import scaled_px
         view = self._results_view_var.get()
         acq_frame = getattr(self, '_acq_frame', None)
-        acq_btn = getattr(self, '_acq_columns_btn', None)
-        if view == 'acquisition' and acq_frame is None:
+        mm_frame = getattr(self, '_mm_frame', None)
+        if (view == 'acquisition' and acq_frame is None) or (view == 'merit_miner' and mm_frame is None):
             view = 'hotspots'
         more_btn = getattr(self, '_more_btn', None)  # Modern only; opens hotspot search filters
         status = getattr(self, '_results_status_label', None)
         before = {'before': status} if status is not None and status.winfo_manager() else {}
-        for btn in (self._columns_btn, self._bp_columns_btn, acq_btn, more_btn):
+        for btn in (self._columns_btn, more_btn):
             if btn is not None:
                 btn.pack_forget()
+        # Status, More filters and Columns belong to the hotspot table; the other views
+        # have their own label row
+        tools_row = getattr(self, '_results_tools_row', None)
+        if tools_row is not None:
+            if view != 'hotspots':
+                tools_row.pack_forget()
+            elif not tools_row.winfo_manager():
+                tools_row.pack(fill="x", padx=(10, 15), pady=(6, 0), after=self._results_header)
         if view != 'best_prices':
             self._bp_close_extra_picker()
-        for frame in (self._hotspots_tree_frame, self._bp_frame, acq_frame):
+        for frame in (self._hotspots_tree_frame, self._bp_frame, acq_frame, mm_frame):
             if frame is not None:
                 frame.pack_forget()
         if view == 'best_prices':
             self._bp_frame.pack(fill="both", expand=True)
-            self._bp_columns_btn.pack(side="right", padx=(scaled_px(8), 0), **before)
         elif view == 'acquisition':
             acq_frame.pack(fill="both", expand=True)
-            acq_btn.pack(side="right", padx=(scaled_px(8), 0), **before)
+        elif view == 'merit_miner':
+            mm_frame.pack(fill="both", expand=True)
         else:
             self._hotspots_tree_frame.pack(fill="both", expand=True, padx=5, pady=(5, 2))
             self._columns_btn.pack(side="right", padx=(scaled_px(8), 0), **before)

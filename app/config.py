@@ -331,6 +331,28 @@ def save_acquisition_search_column_widths(widths: Dict[str, int]) -> None:
     cfg["acquisition_search_column_widths"] = widths
     _save_cfg(cfg)
 
+def load_merit_miner_column_widths() -> Dict[str, int]:
+    """Load Hotspots Finder Merit Miner table column widths from config"""
+    cfg = _load_cfg()
+    return dict(cfg.get("merit_miner_column_widths", {}) or {})
+
+def save_merit_miner_column_widths(widths: Dict[str, int]) -> None:
+    """Save Hotspots Finder Merit Miner table column widths to config"""
+    cfg = _load_cfg()
+    cfg["merit_miner_column_widths"] = widths
+    _save_cfg(cfg)
+
+def load_merit_miner_minerals() -> list:
+    """Load the minerals ticked in the Merit Miner view (English names)"""
+    cfg = _load_cfg()
+    return list(cfg.get("merit_miner_minerals", []) or [])
+
+def save_merit_miner_minerals(minerals: list) -> None:
+    """Save the minerals ticked in the Merit Miner view (English names)"""
+    cfg = _load_cfg()
+    cfg["merit_miner_minerals"] = list(minerals)
+    _save_cfg(cfg)
+
 def load_column_visibility(table_key: str) -> Dict[str, bool]:
     """Load column visibility for any table"""
     cfg = _load_cfg()
@@ -759,6 +781,16 @@ def save_player_power(power: str) -> None:
     """Save player's pledged Powerplay power to config"""
     cfg = _load_cfg()
     cfg["player_power"] = power.strip()
+    _save_cfg(cfg)
+
+def load_player_power_journal_time() -> str:
+    """Timestamp of the journal pledge event last applied to the pledged power"""
+    cfg = _load_cfg()
+    return cfg.get("player_power_journal_time", "")
+
+def save_player_power_journal_time(timestamp: str) -> None:
+    cfg = _load_cfg()
+    cfg["player_power_journal_time"] = timestamp
     _save_cfg(cfg)
 
 def load_api_upload_settings() -> Dict[str, Any]:
