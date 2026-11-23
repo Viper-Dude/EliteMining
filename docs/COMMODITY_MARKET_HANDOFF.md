@@ -17,6 +17,7 @@ The user's requirement: today's search works and must not break. Each step must 
 5. **Step 6:** hardcoded text.
 6. **Step 7b:** Station Type column in Multiple Prices (user request).
 7. Optional later: 7, 8, E2 and E3. Postponed: 1, 5 and 9.
+8. Added 23 Nov 2026 after step 9: **Step 10** (save a price only if it's newer), then **Step 11** (Galaxy-Wide Spansh filter).
 
 Run the steps one after another, never in parallel. Steps 2, 3, 4 and E1 all change `marketplace_api.py`, and other chats may edit the same checkout. A subagent is only worth it for step 0, which is a new file of its own.
 
@@ -198,6 +199,27 @@ Measured on 22 Nov 2026 (Painite near Sol, 500 LY):
 - **Model:** Opus, high, with Plan mode. **In-game test needed** if Auto Prices is affected (jump between systems with Auto Prices on).
 - **Findings (23 Nov 2026):** Spansh ignores `buying_commodities`/`selling_commodities` (a nonsense name returns the same stations as no filter), so the old query was the 300 newest stations in the galaxy. The "33 stations" came from sorting by distance, which puts carriers with no market date first. The working query is `market: [{name, demand|supply >= 1}]` + `distance` + `reference_coords` (a name Spansh doesn't know returns HTTP 400). The LTD name was wrong (`Low Temperature Diamond`; Spansh says `Diamonds`), so Spansh never returned LTD for stations or carriers. The `market` filter also matches carriers, so `_fetch_spansh_carriers` (1000 newest carriers anywhere) could use the same query: optional follow-up, ask first.
 
+## Step 10 — Save a Price Only If It Is Newer (recommended, found 23 Nov 2026)
+
+- Within one search `_merge_by_freshness` keeps the newest price per `marketId`, but the local cache can still lose a newer price. Both writers into `commodity_prices_data` use a plain `INSERT OR REPLACE` on `UNIQUE(system_name, station_name, commodity_name)` with no date check:
+  - the EDDN listener's price write (`eddn_listener.py`, around line 577)
+  - `MarketplaceAPI._backfill_eddn_cache` (after every Near System and Galaxy-Wide search)
+- Failure cases: a late EDDN message with an older market timestamp (for example a player uploading old journals) replaces a newer price; a search that read the cache finishes and writes back an older winner just after a fresher live price arrived.
+- Fix: switch both to `INSERT ... ON CONFLICT(system_name, station_name, commodity_name) DO UPDATE SET ... WHERE <new is newer>` (the bundled SQLite 3.50 supports upsert). Stored timestamps mix formats (`...:39.000Z`, `...:39Z`, maybe `+00:00`), so compare with `julianday()` rather than as text, and let a row with a NULL or unreadable date be replaced. On equal dates keep the stored row. Decide whether a skipped older row may still fill a NULL `system_x/y/z` or `station_type` in the stored row; say which in the commit.
+- Search `app/` for every other `INSERT` into `commodity_prices_data` and give it the same rule.
+- **Checks:** `check_marketplace`, `check_marketplace_indexes`, `check_eddn_reconnect`, plus a new check: an older listener message and an older backfill row don't replace a newer stored price, a newer one does, mixed timestamp formats compare correctly, and a NULL date is replaced.
+- **Dev test:** restart, run a Near System and a Galaxy-Wide search, and check the log has no `Database update error` or `Backfill error`.
+- **Model:** Opus, high (writes on the listener thread).
+
+## Step 11 — Galaxy-Wide Spansh Filter (recommended, found 23 Nov 2026)
+
+- `search_buyers_galaxy_wide` and `search_sellers_galaxy_wide` call `MarketplaceAPI._fetch_spansh`, which still sends the `buying_commodities`/`selling_commodities` filter that Spansh ignores (see the step 9 findings). It gets the 300 newest stations anywhere, and only about half of them trade the commodity. That means fewer matches, not stale prices.
+- Use the same `market` filter as `_fetch_spansh_nearby` (`demand` for buyers, `supply` for sellers). Keep the galaxy-wide behaviour, with no radius when `max_distance` is 0. Check how `_fetch_spansh` uses `reference_system` today, and whether it then needs `reference_coords` instead (Spansh returns HTTP 400 for names it doesn't know).
+- `scripts/check_service_status.py` calls `_fetch_spansh('platinum', 'Sol', 'imports')` directly, so keep that signature or update the check.
+- **Checks:** `py_compile`, `check_marketplace`, `check_service_status`, `check_search_stop`. Run the comparison (the Galaxy-Wide rows are capped at 250, so compare the raw counts in the log as well).
+- **Dev test:** Galaxy-Wide Sell and Buy for Painite and Low Temperature Diamonds; results still appear and Best Sell looks sane.
+- **Model:** Sonnet, medium.
+
 ## EDDN Listener Review (22 Nov 2026)
 
 `app/eddn_listener.py` subscribes to the EDDN feed on its own thread and writes prices, station details, Powerplay and system status into `marketplace_cache.db` (WAL mode). An hourly thread deletes data older than 14 days.
@@ -250,6 +272,7 @@ Measured on a copy of the dev cache:
 - Hardcoded dark colours in the builders (`#1e1e1e`, `#ffffff`): the Modern themes recolour them. Only change them if a theme bug is reported.
 - SQLite variable limit in `add_distances_to_results`: the bundled SQLite is 3.50 (limit 32766), so there's no real risk.
 - Sell My Hold's 1-second cargo poll: it only reads in-memory data, so it's cheap.
+- Stations that stop buying a mineral keep their last price in the cache until the 14-day cleanup. It is shown with its old date and Max Age hides it, so it was left as it is (23 Nov 2026).
 - One database connection per EDDN message: about 3 per second, which is acceptable.
 - EDDN size cap: the file never shrinks without VACUUM, so above 350 MB it would trim 20% of Powerplay data every hour. Today it's 72 MB with little free space, so this isn't reachable soon. Revisit if the file grows past about 250 MB.
 
@@ -275,6 +298,8 @@ Measured on a copy of the dev cache:
 | 7b Station Type in Multiple Prices | Done (checks pass; Type column shown in the dev app; saved column orders without it get Type inserted after Station) | see git log |
 | 8 Sort and refresh | Done, dev tested (checks pass; unknown values sort to the end on Mining like Trade; a new Mining search now clears the old sort arrow and direction, which made the first header click land on either order) | see git log |
 | 9 Spansh nearby | Done, dev tested (LTD search and remote system OK); in-game Auto Prices test pending (user chose fix everywhere; commodity + radius query around the search system, LTD name fixed; comparison only adds stations, e.g. Sol 8 h Painite sell 823 -> 971, Colonia 8 h Platinum 15 -> 30, losses were age-outs; cost: no reuse across jumps, outside the bubble searches up to about 1 s slower; check_marketplace 29 incl. 1 new, check_search_stop 32, check_cargo_sell_planner 13, check_ring_finder_search 51, check_service_status 15, check_marketplace_indexes 14 pass) | see git log |
+| 10 Save only newer prices | Not started | — |
+| 11 Galaxy-Wide Spansh filter | Not started | — |
 | E1 EDDN coordinates | Done, dev tested (first minutes after restart: 348 systems stored, 834 of 864 new EDDN price rows saved with coordinates; checks pass incl. 2 new; comparison only adds stations, e.g. Sol Any Painite sell 4674 -> 5004, Colonia unchanged; losses were age-outs between runs. Coordinates are stored only for station events or systems with price records, because all jumps would add ~100k systems a day) | — |
 | E2 EDDN reconnect | Done, dev tested (network off 5 min: reconnect logged at 20:26:40 after 180 s; reconnects after 180 s of silence, logs once at INFO; new `check_eddn_reconnect` 2 pass, `check_marketplace_indexes` 14 pass) | — |
 | E3 Legacy guard | Done (checks pass; one guard in `_process_message` skips all Legacy messages; fake-message test only, no Legacy in live sample; dev test pending) | see git log |
