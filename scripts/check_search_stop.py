@@ -414,7 +414,7 @@ class RemainingWorkerTests(unittest.TestCase):
         self.assertEqual(sum(bool(rows) for rows in finder._rerank_reverse_search_results.call_args.args[2].values()), 1)
 
     def test_acquisition_stop_skips_price_searches(self):
-        cls = load_methods('app/ring_finder.py', 'RingFinder', {'_acquisition_search_worker'})
+        cls = load_methods('app/acquisition_view.py', 'AcquisitionMixin', {'_acquisition_search_worker'})
         finder = cls()
         finder.ACQUISITION_RADIUS_BY_STATE = {'Fortified': 20}
         parent, control = self.make_control()

@@ -30,6 +30,7 @@ Make `app/main.py` (and later `prospector_panel.py` and `ring_finder.py`) smalle
 | 3c | Distance Calculator tab into `distance_calculator_tab.py` | Done 23 Nov 2026 (`6719590`); checks OK | 13,831 (−444 from the move) |
 | 4 | `prospector_panel.py`, `ring_finder.py` | Later | — |
 | 4a | Best Minerals to Mine and Auto Prices into `best_minerals_view.py` (`BestMineralsMixin`) | Done 23 Nov 2026; checks OK | ring_finder.py 8,181 (−1,015) |
+| 4b | Find Acquisition Systems into `acquisition_view.py` (`AcquisitionMixin`) | Done 23 Nov 2026; checks OK | ring_finder.py 7,749 (−456) |
 
 Line counts are physical lines, including blank lines.
 
