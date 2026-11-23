@@ -9,7 +9,7 @@ from pathlib import Path
 from datetime import datetime
 
 # === CHANGE VERSION AND DATE HERE ===
-NEW_VERSION = "5.6.9"
+NEW_VERSION = "5.7.0"
 NEW_BUILD_DATE = ""  # Format: YYYY-Month-DD (leave empty for today's date)
 VA_PROFILE_VERSION = ""  # Set to "" if this release does not include a VA profile update
 SOUND_PACK_VERSION = "5.5.8"  # Release that last changed the sound files; only change when sounds change
