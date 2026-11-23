@@ -292,5 +292,53 @@ class InputsTests(unittest.TestCase):
         self.assertIsNone(view._rank_minerals_inputs('ring', system_name='Sol'))
 
 
+class AddMineralsBoxTests(unittest.TestCase):
+    """The Add Minerals dropdown-style box and its borderless checklist, on a real Tk root."""
+    def setUp(self):
+        import tkinter as tk
+        from tkinter import ttk
+        self.root = tk.Tk()
+        self.root.withdraw()
+        frame = ttk.Frame(self.root)
+        frame.pack()
+        v = BestMineralsMixin()
+        v.parent = self.root
+        v._bp_frame = frame
+        v._bp = {'picker': None, 'extra_candidates': ['Osmium', 'Rutile'], 'extra_vars': {}, 'results': []}
+        v._bp_extra_text = tk.StringVar(value='+ Add Minerals')
+        v._bp_extra_btn = ttk.Combobox(frame, textvariable=v._bp_extra_text, state='readonly', values=())
+        v._bp_extra_btn.pack()
+        v._format_material_for_display = lambda m: m
+        v._bp_sync_extra_vars()
+        self.view = v
+
+    def tearDown(self):
+        self.root.destroy()
+
+    def test_click_opens_and_closes_the_checklist(self):
+        v = self.view
+        self.assertEqual(v._bp_on_extra_click(), 'break')
+        picker = v._bp['picker']
+        self.assertTrue(picker.winfo_exists())
+        self.assertTrue(picker.overrideredirect())  # no window title bar or Close button
+        v._bp_on_extra_click()
+        self.assertIsNone(v._bp['picker'])
+
+    def test_disabled_box_does_not_open(self):
+        v = self.view
+        v._bp_extra_btn.configure(state='disabled')
+        self.assertEqual(v._bp_on_extra_click(), 'break')
+        self.assertIsNone(v._bp['picker'])
+
+    def test_label_counts_ticked_minerals(self):
+        v = self.view
+        v._bp['extra_vars']['Osmium'].set(True)
+        v._bp_refresh_extra_label()
+        self.assertEqual(v._bp_extra_text.get(), '+ Add Minerals (1)')
+        v._bp['extra_vars']['Osmium'].set(False)
+        v._bp_refresh_extra_label()
+        self.assertEqual(v._bp_extra_text.get(), '+ Add Minerals')
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -202,10 +202,14 @@ class BestMineralsMixin:
                                                command=lambda: self._bp_reload(self._bp['scope'], True))
         self._bp_refresh_btn.pack(side="right")
         self._bp_refresh_btn.configure(state="disabled")
-        self._bp_extra_btn = self._rf_button(top_row, text=t('ring_finder.also_check_button'), **btn_style,
-                                             command=self._bp_show_extra_picker)
+        # Looks like the other mineral dropdowns; clicking it opens a checklist so several
+        # minerals can be ticked, instead of the list of one a real dropdown gives
+        self._bp_extra_text = tk.StringVar(value=t('ring_finder.also_check_button'))
+        self._bp_extra_btn = ttk.Combobox(top_row, textvariable=self._bp_extra_text, width=18, state="disabled",
+                                          values=())
         self._bp_extra_btn.pack(side="right", padx=(0, 8))
-        self._bp_extra_btn.configure(state="disabled")
+        self._bp_extra_btn.bind('<Button-1>', self._bp_on_extra_click)
+        self._bp_extra_btn.bind('<Down>', self._bp_on_extra_click)
 
         # PowerPlay mode: restrict results to stations in the priced system itself - for
         # undermining/reinforcing, that system is the only place the player can actually
@@ -340,7 +344,8 @@ class BestMineralsMixin:
             return bp['loading']
         if bp['scope'] == 'ring' and bp['ring_name']:
             return f"{bp['ring_name']} ({bp['system']})"
-        return bp['system']
+        # No This Ring / Whole System switch without a ring, so say what the prices cover
+        return t('ring_finder.rank_scope_all_rings').format(system=bp['system']) if bp['system'] else ''
 
     def _bp_set_busy(self, busy: bool, system_name: str = ''):
         bp = self._bp
@@ -351,7 +356,7 @@ class BestMineralsMixin:
         state = "disabled" if busy or not bp['system'] else "normal"
         self._bp_refresh_btn.configure(state=state)
         self._bp_scope_switch.configure(state=state)
-        self._bp_extra_btn.configure(state=state)
+        self._bp_extra_btn.configure(state="disabled" if state == "disabled" else "readonly")
         self._bp_update_overlay()
         if busy and not bp['spinning']:
             bp['spinning'] = True
@@ -632,9 +637,11 @@ class BestMineralsMixin:
         already_fetched = {r[0] for r in self._bp['results']}
         self._bp['extra_vars'] = {mat: tk.BooleanVar(value=mat in already_fetched)
                                   for mat in self._bp['extra_candidates']}
+        self._bp_refresh_extra_label()
 
     def _bp_on_extra_toggle(self, mat):
         bp = self._bp
+        self._bp_refresh_extra_label()
         try:
             from config import save_also_check_minerals
             save_also_check_minerals([m for m, var in bp['extra_vars'].items() if var.get()])
@@ -667,20 +674,29 @@ class BestMineralsMixin:
         bp['results'].sort(key=lambda r: r[1].get('sellPrice', 0) if r[1] else -1, reverse=True)
         self._bp_populate()
 
+    def _bp_on_extra_click(self, event=None):
+        """Open the checklist under the Add Minerals box, or close it if it is open."""
+        box = self._bp_extra_btn
+        box.selection_clear()
+        if str(box.cget('state')) == 'disabled':
+            return "break"
+        picker = self._bp.get('picker')
+        if picker is not None:
+            self._bp_close_extra_picker()
+        else:
+            self._bp_show_extra_picker()
+        return "break"
+
+    def _bp_refresh_extra_label(self):
+        ticked = sum(1 for var in self._bp['extra_vars'].values() if var.get())
+        text = t('ring_finder.also_check_button')
+        self._bp_extra_text.set(f"{text} ({ticked})" if ticked else text)
+
     def _bp_show_extra_picker(self):
-        """Persistent picker so several minerals can be ticked in one go (a tk.Menu
-        checkbutton closes on every click)."""
+        """Borderless checklist under the Add Minerals box. Not a tk.Menu, whose check items
+        close it on every click, so several minerals can be ticked in one go."""
         from config import scaled_font, scaled_px, load_theme
         bp = self._bp
-        existing = bp.get('picker')
-        if existing is not None:
-            try:
-                if existing.winfo_exists():
-                    existing.lift()
-                    existing.focus_force()
-                    return
-            except Exception:
-                pass
         candidates = bp['extra_candidates']
         if not candidates:
             self.status_var.set(t('ring_finder.no_hotspot_minerals'))
@@ -694,24 +710,18 @@ class BestMineralsMixin:
 
         picker = tk.Toplevel(self._bp_frame)
         picker.withdraw()
-        try:
-            from app_utils import get_app_icon_path
-            icon_path = get_app_icon_path()
-            if icon_path and icon_path.endswith('.ico'):
-                picker.iconbitmap(icon_path)
-        except Exception:
-            pass
-        picker.title(t('ring_finder.also_check_menu_title'))
-        picker.resizable(False, False)
-        picker.configure(bg=bg)
+        picker.overrideredirect(True)
+        # One pixel of border around the list, like a dropdown list
+        picker.configure(bg=fg if theme == "elite_orange" else "#555555")
 
-        picker_frame = tk.Frame(picker, bg=bg, padx=15, pady=12)
-        picker_frame.pack(fill="both", expand=True)
+        picker_frame = tk.Frame(picker, bg=bg, padx=6, pady=6)
+        picker_frame.pack(fill="both", expand=True, padx=1, pady=1)
 
         # Cap the list height and scroll instead of growing past the screen
         MAX_VISIBLE_ROWS = 8
         ROW_HEIGHT_PX = scaled_px(26)
-        list_canvas = tk.Canvas(picker_frame, bg=bg, highlightthickness=0, width=scaled_px(220),
+        list_width = max(scaled_px(200), self._bp_extra_btn.winfo_width() - scaled_px(16))
+        list_canvas = tk.Canvas(picker_frame, bg=bg, highlightthickness=0, width=list_width,
                                 height=min(len(candidates), MAX_VISIBLE_ROWS) * ROW_HEIGHT_PX)
         list_canvas.pack(side="top", fill="both", expand=True)
         if len(candidates) > MAX_VISIBLE_ROWS:
@@ -738,19 +748,15 @@ class BestMineralsMixin:
                 bind_wheel(child)
         bind_wheel(list_canvas)
 
-        ttk.Button(picker_frame, text=t('common.close'), command=self._bp_close_extra_picker).pack(anchor="e", pady=(10, 0))
-        picker.protocol("WM_DELETE_WINDOW", self._bp_close_extra_picker)
-
         bp['picker'] = picker
         self._bp_place_extra_picker()
         picker.deiconify()
         picker.attributes('-topmost', True)
         picker.lift()
-        picker.focus_force()
-        # Follow the button and close once the view is hidden or the app loses focus -
-        # polled, because binding <Configure>/<Button-1> on the main window would need an
-        # unbind that also drops the app's own handlers for those events.
-        picker.after(400, self._bp_follow_extra_picker)
+        # Follow the box and close on a click elsewhere, when the view is hidden or the app
+        # loses focus - polled, because binding <Button-1> on the main window would need an
+        # unbind that also drops the app's own handlers for that event.
+        picker.after(30, self._bp_follow_extra_picker)
 
     def _bp_place_extra_picker(self):
         picker = self._bp.get('picker')
@@ -774,14 +780,31 @@ class BestMineralsMixin:
             if not self._bp_extra_btn.winfo_viewable() or not app_focused:
                 self._bp_close_extra_picker()
                 return
-            # Re-anchor only when the button moved (main window moved/resized), so the
-            # picker can still be dragged somewhere else
+            if self._bp_left_button_down() and not (self._bp_pointer_over(picker)
+                                                    or self._bp_pointer_over(self._bp_extra_btn)):
+                self._bp_close_extra_picker()
+                return
+            # Re-anchor when the box moved (main window moved/resized)
             btn = self._bp_extra_btn
             if (btn.winfo_rootx(), btn.winfo_rooty() + btn.winfo_height() + 2) != self._bp.get('picker_anchor'):
                 self._bp_place_extra_picker()
-            picker.after(200, self._bp_follow_extra_picker)
+            picker.after(30, self._bp_follow_extra_picker)
         except Exception:
             pass
+
+    @staticmethod
+    def _bp_left_button_down() -> bool:
+        try:
+            import ctypes
+            return bool(ctypes.windll.user32.GetAsyncKeyState(0x01) & 0x8000)
+        except Exception:
+            return False
+
+    @staticmethod
+    def _bp_pointer_over(widget) -> bool:
+        x, y = widget.winfo_pointerxy()
+        left, top = widget.winfo_rootx(), widget.winfo_rooty()
+        return left <= x < left + widget.winfo_width() and top <= y < top + widget.winfo_height()
 
     def _bp_close_extra_picker(self):
         bp = getattr(self, '_bp', None)

@@ -224,7 +224,7 @@ class BestMiningMixin:
     def _bm_refresh_controls(self):
         bm = self._bm
         if not bm['busy']:
-            self._bm_name_label.config(text=t('ring_finder.reverse_search_complete').format(
+            self._bm_name_label.config(text=t('ring_finder.where_to_mine_found').format(
                 count=bm['count'], system=bm['system']) if bm.get('count') else '')
         self._bm_update_overlay()
 
@@ -339,7 +339,9 @@ class BestMiningMixin:
                 distance = float(h.get('distance', 999999))
             except (TypeError, ValueError):
                 distance = 999999.0
-            entry = candidates.setdefault(sys_name, {'distance': distance, 'materials': set()})
+            entry = candidates.setdefault(sys_name, {'distance': distance, 'materials': set(), 'coords': None})
+            if not entry['coords'] and h.get('coords'):
+                entry['coords'] = h['coords']
             for mat in self._parse_materials_from_hotspots(type_field):
                 full_mat = self._expand_abbreviated_materials(mat)
                 if mineral_filter is not None and full_mat != mineral_filter:
@@ -380,19 +382,22 @@ class BestMiningMixin:
                     rows = []
                 rows_by_material[mat] = [r for r in rows if r.get('sellPrice', 0) > 0]
 
-        # Candidate coordinates for local (non-PP) distance re-ranking - local SQLite
-        # lookups, no network calls, so doing one per candidate is instant.
-        candidate_coords = {}
-        try:
-            from local_database import LocalSystemsDatabase
-            local_db = LocalSystemsDatabase()
-            if local_db.is_database_available():
-                for sys_name, _entry in candidate_list:
-                    coords = local_db.get_system_coordinates(sys_name)
-                    if coords:
-                        candidate_coords[sys_name] = coords
-        except Exception:
-            pass
+        # Candidate coordinates for local (non-PP) distance re-ranking. The hotspot rows
+        # carry them; the bundled galaxy database lacks many hotspot systems, so it is only
+        # the fallback (local SQLite, no network calls).
+        candidate_coords = {sys_name: entry['coords'] for sys_name, entry in candidate_list if entry.get('coords')}
+        missing = [sys_name for sys_name, _entry in candidate_list if sys_name not in candidate_coords]
+        if missing:
+            try:
+                from local_database import LocalSystemsDatabase
+                local_db = LocalSystemsDatabase()
+                if local_db.is_database_available():
+                    for sys_name in missing:
+                        coords = local_db.get_system_coordinates(sys_name)
+                        if coords:
+                            candidate_coords[sys_name] = coords
+            except Exception:
+                pass
 
         cache = {
             'target_system': target_system,
@@ -473,7 +478,9 @@ class BestMiningMixin:
         """Rank the cached prices for the current PowerPlay-mode setting and show them."""
         bm = self._bm
         cache = bm.get('cache')
-        if cache is None or bm['busy']:
+        # No busy check: SearchControl runs the results callback before it clears busy, and a
+        # new search clears the cache, so a toggle during a search has nothing to redraw
+        if cache is None:
             return
         pp_mode = self._bm_pp_mode_var.get()
         results = self._rerank_reverse_search_results(
@@ -484,6 +491,13 @@ class BestMiningMixin:
             # The Reference System has no known market: say so instead of a table of No data
             bm['hint'] = t('ring_finder.reverse_search_no_market_data').format(system=cache['target_system'])
             results = []
+        # Say why a row has no price: nothing in the Reference System, nothing within range,
+        # or (rarely) no coordinates to measure from
+        for r in results:
+            if pp_mode:
+                r['no_price'] = t('ring_finder.no_data_in_system')
+            elif r['system'] in cache['candidate_coords']:
+                r['no_price'] = t('ring_finder.where_to_mine_no_buyer').format(distance=int(cache['max_distance']))
         bm['count'] = len(results)
         self._bm_fill(results, pp_mode)
 
@@ -514,7 +528,7 @@ class BestMiningMixin:
                 updated = self._format_data_age(best.get('updatedAt', ''))
                 powerplay = self._bp_pp_text(pp_data.get(station_system, {}))
             else:
-                price = t('ring_finder.no_data')
+                price = r.get('no_price') or t('ring_finder.no_data')
                 station = station_type = ls = updated = powerplay = "-"
             mineral_display = self._format_material_for_display(r['mineral']) if r['mineral'] else "-"
             row_id = tree.insert("", "end", values=(

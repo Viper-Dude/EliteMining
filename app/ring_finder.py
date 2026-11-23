@@ -746,7 +746,7 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Mer
             self._more_btn = self._rf_button(self._rf_actions, text=t('ring_finder.more_filters'),
                                              command=self._toggle_more_filters)
         reset_btn = self._rf_button(self._rf_actions if _modern_form else pp_inner_row, text=t('ring_finder.reset_filters'),
-                             command=self._reset_filters,
+                             command=lambda: self._reset_filters(reset_powerplay=True),
                              bg="#3a3a3a", fg=reset_btn_fg,
                              activebackground="#4a4a4a", activeforeground=reset_btn_active_fg,
                              relief="raised", bd=1, cursor="hand2",
@@ -2216,8 +2216,9 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Mer
         
         return False
     
-    def _reset_filters(self):
-        """Reset all filters to default values"""
+    def _reset_filters(self, reset_powerplay=False):
+        """Reset all filters to default values. The PowerPlay lookup tick is only cleared
+        when the user presses Reset Filters; the automatic resets (startup, each jump) keep it."""
         # Max Distance / Max Results - back to the 50/50 default (auto-search on jump
         # relies on this so it always searches a fixed radius, not whatever distance
         # was left over from a manual search).
@@ -2241,7 +2242,12 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Mer
 
         # Data Source - set to Local (database)
         self.data_source_var.set("database")
+        if reset_powerplay:
+            # Switching back from Spansh/Both restores the stashed PowerPlay tick, so clear it too
+            self._spansh_pp_stashed = False
         self._on_data_source_changed()
+        if reset_powerplay:
+            self.spansh_pp_var.set(False)
         
         # Unvisited Only
         if hasattr(self, 'unvisited_only_var'):

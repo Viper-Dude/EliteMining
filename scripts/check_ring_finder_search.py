@@ -1036,6 +1036,28 @@ class StatusAndAutoSearchTests(unittest.TestCase):
         f.search_hotspots.assert_called_once_with(force_database=True)
 
 
+class ResetFiltersPowerPlayTests(unittest.TestCase):
+    """Only the Reset Filters button clears the PowerPlay lookup tick; automatic resets keep it."""
+    def run_reset(self, **kwargs):
+        with patch.object(sys, 'path', [str(ROOT / 'app')] + sys.path):
+            from ring_finder import RingFinder
+        finder = Mock()
+        finder.spansh_pp_var = Mock()
+        finder._spansh_pp_stashed = True
+        RingFinder._reset_filters(finder, **kwargs)
+        return finder
+
+    def test_button_reset_clears_the_tick_and_the_stash(self):
+        finder = self.run_reset(reset_powerplay=True)
+        finder.spansh_pp_var.set.assert_called_once_with(False)
+        self.assertFalse(finder._spansh_pp_stashed)
+
+    def test_automatic_reset_keeps_the_tick(self):
+        finder = self.run_reset()
+        finder.spansh_pp_var.set.assert_not_called()
+        self.assertTrue(finder._spansh_pp_stashed)
+
+
 class RingFinderSaveFailureTests(unittest.TestCase):
     def setUp(self):
         Saves._save_filter_settings.__globals__.update(os=os, log=logging.getLogger('ring-save-test'))

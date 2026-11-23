@@ -146,6 +146,15 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(v._bm_tree.values(v._bm_tree.order[0], 'Station'), 'Port')
         self.assertEqual(v._bm_tree.values(v._bm_tree.order[0], 'Price'), '300 CR')
 
+    def test_results_show_while_the_search_is_still_marked_busy(self):
+        # SearchControl calls the results callback first and clears busy afterwards
+        v = make_view()
+        v._bm['busy'] = True
+        with patch('system_finder_api.SystemFinderAPI._batch_get_powerplay', return_value={}):
+            v._bm_show_results(cache({'Platinum': [buyer('Near A', 100, x=2)]}))
+        self.assertEqual(len(v._bm_tree.order), 2)
+        self.assertEqual(v._bm['count'], 2)
+
     def test_pp_mode_without_a_market_shows_hint_not_empty_rows(self):
         v = make_view(pp_mode=True)
         v._bm['cache'] = cache({'Platinum': [buyer('Near A', 100, x=2)]})
@@ -154,6 +163,21 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(v._bm_tree.order, [])
         self.assertIn('Sol', v._bm['hint'])
         self.assertEqual(v._bm['count'], 0)
+
+    def test_rows_without_price_say_why(self):
+        v = make_view()
+        # MineA has a buyer 2 Ly away; MineB's only buyer is 100 Ly away
+        v._bm['cache'] = cache({'Platinum': [buyer('Near A', 100, x=2)]})
+        with patch('system_finder_api.SystemFinderAPI._batch_get_powerplay', return_value={}):
+            v._bm_rerender()
+        prices = {v._bm['system_by_row'][r]: v._bm_tree.values(r, 'Price') for r in v._bm_tree.order}
+        self.assertEqual(prices['MineA'], '100 CR')
+        self.assertIn('50', prices['MineB'])
+        v._bm['cache']['candidate_coords'].pop('MineB')
+        with patch('system_finder_api.SystemFinderAPI._batch_get_powerplay', return_value={}):
+            v._bm_rerender()
+        prices = {v._bm['system_by_row'][r]: v._bm_tree.values(r, 'Price') for r in v._bm_tree.order}
+        self.assertNotIn('50', prices['MineB'])  # no coordinates: plain No data
 
     def test_row_formatting(self):
         v = make_view()
@@ -202,6 +226,29 @@ class RunTests(unittest.TestCase):
         v._bm_start = Mock()
         v._bm_on_view_click()
         v._bm_start.assert_not_called()
+
+    def test_candidate_coordinates_come_from_hotspot_rows(self):
+        # The bundled galaxy database misses many hotspot systems; the rows have coordinates
+        v = make_view()
+        v._get_hotspots = Mock(return_value=[
+            {'systemName': 'MineA', 'type': 'Platinum', 'distance': '5.0', 'coords': {'x': 1, 'y': 2, 'z': 3}},
+            {'systemName': 'MineB', 'type': 'Platinum', 'distance': '9.0', 'coords': None}])
+        v._parse_materials_from_hotspots = lambda value: [value]
+        v._expand_abbreviated_materials = lambda value: value
+        v._bm_show_results = Mock()
+        control = Mock()
+        control.is_cancelled.return_value = False
+        local_db = Mock()
+        local_db.is_database_available.return_value = True
+        local_db.get_system_coordinates.side_effect = lambda name: {'x': 9, 'y': 9, 'z': 9} if name == 'MineB' else None
+        with patch('marketplace_api.MarketplaceAPI.search_buyers', return_value=[]),                 patch('local_database.LocalSystemsDatabase', return_value=local_db):
+            v._reverse_search_worker('Sol', 50.0, 'Platinum', control)
+        callback = control.complete.call_args.args[1]
+        callback([])
+        coords = v._bm_show_results.call_args.args[0]['candidate_coords']
+        self.assertEqual(coords['MineA'], {'x': 1, 'y': 2, 'z': 3})
+        self.assertEqual(coords['MineB'], {'x': 9, 'y': 9, 'z': 9})  # fallback only for the missing one
+        local_db.get_system_coordinates.assert_called_once_with('MineB')
 
     def test_no_candidates_hint(self):
         v = make_view()
