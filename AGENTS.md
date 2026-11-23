@@ -13,7 +13,7 @@
 - Comments only when the WHY is non-obvious; no task/PR references. No emojis unless asked.
 - Reuse first: search the likely modules (including other tabs, e.g. distance/coordinate lookups in `ring_finder.py`) for an existing function and extend it minimally. Text-only edits need no search.
 - Patch notes (`docs/PATCHNOTES_v*.md`): one plain-English sentence per change from the player's view, only what is new or fixed, related changes combined, no dev terms (EDDN, API, cache, database, function names). Use the "New Features & Improvements" and "Bug Fixes" sections from `docs/PATCHNOTES_TEMPLATE.md`.
-- At the start of each new task (not follow-ups), recommend a model and effort in one line: lighter for small work, strongest with high effort for threading, DB writes, VoiceAttack contracts or multi-component work. Say whether Plan mode helps, and wait if switching would clearly help.
+- At the start of each new task (not follow-ups), recommend a model and effort in one line: lighter for small work, strongest with high effort for threading, DB writes, VoiceAttack contracts or multi-component work. Say whether Plan mode helps. Then wait for the user to confirm before editing any code; reading and searching are fine.
 - When the chat ends, save lasting decisions and open issues to memory or docs, without duplicates and only in authorized files.
 
 ## Validation

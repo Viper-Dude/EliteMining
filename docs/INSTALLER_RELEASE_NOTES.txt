@@ -1,6 +1,7 @@
 ﻿What's new in EliteMining v5.6.9
 
 New Features & Improvements
+- General code optimalization.
 - Commodity Market searches are faster and find more stations with fresh prices, both nearby and galaxy-wide.
 - Low Temperature Diamonds is now named consistently across the app.
 

@@ -9191,7 +9191,7 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin, MiningCardMixin):
         self.bookmark_mineral_var = tk.StringVar(value=t('bookmarks.all_minerals'))
         mineral_combo = ttk.Combobox(filter_frame, textvariable=self.bookmark_mineral_var,
                                      values=[t('bookmarks.all_minerals')] + [self._bookmark_materials_display(m) for m in MINING_COMMODITY_ORDER],
-                                     state="readonly", width=22)
+                                     state="readonly", width=16)
         mineral_combo.pack(side="left", padx=(0, 10))
         mineral_combo.bind("<<ComboboxSelected>>", self._on_bookmark_filter_changed)
         mineral_combo.bind("<<ComboboxSelected>>", lambda e: e.widget.selection_clear(), add='+')

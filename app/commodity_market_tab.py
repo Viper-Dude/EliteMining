@@ -185,7 +185,7 @@ class CommodityMarketTabMixin:
         self.marketplace_commodity = tk.StringVar(value=self._commodity_map.get(saved_commodity, saved_commodity))
         sorted_commodities = [self._commodity_map[k] for k in self._commodity_order]
         commodity_combo = ttk.Combobox(filter_grid, textvariable=self.marketplace_commodity,
-                                     values=sorted_commodities, state="readonly", width=20)
+                                     values=sorted_commodities, state="readonly", width=16)
         commodity_combo.grid(row=0, column=4, sticky="w", pady=(0, 8))
         commodity_combo.bind("<Return>", lambda e: self._search_marketplace())
         commodity_combo.bind("<<ComboboxSelected>>", lambda e: self._save_marketplace_preferences())

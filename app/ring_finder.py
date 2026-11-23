@@ -637,7 +637,7 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         # Material filter (new - specific materials) - dynamically populated from database
         ttk.Label(search_frame, text=t('ring_finder.mineral')).grid(row=3, column=0, sticky="w", padx=5, pady=5)
         self.specific_material_var = tk.StringVar(value=t('ring_finder.all_minerals'))
-        self.specific_material_combo = ttk.Combobox(search_frame, textvariable=self.specific_material_var, width=22, state="readonly")
+        self.specific_material_combo = ttk.Combobox(search_frame, textvariable=self.specific_material_var, width=16, state="readonly")
         
         # Get materials from database and sort alphabetically (localized display)
         available_materials = self._get_available_materials()
@@ -5175,7 +5175,7 @@ class RingFinder(RingFinderSearchMixin, ColumnVisibilityMixin):
         saved_mineral = load_reverse_search_mineral()
         saved_display = next((m for m in available_materials if self._to_english(m) == saved_mineral), None) if saved_mineral else None
         mineral_var = tk.StringVar(value=saved_display or t('ring_finder.all_minerals'))
-        mineral_combo = ttk.Combobox(second_row, textvariable=mineral_var, width=22, state="readonly")
+        mineral_combo = ttk.Combobox(second_row, textvariable=mineral_var, width=16, state="readonly")
         mineral_combo['values'] = available_materials
         mineral_combo.pack(side="left", padx=(8, 0))
 
