@@ -131,6 +131,48 @@ class CarrierChecks(unittest.TestCase):
         self.assertEqual(path.read_bytes(), original)
         self.assertEqual(list(path.parent.iterdir()), [path])
 
+    def test_squadron_carrier_events_are_ignored(self):
+        before = deepcopy(self.parser.carrier_data)
+        for kind in ('CarrierStats', 'CarrierLocation', 'CarrierFinance', 'CarrierJumpRequest',
+                     'CarrierJumpCancelled', 'CarrierBankTransfer'):
+            with self.subTest(kind=kind):
+                self.parser.process_carrier_event(self.event(
+                    kind, CarrierType='SquadronCarrier', CarrierID=333, Name='Squadron',
+                    Callsign='SQD-333', StarSystem='Achenar', SystemName='Achenar',
+                    DepartureTime='2026-11-01T12:15:00Z', CarrierBalance=1))
+                self.assertEqual(self.parser.carrier_data, before)
+        self.parser.process_carrier_event(self.event(
+            'CarrierStats', CarrierType='FleetCarrier', CarrierID=111, Name='Renamed'))
+        self.assertEqual(self.parser.carrier_data['name'], 'Renamed')
+
+    def test_pending_jump_survives_restart(self):
+        self.parser.process_carrier_event(self.event(
+            'CarrierJumpRequest', CarrierID=111, SystemName='Achenar', Body='Achenar 1',
+            DepartureTime='2026-11-01T12:15:00Z'))
+        with patch('path_utils.get_app_data_dir', return_value=self.folder.name):
+            restarted = JournalParser(self.folder.name, user_db=Mock())
+        self.assertEqual(restarted.carrier_data['jump_destination'], 'Achenar')
+        self.assertEqual(restarted.carrier_data['jump_body'], 'Achenar 1')
+        self.assertEqual(restarted.carrier_data['jump_departure_time'], '2026-11-01T12:15:00Z')
+
+    def test_failed_catchup_scan_restores_carrier_updates(self):
+        for method in ('_process_journals_for_catchup', '_process_journals_for_catchup_with_progress'):
+            with self.subTest(method=method):
+                app = App()
+                app.cargo_monitor = SimpleNamespace(journal_parser=self.parser, user_db=Mock(),
+                                                    _catchup_scan_in_progress=False)
+                app.after = Mock(side_effect=RuntimeError('main loop gone'))
+                callback = Mock(side_effect=RuntimeError('main loop gone'))
+                with patch.dict(sys.modules, mining_missions=SimpleNamespace(
+                        MISSIONS_AVAILABLE=False, get_mission_tracker=lambda: None)), \
+                        patch.object(self.parser, '_save_carrier_data') as save, \
+                        self.assertRaises(RuntimeError):
+                    kwargs = {'progress_callback': callback} if method.endswith('progress') else {}
+                    getattr(app, method)(['missing.log'], **kwargs)
+                self.assertFalse(self.parser._suppress_carrier_notifications)
+                self.assertFalse(app.cargo_monitor._catchup_scan_in_progress)
+                save.assert_called_once()
+
     def test_both_catchup_readers_replay_fuel_and_balance_and_save_once(self):
         events = [self.event('CarrierDepositFuel', CarrierID=111, Total=900),
                   self.event('CarrierBankTransfer', CarrierID=111, CarrierBalance=5000)]
@@ -173,7 +215,22 @@ class CarrierUIChecks(unittest.TestCase):
         self.cd['space_cargo'] = None
         self.tab._refresh(self.cd)
         self.assertEqual(self.tab._sv['cargo_used'].get(), '-')
+        self.cd['space_free'] = None
+        self.tab._refresh(self.cd)
         self.assertEqual(self.tab._sv['cargo_used_total'].get(), '-')
+
+    def test_used_space_includes_reserved_space_and_packs(self):
+        self.cd.update(space_cargo=10000, space_crew=1000, space_free=9000)
+        self.tab._refresh(self.cd)
+        self.assertEqual(self.tab._sv['cargo_used_total'].get(), '16,000 / 25,000')
+
+    def test_messages_sit_under_help_banner(self):
+        self.tab._refresh(dict(system='Sol'))
+        children = self.tab._scroll_frame.pack_slaves()
+        self.assertEqual(children.index(self.tab._hint_lbl), children.index(self.tab._help_frame) + 1)
+        fresh = FleetCarrierTab(self.root)
+        children = fresh._scroll_frame.pack_slaves()
+        self.assertEqual(children.index(fresh._no_data_lbl), children.index(fresh._help_frame) + 1)
 
     def test_history_widgets_survive_unchanged_refresh(self):
         self.cd['jump_history'] = [dict(system='Sol', timestamp='2026-11-01T12:00:00Z')]

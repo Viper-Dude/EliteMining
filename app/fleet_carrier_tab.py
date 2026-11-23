@@ -3,7 +3,7 @@ Fleet Carrier Tab - EliteMining
 Displays live fleet carrier status populated from journal events via JournalParser.
 All display strings use the localization system via t().
 """
-from ui.theme import modern_color
+from ui.theme import get_theme_colors
 
 import tkinter as tk
 from tkinter import ttk
@@ -92,30 +92,14 @@ class FleetCarrierTab(tk.Frame):
         except Exception:
             theme = "elite_orange"
 
-        if theme == "elite_orange":
-            self.bg        = "#0a0a0a"
-            self.fg        = "#ff8c00"
-            self.fg_bright = "#ffa500"
-            self.fg_dim    = "#666666"
-            self.fg_inactive = "#888888"
-            self.sect_bg   = "#141414"
-            self.hdr_bg    = "#1e1e1e"
-        elif theme in ("modern", "modern_slate", "modern_orange"):
-            self.bg        = modern_color("#14171B")
-            self.fg        = modern_color("#E6EAF0")
-            self.fg_bright = "#FFFFFF"
-            self.fg_dim    = modern_color("#8A94A3")
-            self.fg_inactive = "#6B7482"
-            self.sect_bg   = modern_color("#1D2228")
-            self.hdr_bg    = modern_color("#262C34")
-        else:
-            self.bg        = "#1e1e1e"
-            self.fg        = "#e6e6e6"
-            self.fg_bright = "#ffffff"
-            self.fg_dim    = "#888888"
-            self.fg_inactive = "#999999"
-            self.sect_bg   = "#252525"
-            self.hdr_bg    = "#333333"
+        colors = get_theme_colors(theme)
+        self.bg          = colors["bg_dark"]
+        self.fg          = colors["fg"]
+        self.fg_bright   = colors["fg_bright"]
+        self.fg_dim      = colors["fg_muted"]
+        self.fg_inactive = colors["btn_fg_disabled"]
+        self.sect_bg     = colors["bg_accent"]
+        self.hdr_bg      = colors["btn_bg"]
 
         super().__init__(parent, bg=self.bg, **kwargs)
         self._tracker = None
@@ -229,12 +213,25 @@ class FleetCarrierTab(tk.Frame):
         # Help banner
         help_frame = tk.Frame(sf, bg=self.hdr_bg)
         help_frame.pack(fill="x", padx=4, pady=(8, 4))
+        self._help_frame = help_frame
         tk.Label(
             help_frame,
             text=t("fleet_carrier.help_banner"),
             bg=self.hdr_bg, fg=self.fg_dim,
             font=scaled_font(8, family="Helvetica"), justify="left", anchor="w", wraplength=600
         ).pack(fill="x", padx=10, ipady=4)
+
+        self._no_data_lbl = tk.Label(
+            sf, text=t("fleet_carrier.no_data"),
+            bg=self.bg, fg=self.fg_dim, font=scaled_font(11, family="Helvetica"), justify="center"
+        )
+        self._no_data_lbl.pack(pady=12)
+
+        # shown only when location is known but stats not yet received
+        self._hint_lbl = tk.Label(
+            sf, text=t("fleet_carrier.stats_hint"),
+            bg=self.bg, fg=self.fg_dim, font=scaled_font(9, family="Helvetica"), justify="center"
+        )
 
         self._build_status_section(sf)
         self._build_jump_section(sf)
@@ -243,17 +240,6 @@ class FleetCarrierTab(tk.Frame):
         self._build_cargo_section(sf)
         self._build_history_section(sf)
 
-        self._no_data_lbl = tk.Label(
-            sf, text=t("fleet_carrier.no_data"),
-            bg=self.bg, fg=self.fg_dim, font=scaled_font(11, family="Helvetica"), justify="center"
-        )
-        self._no_data_lbl.pack(pady=40)
-
-        self._hint_lbl = tk.Label(
-            sf, text=t("fleet_carrier.stats_hint"),
-            bg=self.bg, fg=self.fg_dim, font=scaled_font(9, family="Helvetica"), justify="center"
-        )
-        # shown only when location is known but stats not yet received
         bind_mousewheel_recursive(canvas, self._on_mousewheel)
 
     def _build_status_section(self, parent):
@@ -370,7 +356,7 @@ class FleetCarrierTab(tk.Frame):
         if has_stats:
             self._hint_lbl.pack_forget()
         else:
-            self._hint_lbl.pack(pady=(0, 8))
+            self._hint_lbl.pack(pady=(4, 4), after=self._help_frame)
 
         # Status
         name = cd.get("name") or "-"
@@ -436,7 +422,8 @@ class FleetCarrierTab(tk.Frame):
         cargo   = cd.get("space_cargo")
         crew_sp = cd.get("space_crew")
         free    = cd.get("space_free")
-        used    = cargo + crew_sp if cargo is not None and crew_sp is not None else None
+        # Total also includes reserved market space and ship/module packs, so derive used from free space
+        used    = total - free if total is not None and free is not None else None
         self._sv["cargo_total"].set(t("fleet_carrier.units_fmt", n=total) if total is not None else "-")
         self._sv["cargo_used"].set(t("fleet_carrier.units_fmt", n=cargo) if cargo is not None else "-")
         self._sv["cargo_free"].set(t("fleet_carrier.units_fmt", n=free)  if free is not None else "-")

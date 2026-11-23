@@ -520,7 +520,8 @@ class JournalParser:
 
     def process_carrier_event(self, event: Dict[str, Any]) -> None:
         handler = self._CARRIER_EVENT_HANDLERS.get(event.get('event'))
-        if handler:
+        # Squadron carrier events share these event names but must not overwrite the player's own carrier
+        if handler and event.get('CarrierType', 'FleetCarrier') == 'FleetCarrier':
             getattr(self, handler)(event)
 
     def _is_own_carrier(self, event: Dict[str, Any]) -> bool:
@@ -569,27 +570,22 @@ class JournalParser:
                 os.remove(temp_path)
 
     def _load_carrier_data(self):
-        """Load previously saved carrier_data from disk (skips live fields)."""
+        """Load previously saved carrier_data from disk."""
         try:
             if not os.path.exists(self._carrier_save_path):
                 return
             with open(self._carrier_save_path, 'r', encoding='utf-8') as f:
                 saved = json.load(f)
-            # Merge saved values into carrier_data, keeping defaults for missing keys
-            # Skip in-flight fields that shouldn't persist
-            skip = {'jump_destination', 'jump_departure_time', 'jump_body',
-                    'on_carrier_updated'}
+            # Pending jumps are kept: a restart resumes the journal past the request, and the tab hides expired ones
             for k, v in saved.items():
-                if k not in skip and k in self.carrier_data:
+                if k in self.carrier_data:
                     self.carrier_data[k] = v
             log.debug(f"[FC] Loaded saved carrier data for {self.carrier_data.get('name')}")
         except Exception as e:
             log.warning(f"[FC] Could not load saved carrier data: {e}")
 
     def process_carrier_stats(self, event: Dict[str, Any]) -> None:
-        """Process CarrierStats event — full snapshot of carrier state.
-        Note: CarrierStats has no CarrierType field; it always refers to the player's own carrier.
-        """
+        """Process CarrierStats event — full snapshot of carrier state."""
         try:
             cd = self.carrier_data
             cd['carrier_id']   = event.get('CarrierID', cd['carrier_id'])
@@ -640,10 +636,6 @@ class JournalParser:
     def process_carrier_location(self, event: Dict[str, Any]) -> None:
         """Process CarrierLocation event — where the carrier is parked."""
         try:
-            carrier_type = event.get('CarrierType', '')
-            # Only skip if explicitly set to something other than FleetCarrier
-            if carrier_type and carrier_type != 'FleetCarrier':
-                return
             cd = self.carrier_data
             new_system = event.get('StarSystem', cd['system'])
             self._record_carrier_location_change(new_system, event.get('timestamp', ''), exact=False)
@@ -677,9 +669,7 @@ class JournalParser:
             self.process_carrier_docked(event)
 
     def process_carrier_finance(self, event: Dict[str, Any]) -> None:
-        """Process CarrierFinance event — balance/tax update.
-        Note: CarrierFinance has no CarrierType field in most journal versions.
-        """
+        """Process CarrierFinance event — balance/tax update."""
         try:
             cd = self.carrier_data
             cd['carrier_id']        = event.get('CarrierID', cd['carrier_id'])
@@ -691,9 +681,7 @@ class JournalParser:
             log.warning(f"Error processing CarrierFinance: {e}")
 
     def process_carrier_jump_request(self, event: Dict[str, Any]) -> None:
-        """Process CarrierJumpRequest — scheduled jump destination.
-        Note: No CarrierType field; always refers to the player's own carrier.
-        """
+        """Process CarrierJumpRequest — scheduled jump destination."""
         try:
             cd = self.carrier_data
             cd['carrier_id']        = event.get('CarrierID', cd['carrier_id'])
@@ -756,9 +744,7 @@ class JournalParser:
             log.warning(f"Error processing CarrierDepositFuel: {e}")
 
     def process_carrier_bank_transfer(self, event: Dict[str, Any]) -> None:
-        """Process CarrierBankTransfer — update carrier balance.
-        Note: No CarrierType field; always refers to the player's own carrier.
-        """
+        """Process CarrierBankTransfer — update carrier balance."""
         try:
             cd = self.carrier_data
             cd['carrier_id'] = event.get('CarrierID', cd['carrier_id'])

@@ -13051,116 +13051,116 @@ Your keybinds will need to be reconfigured manually."""
         
         # Suppress fleet carrier UI notifications during scan
         self.cargo_monitor.journal_parser._suppress_carrier_notifications = True
-        
         try:
-            from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
-            if MISSIONS_AVAILABLE:
-                mission_tracker = get_mission_tracker()
-                if mission_tracker:
-                    mission_tracker.start_batch()
-        except:
-            pass
-        
-        total = len(journals)
-        for idx, journal_path in enumerate(journals):
-            # Update progress with localized message
-            if progress_callback and idx % 10 == 0:
-                msg = t('dialogs.processing_journal', current=idx + 1, total=total)
-                progress_callback(idx, msg)
-            
             try:
-                with open(journal_path, 'r', encoding='utf-8') as f:
-                    current_system = None
-                    
-                    for line in f:
-                        line = line.strip()
-                        if not line:
-                            continue
-                        
-                        try:
-                            event = json.loads(line)
-                            event_type = event.get('event', '')
-                            self.cargo_monitor.journal_parser.process_carrier_event(event)
-                            
-                            # CarrierJump is a commander arrival; CarrierLocation only tracks the carrier.
-                            if event_type in ('FSDJump', 'CarrierJump'):
-                                system_name = event.get('StarSystem', '')
-                                if system_name:
-                                    timestamp = event.get('timestamp', '')
-                                    system_address = event.get('SystemAddress')
-                                    star_pos = event.get('StarPos', [])
-                                    coordinates = tuple(star_pos) if len(star_pos) >= 3 else None
-                                    
-                                    # Use single source of truth for visit recording
-                                    if self.record_system_visit(system_name, timestamp, coordinates, system_address):
-                                        visits_added += 1
-                                    current_system = system_name
-                            
-
-                            elif event_type == 'Location':
-                                system_name = event.get('StarSystem', '')
-                                if system_name:
-                                    current_system = system_name
-
-                            elif event_type == 'Scan':
-                                try:
-                                    self.cargo_monitor.journal_parser.process_scan(event)
-                                    hotspots_added += 1
-                                except:
-                                    scan_failures += 1
-                            
-                            elif event_type == 'SAASignalsFound':
-                                try:
-                                    self.cargo_monitor.journal_parser.process_saa_signals_found(event, current_system)
-                                    hotspots_added += 1
-                                except:
-                                    scan_failures += 1
-                            
-                            elif event_type == 'MissionAccepted':
-                                try:
-                                    from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
-                                    if MISSIONS_AVAILABLE:
-                                        tracker = get_mission_tracker()
-                                        if tracker and tracker.process_event(event):
-                                            missions_found += 1
-                                except:
-                                    pass
-                            
-                            elif event_type in ['MissionCompleted', 'MissionAbandoned', 'CargoDepot']:
-                                try:
-                                    from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
-                                    if MISSIONS_AVAILABLE:
-                                        tracker = get_mission_tracker()
-                                        if tracker:
-                                            tracker.process_event(event)
-                                except:
-                                    pass
-                                    
-                        except json.JSONDecodeError:
-                            continue
-            except Exception:
-                continue
-        
-        # End batch mode
-        if mission_tracker:
-            try:
-                mission_tracker.end_batch()
+                from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
+                if MISSIONS_AVAILABLE:
+                    mission_tracker = get_mission_tracker()
+                    if mission_tracker:
+                        mission_tracker.start_batch()
             except:
                 pass
         
-        # Final progress update
-        if progress_callback:
-            msg = t('dialogs.scan_complete', visits=visits_added, hotspots=hotspots_added)
-            progress_callback(total, msg)
+            total = len(journals)
+            for idx, journal_path in enumerate(journals):
+                # Update progress with localized message
+                if progress_callback and idx % 10 == 0:
+                    msg = t('dialogs.processing_journal', current=idx + 1, total=total)
+                    progress_callback(idx, msg)
+            
+                try:
+                    with open(journal_path, 'r', encoding='utf-8') as f:
+                        current_system = None
+                    
+                        for line in f:
+                            line = line.strip()
+                            if not line:
+                                continue
+                        
+                            try:
+                                event = json.loads(line)
+                                event_type = event.get('event', '')
+                                self.cargo_monitor.journal_parser.process_carrier_event(event)
+                            
+                                # CarrierJump is a commander arrival; CarrierLocation only tracks the carrier.
+                                if event_type in ('FSDJump', 'CarrierJump'):
+                                    system_name = event.get('StarSystem', '')
+                                    if system_name:
+                                        timestamp = event.get('timestamp', '')
+                                        system_address = event.get('SystemAddress')
+                                        star_pos = event.get('StarPos', [])
+                                        coordinates = tuple(star_pos) if len(star_pos) >= 3 else None
+                                    
+                                        # Use single source of truth for visit recording
+                                        if self.record_system_visit(system_name, timestamp, coordinates, system_address):
+                                            visits_added += 1
+                                        current_system = system_name
+                            
+
+                                elif event_type == 'Location':
+                                    system_name = event.get('StarSystem', '')
+                                    if system_name:
+                                        current_system = system_name
+
+                                elif event_type == 'Scan':
+                                    try:
+                                        self.cargo_monitor.journal_parser.process_scan(event)
+                                        hotspots_added += 1
+                                    except:
+                                        scan_failures += 1
+                            
+                                elif event_type == 'SAASignalsFound':
+                                    try:
+                                        self.cargo_monitor.journal_parser.process_saa_signals_found(event, current_system)
+                                        hotspots_added += 1
+                                    except:
+                                        scan_failures += 1
+                            
+                                elif event_type == 'MissionAccepted':
+                                    try:
+                                        from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
+                                        if MISSIONS_AVAILABLE:
+                                            tracker = get_mission_tracker()
+                                            if tracker and tracker.process_event(event):
+                                                missions_found += 1
+                                    except:
+                                        pass
+                            
+                                elif event_type in ['MissionCompleted', 'MissionAbandoned', 'CargoDepot']:
+                                    try:
+                                        from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
+                                        if MISSIONS_AVAILABLE:
+                                            tracker = get_mission_tracker()
+                                            if tracker:
+                                                tracker.process_event(event)
+                                    except:
+                                        pass
+                                    
+                            except json.JSONDecodeError:
+                                continue
+                except Exception:
+                    continue
         
-        print(f"[FIRST INSTALL] Scan complete: {total} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} missions")
-        log.info(f"First install scan complete: {total} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} missions")
-        if scan_failures:
-            log.warning("First install scan: %d hotspot events could not be saved", scan_failures)
+            # End batch mode
+            if mission_tracker:
+                try:
+                    mission_tracker.end_batch()
+                except:
+                    pass
         
-        # Re-enable carrier notifications and fire a single update
-        self.cargo_monitor.journal_parser._suppress_carrier_notifications = False
-        self.cargo_monitor.journal_parser._notify_carrier_updated()
+            # Final progress update
+            if progress_callback:
+                msg = t('dialogs.scan_complete', visits=visits_added, hotspots=hotspots_added)
+                progress_callback(total, msg)
+        
+            print(f"[FIRST INSTALL] Scan complete: {total} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} missions")
+            log.info(f"First install scan complete: {total} files, {visits_added} visits, {hotspots_added} hotspots, {missions_found} missions")
+            if scan_failures:
+                log.warning("First install scan: %d hotspot events could not be saved", scan_failures)
+        finally:
+            # Re-enable carrier notifications and fire a single update
+            self.cargo_monitor.journal_parser._suppress_carrier_notifications = False
+            self.cargo_monitor.journal_parser._notify_carrier_updated()
         
         # Sync FC location to distance calculator from the now-correct carrier_data
         def _sync_fc_location():
@@ -13280,157 +13280,156 @@ Your keybinds will need to be reconfigured manually."""
         
         # Suppress fleet carrier UI notifications during scan
         self.cargo_monitor.journal_parser._suppress_carrier_notifications = True
-        
-        # Start batch mode for mission tracker to avoid UI spam during scan
-        mission_tracker = None
         try:
-            from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
-            if MISSIONS_AVAILABLE:
-                mission_tracker = get_mission_tracker()
-                if mission_tracker:
-                    mission_tracker.start_batch()
-        except:
-            pass
-        
-        for idx, journal_path in enumerate(journals):
-            # Update progress in status bar
-            if idx % 25 == 0:  # Update every 25 files
-                progress = t('status_bar.journal_scanning_progress').format(done=idx, total=len(journals))
-                self.after(0, lambda p=progress: self._set_journal_scan_status(p, 0))
-
+            # Start batch mode for mission tracker to avoid UI spam during scan
+            mission_tracker = None
             try:
-                with open(journal_path, 'rb') as f:
-                    if resume_offsets and journal_path in resume_offsets:
-                        try:
-                            offset = resume_offsets[journal_path]
-                            if offset <= os.fstat(f.fileno()).st_size:
-                                f.seek(offset)
-                        except Exception:
-                            pass
-                    current_system = None
-
-                    position = f.tell()
-                    for line in f:
-                        if not line.endswith(b'\n'):
-                            try:
-                                json.loads(line)
-                            except (ValueError, UnicodeError):
-                                break
-                        position = f.tell()
-                        line = line.decode('utf-8', errors='replace').strip()
-                        if not line:
-                            continue
-                        
-                        try:
-                            event = json.loads(line)
-                            event_type = event.get('event', '')
-                            self.cargo_monitor.journal_parser.process_carrier_event(event)
-                            
-                            # CarrierJump is a commander arrival; CarrierLocation only tracks the carrier.
-                            if event_type in ('FSDJump', 'CarrierJump'):
-                                system_name = event.get('StarSystem', '')
-                                if system_name:
-                                    timestamp = event.get('timestamp', '')
-                                    system_address = event.get('SystemAddress')
-                                    star_pos = event.get('StarPos', [])
-                                    coordinates = tuple(star_pos) if len(star_pos) >= 3 else None
-                                    
-                                    # Use single source of truth for visit recording
-                                    if self.record_system_visit(system_name, timestamp, coordinates, system_address):
-                                        visits_added += 1
-                                    current_system = system_name
-                            
-
-                            elif event_type == 'Location':
-                                # Location = game loaded, just track current system for context
-                                system_name = event.get('StarSystem', '')
-                                if system_name:
-                                    current_system = system_name
-
-
-                            
-                            # Process Scan events for ring/hotspot data
-                            elif event_type == 'Scan':
-                                try:
-                                    self.cargo_monitor.journal_parser.process_scan(event)
-                                    hotspots_added += 1
-                                except Exception as e:
-                                    log.error(f"Error processing Scan event: {e}")
-                            
-                            # Process SAASignalsFound for hotspots
-                            elif event_type == 'SAASignalsFound':
-                                try:
-                                    self.cargo_monitor.journal_parser.process_saa_signals_found(event, current_system)
-                                    hotspots_added += 1
-                                except Exception as e:
-                                    log.error(f"Error processing SAASignalsFound event: {e}")
-                            
-                            # Process mining missions
-                            elif event_type == 'MissionAccepted':
-                                try:
-                                    from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
-                                    if MISSIONS_AVAILABLE:
-                                        tracker = get_mission_tracker()
-                                        if tracker:
-                                            if tracker.process_event(event):
-                                                missions_found += 1
-                                except:
-                                    pass
-                            
-                            elif event_type == 'MissionCompleted':
-                                try:
-                                    from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
-                                    if MISSIONS_AVAILABLE:
-                                        tracker = get_mission_tracker()
-                                        if tracker:
-                                            tracker.process_event(event)
-                                except:
-                                    pass
-                            
-                            elif event_type == 'MissionAbandoned':
-                                try:
-                                    from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
-                                    if MISSIONS_AVAILABLE:
-                                        tracker = get_mission_tracker()
-                                        if tracker:
-                                            tracker.process_event(event)
-                                except:
-                                    pass
-                            
-                            elif event_type == 'CargoDepot':
-                                try:
-                                    from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
-                                    if MISSIONS_AVAILABLE:
-                                        tracker = get_mission_tracker()
-                                        if tracker:
-                                            tracker.process_event(event)
-                                except:
-                                    pass
-                                    
-                        except json.JSONDecodeError:
-                            continue
-                        except:
-                            continue
-                    if checkpoint_valid:
-                        scanned_checkpoint = (os.path.basename(journal_path), position)
-            except Exception as e:
-                checkpoint_valid = False
-                log.error(f"[JOURNAL] Error reading {os.path.basename(journal_path)}: {e}")
-                continue
-        
-        # End batch mode for mission tracker
-        if mission_tracker:
-            try:
-                mission_tracker.end_batch()
+                from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
+                if MISSIONS_AVAILABLE:
+                    mission_tracker = get_mission_tracker()
+                    if mission_tracker:
+                        mission_tracker.start_batch()
             except:
                 pass
         
-        # Clear catchup scan flag
-        self.cargo_monitor._catchup_scan_in_progress = False
+            for idx, journal_path in enumerate(journals):
+                # Update progress in status bar
+                if idx % 25 == 0:  # Update every 25 files
+                    progress = t('status_bar.journal_scanning_progress').format(done=idx, total=len(journals))
+                    self.after(0, lambda p=progress: self._set_journal_scan_status(p, 0))
+
+                try:
+                    with open(journal_path, 'rb') as f:
+                        if resume_offsets and journal_path in resume_offsets:
+                            try:
+                                offset = resume_offsets[journal_path]
+                                if offset <= os.fstat(f.fileno()).st_size:
+                                    f.seek(offset)
+                            except Exception:
+                                pass
+                        current_system = None
+
+                        position = f.tell()
+                        for line in f:
+                            if not line.endswith(b'\n'):
+                                try:
+                                    json.loads(line)
+                                except (ValueError, UnicodeError):
+                                    break
+                            position = f.tell()
+                            line = line.decode('utf-8', errors='replace').strip()
+                            if not line:
+                                continue
+                        
+                            try:
+                                event = json.loads(line)
+                                event_type = event.get('event', '')
+                                self.cargo_monitor.journal_parser.process_carrier_event(event)
+                            
+                                # CarrierJump is a commander arrival; CarrierLocation only tracks the carrier.
+                                if event_type in ('FSDJump', 'CarrierJump'):
+                                    system_name = event.get('StarSystem', '')
+                                    if system_name:
+                                        timestamp = event.get('timestamp', '')
+                                        system_address = event.get('SystemAddress')
+                                        star_pos = event.get('StarPos', [])
+                                        coordinates = tuple(star_pos) if len(star_pos) >= 3 else None
+                                    
+                                        # Use single source of truth for visit recording
+                                        if self.record_system_visit(system_name, timestamp, coordinates, system_address):
+                                            visits_added += 1
+                                        current_system = system_name
+                            
+
+                                elif event_type == 'Location':
+                                    # Location = game loaded, just track current system for context
+                                    system_name = event.get('StarSystem', '')
+                                    if system_name:
+                                        current_system = system_name
+
+
+                            
+                                # Process Scan events for ring/hotspot data
+                                elif event_type == 'Scan':
+                                    try:
+                                        self.cargo_monitor.journal_parser.process_scan(event)
+                                        hotspots_added += 1
+                                    except Exception as e:
+                                        log.error(f"Error processing Scan event: {e}")
+                            
+                                # Process SAASignalsFound for hotspots
+                                elif event_type == 'SAASignalsFound':
+                                    try:
+                                        self.cargo_monitor.journal_parser.process_saa_signals_found(event, current_system)
+                                        hotspots_added += 1
+                                    except Exception as e:
+                                        log.error(f"Error processing SAASignalsFound event: {e}")
+                            
+                                # Process mining missions
+                                elif event_type == 'MissionAccepted':
+                                    try:
+                                        from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
+                                        if MISSIONS_AVAILABLE:
+                                            tracker = get_mission_tracker()
+                                            if tracker:
+                                                if tracker.process_event(event):
+                                                    missions_found += 1
+                                    except:
+                                        pass
+                            
+                                elif event_type == 'MissionCompleted':
+                                    try:
+                                        from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
+                                        if MISSIONS_AVAILABLE:
+                                            tracker = get_mission_tracker()
+                                            if tracker:
+                                                tracker.process_event(event)
+                                    except:
+                                        pass
+                            
+                                elif event_type == 'MissionAbandoned':
+                                    try:
+                                        from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
+                                        if MISSIONS_AVAILABLE:
+                                            tracker = get_mission_tracker()
+                                            if tracker:
+                                                tracker.process_event(event)
+                                    except:
+                                        pass
+                            
+                                elif event_type == 'CargoDepot':
+                                    try:
+                                        from mining_missions import get_mission_tracker, MISSIONS_AVAILABLE
+                                        if MISSIONS_AVAILABLE:
+                                            tracker = get_mission_tracker()
+                                            if tracker:
+                                                tracker.process_event(event)
+                                    except:
+                                        pass
+                                    
+                            except json.JSONDecodeError:
+                                continue
+                            except:
+                                continue
+                        if checkpoint_valid:
+                            scanned_checkpoint = (os.path.basename(journal_path), position)
+                except Exception as e:
+                    checkpoint_valid = False
+                    log.error(f"[JOURNAL] Error reading {os.path.basename(journal_path)}: {e}")
+                    continue
         
-        # Re-enable carrier notifications and fire a single update
-        self.cargo_monitor.journal_parser._suppress_carrier_notifications = False
-        self.cargo_monitor.journal_parser._notify_carrier_updated()
+            # End batch mode for mission tracker
+            if mission_tracker:
+                try:
+                    mission_tracker.end_batch()
+                except:
+                    pass
+        finally:
+            # Clear catchup scan flag
+            self.cargo_monitor._catchup_scan_in_progress = False
+            # Re-enable carrier notifications and fire a single update
+            self.cargo_monitor.journal_parser._suppress_carrier_notifications = False
+            self.cargo_monitor.journal_parser._notify_carrier_updated()
         
         # Sync FC location to distance calculator from the now-correct carrier_data
         def _sync_fc_location():

@@ -1786,7 +1786,7 @@
     "section_jump": "Jump Schedule",
     "section_finance": "Finance",
     "section_services": "Services",
-    "services_help": "Brighter grey = Inactive or not installed",
+    "services_help": "Dimmed = Inactive or not installed",
     "section_cargo": "Cargo Capacity",
     "section_history": "Jump History",
     "label_location": "Location",

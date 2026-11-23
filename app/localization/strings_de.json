@@ -1794,7 +1794,7 @@
     "section_jump": "Sprungplan",
     "section_finance": "Finanzen",
     "section_services": "Dienste",
-    "services_help": "Hellgrau = Inaktiv oder nicht installiert",
+    "services_help": "Abgeblendet = Inaktiv oder nicht installiert",
     "section_cargo": "Frachtkapazität",
     "section_history": "Sprungverlauf",
     "label_location": "Standort",
