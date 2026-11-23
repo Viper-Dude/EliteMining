@@ -38,7 +38,7 @@ TRADE = ['Gold']
 GALAXY_LIMIT = 250
 
 # Same table the Trade tab uses (_convert_age_to_days in commodity_market_tab.py).
-TRADE_DAYS = {'Any': 30, '1 hour': 1, '8 hours': 1, '16 hours': 1, '1 day': 1, '2 days': 2}
+TRADE_DAYS = {'Any': 30, '1 hour': 2, '8 hours': 2, '16 hours': 2, '1 day': 2, '2 days': 3}
 
 
 def mining_days(age):

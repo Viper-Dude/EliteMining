@@ -1205,16 +1205,7 @@ class CommodityMarketTabMixin:
         }
 
     def _convert_age_to_days(self, age_str):
-        """Convert max age string to days for API (API expects integer days, rounds up sub-day values)"""
-        age_map = {
-            "Any": 30,
-            "1 hour": 1,    # API doesn't support hours, use 1 day minimum
-            "8 hours": 1,   # API doesn't support hours, use 1 day minimum
-            "16 hours": 1,  # API doesn't support hours, use 1 day minimum
-            "1 day": 1,
-            "2 days": 2
-        }
-        return age_map.get(age_str, 1)  # Default to 1 day
+        return MarketplaceAPI.convert_age_to_days(age_str)
     
     
     def _use_current_system_marketplace(self):
