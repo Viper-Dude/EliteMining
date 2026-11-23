@@ -20,18 +20,15 @@ from version import __version__
 from ui.theme import get_theme_colors
 
 
-source = ast.parse((ROOT / 'app/main.py').read_text(encoding='utf-8-sig'))
-original = next(node for node in source.body if isinstance(node, ast.ClassDef) and node.name == 'App')
-_first = next(n.lineno for n in original.body if isinstance(n, ast.FunctionDef) and n.name == '_build_distance_calculator_tab')
-_last = next(n.lineno for n in original.body if isinstance(n, ast.FunctionDef) and n.name == '_check_market_api_status')
-# Methods plus class constants (such as _DISTANCE_RESULT_FIELDS) defined in the Distance Calculator section
-methods = [node for node in original.body if isinstance(node, (ast.FunctionDef, ast.Assign))
-           and _first <= node.lineno < _last]
+source = ast.parse((ROOT / 'app/distance_calculator_tab.py').read_text(encoding='utf-8-sig'))
+original = next(node for node in source.body if isinstance(node, ast.ClassDef) and node.name == 'DistanceCalculatorTabMixin')
+# Methods plus class constants (such as _DISTANCE_RESULT_FIELDS)
+methods = [node for node in original.body if isinstance(node, (ast.FunctionDef, ast.Assign))]
 node = ast.ClassDef(name='App', bases=[], keywords=[], body=methods, decorator_list=[])
 namespace = dict(tk=tk, ttk=ttk, logging=logging, threading=threading, get_theme_colors=get_theme_colors,
                  ToolTip=Mock(), compact_classic_button=Mock(),
                  create_action_button=lambda parent, primary=False, **kwargs: tk.Button(parent, **kwargs))
-exec(compile(ast.fix_missing_locations(ast.Module(body=[node], type_ignores=[])), 'app/main.py', 'exec'), namespace)
+exec(compile(ast.fix_missing_locations(ast.Module(body=[node], type_ignores=[])), 'app/distance_calculator_tab.py', 'exec'), namespace)
 App = namespace['App']
 
 
