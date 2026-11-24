@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from tkinter import ttk
 
 from acquisition_view import _OverlayStatus, configure_outdated_tag, outdated_note, set_outdated_tag
+from carrier_names import station_display_name
 from column_visibility_helper import displayed_column
 from core.constants import MENU_COLORS
 from ui.search_control import SearchControl
@@ -445,7 +446,7 @@ class MeritMinerMixin:
             row_id = tree.insert("", "end", values=(
                 self._format_material_for_display(hit['mineral']), hit['system'], hit['ring'] or '-',
                 state_labels.get(hit['state'], hit['state']), f"{hit['distance']:.1f}", hit['sell_system'],
-                station, self._format_pad_size(buyer.get('maxLandingPadSize')), f"{hit['sell_distance']:.1f}",
+                station_display_name(buyer) or '-', self._format_pad_size(buyer.get('maxLandingPadSize')), f"{hit['sell_distance']:.1f}",
                 f"{demand:,}" if isinstance(demand, (int, float)) else '-', f"{hit['price']:,} CR", self._format_data_age(buyer.get('updatedAt', ''))))
             mm['mine_by_row'][row_id] = hit['system']
             mm['sell_by_row'][row_id] = hit['sell_system']

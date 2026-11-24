@@ -14,6 +14,7 @@ import time
 from datetime import datetime
 from typing import Optional
 import logging
+import carrier_names
 import system_info_cache
 
 log = logging.getLogger('EliteMining.EDDN')
@@ -206,6 +207,7 @@ class EDDNListener:
                     ON system_powerplay(system_name COLLATE NOCASE)
                 ''')
                 # System status (security, faction states...) from FSDJump/Location/CarrierJump
+                carrier_names.ensure_tables(cursor)
                 system_info_cache.ensure_table(cursor)
                 # Drop FTS5 table if it exists from older versions (unused, wastes space)
                 cursor.execute('DROP TABLE IF EXISTS commodity_prices_fts')
@@ -402,6 +404,9 @@ class EDDNListener:
             if 'commodity' in schema_ref.lower():
                 self._process_commodity_message(message)
             # Journal Docked/Location events — cache station metadata (stationType etc.)
+            elif schema_ref.rstrip('#/').endswith('/fsssignaldiscovered/1'):
+                signals = message.get('message', {}).get('signals', [])
+                carrier_names.store_names(self.database_path, map(carrier_names.from_signal, signals))
             elif 'journal' in schema_ref.lower():
                 self._process_journal_message(message)
                 

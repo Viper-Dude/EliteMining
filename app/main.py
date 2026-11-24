@@ -172,7 +172,7 @@ from overlays import (
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.7.0"
+APP_VERSION = "v5.7.1"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -858,6 +858,7 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
         eddn_cache_path = os.path.join(get_app_data_dir(), "data", "marketplace_cache.db")
         os.makedirs(os.path.dirname(eddn_cache_path), exist_ok=True)
         self.eddn_listener = EDDNListener(eddn_cache_path)
+        self.cargo_monitor.start_carrier_names(eddn_cache_path)
         self.eddn_listener.start()
         print(f"[OK] EDDN listener started (real-time market data) -> {eddn_cache_path}")
         
@@ -6612,7 +6613,7 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
         if sel:
             self._load_ship_preset(sel)
 
-    def _load_ship_preset(self, sel: str) -> None:
+    def _load_ship_preset(self, sel: str) -> bool:
         if self._ship_is_preset_modified():
             result = self._show_unsaved_ship_preset_dialog()
             if result == "yes":  # Save changes to the currently active preset
@@ -6620,7 +6621,7 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
             elif result == "no":  # Discard changes
                 pass
             else:  # Cancel - don't switch
-                return
+                return False
 
         try:
             with open(self._settings_path(sel), "r", encoding="utf-8") as f:
@@ -6630,8 +6631,10 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
             if slot:
                 self._ann_load_preset(slot)
             self._ship_set_active_preset(sel)
+            return True
         except Exception as e:
             messagebox.showerror("Load failed", str(e))
+            return False
 
     def _ship_get_current_snapshot(self):
         """Get a snapshot of current ship preset settings for comparison"""
@@ -7448,6 +7451,7 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
                 watcher.remove_watch(old_dir)
             if new_dir and os.path.isdir(new_dir):
                 watcher.add_watch(new_dir, self._on_journal_file_change)
+                self.cargo_monitor.backfill_carrier_names(self.eddn_listener.database_path, new_dir)
         except Exception as e:
             log.error(f"Could not move journal folder watch: {e}")
 
@@ -8031,8 +8035,8 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
             return
         self._last_auto_load_ship = ship_identity
         name = self._load_ship_preset_auto_load().get(ship_key)
-        if name and os.path.exists(self._settings_path(name)):
-            self._load_ship_preset(name)
+        if name and os.path.exists(self._settings_path(name)) and self._load_ship_preset(name):
+            self._select_preset_by_name(name)
 
     def _current_ship_preset_key(self) -> Optional[str]:
         ship_type = self.cargo_monitor.ship_type

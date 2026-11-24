@@ -11,6 +11,7 @@ from typing import List
 
 from localization import t
 from ui.search_control import SearchControl
+from carrier_names import station_display_name
 from marketplace_api import MarketplaceAPI
 from core.constants import MINING_COMMODITY_ORDER
 from app_utils import create_action_button, format_market_pad, format_market_powerplay, format_market_source, format_market_station_type, format_relative_age
@@ -384,7 +385,7 @@ class MultiMineralTab:
             ls = info.get('distanceToArrival')
             parent = self.tree.insert("", "end", open=True, text="", values=(
                 info.get('systemName', ''),
-                info.get('stationName', ''),
+                station_display_name(info),
                 format_market_station_type(info.get('stationType')),
                 format_market_pad(info.get('maxLandingPadSize')),
                 f"{dist:.1f}" if dist is not None else "-",

@@ -254,7 +254,7 @@
     "view_best_prices": "Beste Preise",
     "view_acquisition": "Übernahme",
     "view_hotspots_tooltip": "Ringe mit Hotspots, die zu Ihrer Suche passen.",
-    "view_best_prices_tooltip": "Beste Verkaufsorte für die Mineralien des gewählten Rings oder Systems.",
+    "view_best_prices_tooltip": "Beste Verkaufsorte für die Mineralien des gewählten Rings oder Systems.\nPreise können veraltet sein: Vor dem Flug immer Inara und die Landeerlaubnis prüfen.",
     "view_acquisition_tooltip": "Nahe unbesetzte Systeme, die Ihre Mineralien kaufen, für Acquire-Verdienste neben einem Fortified- oder Stronghold-System.",
     "rank_scope_all_rings": "{system} · alle Ringe",
     "rank_scope_ring_tooltip": "Preise nur für die Mineralien dieses Rings.",

@@ -6,6 +6,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from app_utils import create_action_button
+from carrier_names import station_display_name
 from column_visibility_helper import displayed_column
 from config import _load_cfg
 from core.constants import MENU_COLORS
@@ -939,7 +940,8 @@ class CommodityMarketTabMixin:
         values = tree.item(item, 'values')
         if not values or len(values) < 2:
             return "", ""
-        return str(values[0]).strip(), str(values[1]).strip()
+        station = getattr(tree, '_raw_station_names', {}).get(item, str(values[1]).strip())
+        return str(values[0]).strip(), station
 
     def _selected_system_station(self, tree):
         selection = tree.selection()
@@ -1742,6 +1744,7 @@ class CommodityMarketTabMixin:
         """Display trade search results in trade table"""
         # Clear existing results
         self.trade_tree.delete(*self.trade_tree.get_children())
+        self.trade_tree._raw_station_names = {}
         self._trade_row_source = {}
         self.trade_sort_column = None
         self.trade_sort_reverse = False
@@ -1815,7 +1818,7 @@ class CommodityMarketTabMixin:
             row_tag = 'oddrow' if row_index % 2 == 0 else 'evenrow'
             row_id = self.trade_tree.insert('', 'end', values=(
                 f" {system_name} ",
-                f" {station_name} ",
+                f" {station_display_name(result, 'Unknown')} ",
                 f" {station_type} ",
                 f" {pad} ",
                 f" {distance} ",
@@ -1826,6 +1829,7 @@ class CommodityMarketTabMixin:
                 f" {updated} ",
                 ""
             ), tags=(row_tag,))
+            self.trade_tree._raw_station_names[row_id] = station_name
             self._trade_row_source[row_id] = format_market_source(result)
 
         # Backfill/refresh PowerPlay from Spansh's own Exploited/Fortified/Stronghold/Unoccupied
@@ -2124,6 +2128,7 @@ class CommodityMarketTabMixin:
         try:
             # Determine mode for correct field handling
             is_buy_mode = self.marketplace_buy_mode.get()
+            self.marketplace_tree._raw_station_names = {}
             self._marketplace_row_source = {}
             self.marketplace_sort_column = None
             self.marketplace_sort_reverse = False
@@ -2186,7 +2191,7 @@ class CommodityMarketTabMixin:
                 # Add subtle visual separator using spacing
                 row_id = self.marketplace_tree.insert("", "end", values=(
                     f" {system_name} ",
-                    f" {station_name} ",
+                    f" {station_display_name(result)} ",
                     f" {station_type} ",
                     f" {pad} ",
                     f" {distance} ",
@@ -2197,6 +2202,7 @@ class CommodityMarketTabMixin:
                     f" {updated} ",
                     ""
                 ), tags=(tag,))
+                self.marketplace_tree._raw_station_names[row_id] = station_name
                 self._marketplace_row_source[row_id] = format_market_source(result)
 
             # Backfill/refresh PowerPlay from Spansh's own Exploited/Fortified/Stronghold/

@@ -15,6 +15,7 @@ from ui.search_control import SearchControl
 from marketplace_api import MarketplaceAPI
 from config import _load_cfg, update_config_value, load_theme
 from ui.tooltip import ToolTip, add_header_tooltips
+from carrier_names import station_display_name
 from column_visibility_helper import ColumnVisibilityMixin
 from core.constants import get_menu_colors
 from app_utils import create_action_button, format_market_pad, format_market_source, format_market_station_type, format_relative_age, open_system_website
@@ -351,7 +352,7 @@ class CargoSellPlanner(ColumnVisibilityMixin):
         self.destinations.clear()
         baseline = plans[0][1] if plans else None
         for name, plan in plans:
-            route = ' → '.join(s['info']['systemName'] + ' / ' + s['info']['stationName'] for s in plan['stops'])
+            route = ' → '.join(s['info']['systemName'] + ' / ' + station_display_name(s['info']) for s in plan['stops'])
             distance = f"{plan['distance']:.1f}" if plan['distance'] is not None else '?'
             station_types = ' → '.join(format_market_station_type(s['info'].get('stationType')) for s in plan['stops'])
             arrival = ' → '.join(self._format_arrival(s['info'].get('distanceToArrival')) for s in plan['stops'])
@@ -383,7 +384,7 @@ class CargoSellPlanner(ColumnVisibilityMixin):
             arrival = row.get('distanceToArrival')
             arrival_display = self._format_arrival(arrival)
             item = self.details.insert('', 'end', values=(
-                f"{sale['stop'] + 1}. {stop['systemName']} / {stop['stationName']}",
+                f"{sale['stop'] + 1}. {stop['systemName']} / {station_display_name(stop)}",
                 format_market_station_type(row.get('stationType')),
                 format_market_pad(row.get('maxLandingPadSize')),
                 f'{leg:.1f}' if leg is not None else '?',

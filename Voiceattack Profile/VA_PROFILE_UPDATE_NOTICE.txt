@@ -1,11 +1,11 @@
 ============================================================
-  EliteMining v5.6.8 — VoiceAttack Profile Update 
+  EliteMining v5.7.1 — VoiceAttack Profile Update 
 ============================================================
 
-This release includes an updated VoiceAttack profile (v5.6.8).
+This release includes an updated VoiceAttack profile (v5.7.1).
 
 What's changed:
-- Fixed the cargo scoop timer not starting on the first mining run. It can still fail when launching collector limpets, because each launch briefly opens and closes the cargo scoop.
+- Various improvements.
 
 Keep the VoiceAttack profile option ticked on the next page to install the updated
 profile. Follow the app's profile update instructions to import it into VoiceAttack.

@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / 'app'))
 
 from marketplace_api import MarketplaceAPI, _short_cache, _short_cache_key_locks, _short_cached
 from system_finder_api import SystemFinderAPI
+from commodity_market_tab import CommodityMarketTabMixin
 from ui.search_control import SearchControl
 from check_ring_finder_search import load_methods
 
@@ -239,10 +240,7 @@ for _method in (App._search_marketplace, App._search_systems):
 
 class SearchScreenTests(unittest.TestCase):
     def test_marketplace_renderer_receives_enrichment_setting(self):
-        cls = load_methods('app/commodity_market_tab.py', 'CommodityMarketTabMixin', {'_display_marketplace_results', '_populate_marketplace_results',
-                                                                                    '_start_commodity_pp_backfill', '_next_commodity_pp_generation'})
-        cls._populate_marketplace_results.__globals__.update(threading=threading)
-        app = cls()
+        app = CommodityMarketTabMixin()
         app._clear_marketplace_results = Mock()
         app.marketplace_buy_mode = SimpleNamespace(get=lambda: False)
         app.marketplace_commodity = SimpleNamespace(get=lambda: 'Platinum')
@@ -250,11 +248,17 @@ class SearchScreenTests(unittest.TestCase):
         app.marketplace_tree.get_children.return_value = ()
         app.marketplace_total_label = Widget()
         app._backfill_commodity_pp_worker = Mock()
-        rows = [dict(systemName='Sol', stationName='Station', sellPrice=123, demand=10, distance=1)]
-        with patch.object(SystemFinderAPI, '_batch_get_powerplay', return_value={}), \
+        rows = [dict(systemName='Sol', stationName='MMC0', sellPrice=123, demand=10, distance=1)]
+        with patch.dict('carrier_names._names', {'MMC0': 'Squad Ship'}), \
+                patch.object(SystemFinderAPI, '_batch_get_powerplay', return_value={}), \
                 patch('threading.Thread', ImmediateThread):
             app._display_marketplace_results(rows, enrich_powerplay=False)
             app.marketplace_tree.insert.assert_called_once()
+            values = app.marketplace_tree.insert.call_args.kwargs['values']
+            self.assertEqual(values[1].strip(), 'Squad Ship (MMC0)')
+            app.marketplace_tree.item.return_value = values
+            item = app.marketplace_tree.insert.return_value
+            self.assertEqual(app._row_system_station(app.marketplace_tree, item), ('Sol', 'MMC0'))
             app._backfill_commodity_pp_worker.assert_not_called()
             app._display_marketplace_results(rows, enrich_powerplay=True)
             app._backfill_commodity_pp_worker.assert_called_once()

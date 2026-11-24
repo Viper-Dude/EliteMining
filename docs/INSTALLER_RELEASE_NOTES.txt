@@ -1,12 +1,7 @@
-﻿What's new in EliteMining v5.7.0
+﻿What's new in EliteMining v5.7.1
 
 New Features & Improvements
-- The Hotspots Finder search results now have five views to switch between: Hotspots, Best Prices, Where to Mine, Acquisition and Merit Miner, so prices, best mining systems and acquisition systems no longer open in popups.
-- Where to Mine lists the nearest mining systems with the best price and demand within your chosen selling distance.
-- Auto Prices switches to Best Prices after each jump.
-- New Merit Miner finds the nearest systems of your power where you can mine a chosen mineral for merits, and where to sell it.
-- Right-click a Merit Miner result to see every buyer near that system, and the Acquisition view now says when a system belongs to another power.
-- My Pledged Power is now set automatically from the game each time you log in.
+- Fleet carriers in search results, sell plans and the Auto Prices overlay now show their name next to the callsign when known.
+- The Ship Presets sidebar now opens the group for your new ship and highlights its automatically loaded preset that you have choosen to Auto - Load.
 
 Bug Fixes
-- Find Acquisition Systems now shows "Unoccupied" instead of a placeholder name in the Contesting Power column.

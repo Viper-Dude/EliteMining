@@ -9,6 +9,7 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Optional
 
+from carrier_names import station_display_name
 from column_visibility_helper import displayed_column
 from core.constants import MENU_COLORS
 from ui.search_control import SearchControl
@@ -515,7 +516,7 @@ class AcquisitionMixin:
             station = buyer_row.get('stationName', '') or '-'
             demand = buyer_row.get('demand')
             row_id = tree.insert("", "end", values=(
-                sys_name, station, self._format_station_type(buyer_row.get('stationType')),
+                sys_name, station_display_name(buyer_row) or '-', self._format_station_type(buyer_row.get('stationType')),
                 self._format_pad_size(buyer_row.get('maxLandingPadSize')), f"{distance:.1f}", power,
                 self._format_material_for_display(best_mineral.get(sys_name, '')),
                 f"{demand:,}" if isinstance(demand, (int, float)) else '-',

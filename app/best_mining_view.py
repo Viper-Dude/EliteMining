@@ -10,6 +10,7 @@ from tkinter import ttk
 from typing import Optional
 
 from acquisition_view import _OverlayStatus
+from carrier_names import station_display_name
 from column_visibility_helper import displayed_column
 from core.constants import MENU_COLORS
 from ui.search_control import SearchControl
@@ -501,9 +502,9 @@ class BestMiningMixin:
                 price = f"{best.get('sellPrice', 0):,} CR"
                 station_system = best.get('systemName', '')
                 if not station_system:
-                    station = best.get('stationName', '') or "-"
+                    station = station_display_name(best) or "-"
                 else:
-                    station = f"{best.get('stationName', '')} ({station_system})"
+                    station = f"{station_display_name(best)} ({station_system})"
                 station_type = self._format_station_type(best.get('stationType'))
                 demand_val = best.get('demand')
                 demand = f"{int(demand_val):,}" if isinstance(demand_val, (int, float)) else "-"

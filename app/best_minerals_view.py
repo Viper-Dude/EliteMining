@@ -11,6 +11,7 @@ from tkinter import ttk
 from typing import Dict, List
 
 from core.constants import MENU_COLORS
+from carrier_names import station_display_name
 from column_visibility_helper import displayed_column
 from ui.striped_treeview import StripedTreeview
 from ui.theme import modern_color
@@ -42,7 +43,7 @@ class BestMineralsMixin:
                 ranked.append((mat, best))
         ranked.sort(key=lambda item: item[1].get('sellPrice', 0), reverse=True)
         for mat, row in ranked:
-            station = row.get('stationName', '')
+            station = station_display_name(row)
             if row.get('systemName', '') != system_name:
                 station += f" ({row.get('systemName', '')})"
             pad = self._format_pad_size(row.get('maxLandingPadSize'))
@@ -538,7 +539,7 @@ class BestMineralsMixin:
             if row_best and row_best.get('sellPrice', 0) > 0:
                 price = f"{row_best.get('sellPrice', 0):,} CR"
                 station_system = row_best.get('systemName', '')
-                station = f"{row_best.get('stationName', '')} ({station_system})"
+                station = f"{station_display_name(row_best)} ({station_system})"
                 station_type = self._format_station_type(row_best.get('stationType'))
                 pad = self._format_pad_size(row_best.get('maxLandingPadSize'))
                 demand_val = row_best.get('demand')

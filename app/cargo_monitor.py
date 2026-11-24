@@ -10,6 +10,7 @@ import threading
 import time
 import tkinter as tk
 
+import carrier_names
 from config import _load_cfg
 from journal_parser import JournalParser
 from journal_reader import journal_resume_offset, read_complete_journal_lines
@@ -1308,6 +1309,28 @@ class CargoMonitor:
             main_app.after(0, self._deliver_journal_events, events)
             return
         self._deliver_journal_events(events)
+
+    def start_carrier_names(self, db_path):
+        self._queue_background_job(lambda: carrier_names.load_names(db_path))
+
+        def collect(events):
+            relevant = [event for event in events if event.get('event') in ('FSSSignalDiscovered', 'CarrierStats')]
+            if relevant:
+                self._queue_background_job(lambda: carrier_names.store_names(
+                    db_path, map(carrier_names.from_journal, relevant)))
+
+        self.add_journal_listener(collect)
+        self.backfill_carrier_names(db_path, self.journal_dir)
+
+    @staticmethod
+    def backfill_carrier_names(db_path, folder):
+        def run():
+            try:
+                carrier_names.backfill(db_path, folder)
+            except Exception:
+                log.exception("Carrier name journal backfill failed")
+
+        threading.Thread(target=run, name="CarrierNameHistory", daemon=True).start()
 
     def _queue_cache_upserts(self, event):
         """Store PowerPlay and system status from a jump/location event off the UI thread.

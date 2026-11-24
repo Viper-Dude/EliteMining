@@ -254,7 +254,7 @@
     "view_best_prices": "Best Prices",
     "view_acquisition": "Acquisition",
     "view_hotspots_tooltip": "Rings with hotspots that match your search.",
-    "view_best_prices_tooltip": "Best places to sell the minerals from the selected ring or system.",
+    "view_best_prices_tooltip": "Best places to sell the minerals from the selected ring or system.\nPrices may be old: always check Inara and docking access before flying.",
     "view_acquisition_tooltip": "Nearby Unoccupied systems that buy your minerals, for Acquire merits near a Fortified or Stronghold system.",
     "rank_scope_all_rings": "{system} · all rings",
     "rank_scope_ring_tooltip": "Prices for the minerals found in this ring only.",
