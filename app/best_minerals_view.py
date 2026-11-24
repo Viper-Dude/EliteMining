@@ -260,8 +260,9 @@ class BestMineralsMixin:
         }
         self._bp_sort_reverse = {col: False for col in columns}
         for col in columns:
-            tree.heading(col, text=self._bp_column_labels[col], anchor="w", command=lambda c=col: self._bp_sort(c))
-            tree.column(col, width=self.BP_DEFAULT_WIDTHS[col], minwidth=40, anchor="w", stretch=False)
+            anchor = "center" if col == "Pad" else "w"
+            tree.heading(col, text=self._bp_column_labels[col], anchor=anchor, command=lambda c=col: self._bp_sort(c))
+            tree.column(col, width=self.BP_DEFAULT_WIDTHS[col], minwidth=40, anchor=anchor, stretch=False)
 
         try:
             from config import load_rank_minerals_column_widths

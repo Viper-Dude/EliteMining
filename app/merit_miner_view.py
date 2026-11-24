@@ -125,10 +125,11 @@ class MeritMinerMixin:
         header_pad = scaled_px(24)
         default_widths = {}
         for col in columns:
-            tree.heading(col, text=column_labels[col], anchor="w")
+            anchor = "center" if col == "Pad" else "w"
+            tree.heading(col, text=column_labels[col], anchor=anchor)
             min_w = max(heading_font.measure(column_labels[col]) + header_pad, scaled_px(50))
             default_widths[col] = max(scaled_px(self.MM_DEFAULT_WIDTHS[col]), min_w)
-            tree.column(col, width=default_widths[col], minwidth=min_w, anchor="w", stretch=False)
+            tree.column(col, width=default_widths[col], minwidth=min_w, anchor=anchor, stretch=False)
 
         try:
             from config import load_merit_miner_column_widths
