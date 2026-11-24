@@ -27,6 +27,40 @@ log = logging.getLogger('ring_finder')
 
 
 class BestMineralsMixin:
+    def _build_prices_overlay_text(self, system_name: str, results: list) -> str:
+        """All minerals by best sell price, one line each, honouring the in-system-only setting"""
+        from config import load_pp_mode
+        in_system_only = load_pp_mode()
+        header_key = 'ring_finder.prices_overlay_header_in_system' if in_system_only else 'ring_finder.prices_overlay_header'
+        lines = [t(header_key).format(system=system_name.upper())]
+        ranked = []
+        for mat, best, priced_rows in results:
+            if in_system_only:
+                in_system = [r for r in priced_rows if r.get('systemName', '') == system_name]
+                best = max(in_system, key=lambda r: r.get('sellPrice', 0)) if in_system else None
+            if best and best.get('sellPrice', 0) > 0:
+                ranked.append((mat, best))
+        ranked.sort(key=lambda item: item[1].get('sellPrice', 0), reverse=True)
+        for mat, row in ranked:
+            station = row.get('stationName', '')
+            if row.get('systemName', '') != system_name:
+                station += f" ({row.get('systemName', '')})"
+            pad = self._format_pad_size(row.get('maxLandingPadSize'))
+            if pad != '?':
+                station += f" [{pad}]"
+            if in_system_only:
+                ls = row.get('distanceToArrival')
+                dist_text = f"  {ls:,.0f} LS" if ls else ""
+            else:
+                dist = row.get('distance')
+                dist_text = f"  {dist:.1f} LY" if dist is not None else ""
+            demand = row.get('demand')
+            demand_text = f"  {t('ring_finder.col_demand')} {demand:,}" if isinstance(demand, (int, float)) else ""
+            lines.append(f"{self._format_material_for_display(mat).upper()}  {row['sellPrice']:,} CR{demand_text}  {station}{dist_text}")
+        if not ranked:
+            lines.append(t('ring_finder.no_data_in_system') if in_system_only else t('ring_finder.no_data'))
+        return "\n".join(lines)
+
     def _rank_minerals_inputs(self, scope: str, system_name: str = None):
         """Work out what to price for the selected row: (system_name, fetch_materials,
         extra_candidates, mineral_ring_types), or None (status set) if nothing to rank.
