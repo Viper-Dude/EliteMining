@@ -67,7 +67,7 @@ class View(BestMiningMixin, BestMineralsMixin):
     pass
 
 
-def make_view(reference='Sol', mineral='All Minerals', pp_mode=False):
+def make_view(reference='Sol', mineral='All Minerals'):
     v = View()
     v._bm = {'busy': False, 'status': '', 'hint': '', 'spin': 0, 'spinning': True, 'ran': False,
              'system': '', 'count': 0, 'cache': None,
@@ -75,7 +75,7 @@ def make_view(reference='Sol', mineral='All Minerals', pp_mode=False):
     v._bm_all_label = 'All Minerals'
     v._bm_mineral_var = Var(mineral)
     v._bm_distance_var = Var('50')
-    v._bm_pp_mode_var = Var(pp_mode)
+    v._bm_sell_distance_var = Var('50')
     v._bm_control = Mock(running=False)
     v._bm_refresh_controls = Mock()
     v._bm_tree = Tree()
@@ -91,61 +91,60 @@ def make_view(reference='Sol', mineral='All Minerals', pp_mode=False):
 
 def buyer(system, price, x=0.0, station='Port', ls=1234.6):
     return {'systemName': system, 'stationName': station, 'sellPrice': price, 'systemX': x, 'systemY': 0.0,
-            'systemZ': 0.0, 'distanceToArrival': ls, 'stationType': 'Coriolis', 'updatedAt': '1h'}
+            'systemZ': 0.0, 'distanceToArrival': ls, 'stationType': 'Coriolis', 'updatedAt': '1h', 'demand': 12345}
 
 
-def cache(rows_by_material, candidates=None, coords=None, target='Sol'):
-    return {'target_system': target,
-            'candidates': candidates or [('MineA', {'distance': 5.0, 'materials': {'Platinum'}}),
+def cache(rows_by_material, candidates=None, coords=None, sell_distance=50.0):
+    return {'candidates': candidates or [('MineA', {'distance': 5.0, 'materials': {'Platinum'}}),
                                          ('MineB', {'distance': 9.0, 'materials': {'Platinum', 'Painite'}})],
             'rows_by_material': rows_by_material,
             'candidate_coords': coords if coords is not None else {'MineA': {'x': 0, 'y': 0, 'z': 0},
                                                                    'MineB': {'x': 100, 'y': 0, 'z': 0}},
-            'max_distance': 50.0}
+            'max_distance': 50.0, 'sell_distance': sell_distance}
 
 
 class RankTests(unittest.TestCase):
-    def rank(self, c, pp_mode):
+    def rank(self, c):
         return BestMiningMixin._rerank_reverse_search_results(
-            c['target_system'], c['candidates'], c['rows_by_material'], c['candidate_coords'],
-            c['max_distance'], pp_mode)
+            c['candidates'], c['rows_by_material'], c['candidate_coords'], c['sell_distance'])
 
-    def test_without_pp_mode_each_candidate_uses_its_nearest_buyer(self):
-        c = cache({'Platinum': [buyer('Near A', 100, x=2), buyer('Near B', 90, x=98), buyer('Sol', 500, x=300)],
+    def test_each_candidate_uses_its_best_price_within_sell_range(self):
+        c = cache({'Platinum': [buyer('Near A', 100, x=2), buyer('Far A', 400, x=40), buyer('Near B', 90, x=98),
+                                buyer('Too Far', 999, x=300)],
                    'Painite': [buyer('Near B2', 300, x=101)]})
-        results = self.rank(c, False)
+        results = self.rank(c)
         by_system = {r['system']: r for r in results}
-        self.assertEqual(by_system['MineA']['best']['systemName'], 'Near A')
-        self.assertEqual(by_system['MineB']['best']['systemName'], 'Near B2')
+        self.assertEqual(by_system['MineA']['best']['systemName'], 'Far A')
+        self.assertAlmostEqual(by_system['MineA']['sell_distance'], 40.0)
+        self.assertEqual(by_system['MineB']['best']['systemName'], 'Near B2')  # Far A is 60 Ly from MineB
         self.assertEqual(by_system['MineB']['mineral'], 'Painite')
-        self.assertEqual([r['system'] for r in results], ['MineB', 'MineA'])  # highest price first
+        self.assertEqual([r['system'] for r in results], ['MineA', 'MineB'])
 
-    def test_pp_mode_counts_only_the_reference_system(self):
-        c = cache({'Platinum': [buyer('Near A', 900, x=2), buyer('Sol', 300), buyer('Sol', 350, station='Dock')],
-                   'Painite': [buyer('Near B2', 999, x=101)]})
-        results = self.rank(c, True)
-        for r in results:
-            self.assertEqual(r['best']['systemName'], 'Sol')
-            self.assertEqual(r['best']['sellPrice'], 350)
-            self.assertEqual(r['mineral'], 'Platinum')
+    def test_nearest_mining_system_comes_first(self):
+        c = cache({'Platinum': [buyer('Near A', 100, x=2), buyer('Near B', 900, x=98)]})
+        self.assertEqual([r['system'] for r in self.rank(c)], ['MineA', 'MineB'])  # 5 Ly before 9 Ly
+        c['candidates'][0][1]['distance'] = 20.0
+        self.assertEqual([r['system'] for r in self.rank(c)], ['MineB', 'MineA'])
+
+    def test_equal_prices_pick_the_nearer_buyer(self):
+        c = cache({'Platinum': [buyer('Farther', 200, x=30), buyer('Nearer', 200, x=10)]},
+                  candidates=[('MineA', {'distance': 5.0, 'materials': {'Platinum'}})])
+        self.assertEqual(self.rank(c)[0]['best']['systemName'], 'Nearer')
+
+    def test_sell_within_is_separate_from_max_distance(self):
+        c = cache({'Platinum': [buyer('Far A', 400, x=80)]}, sell_distance=100.0,
+                  candidates=[('MineA', {'distance': 5.0, 'materials': {'Platinum'}})])
+        self.assertEqual(self.rank(c)[0]['best']['systemName'], 'Far A')  # 80 Ly > Max Distance 50
+        c['sell_distance'] = 50.0
+        self.assertIsNone(self.rank(c)[0]['best'])
+
+    def test_candidate_without_coordinates_is_unpriced(self):
+        c = cache({'Platinum': [buyer('Near A', 100, x=2)]}, coords={},
+                  candidates=[('MineA', {'distance': 5.0, 'materials': {'Platinum'}})])
+        self.assertIsNone(self.rank(c)[0]['best'])
 
 
 class RenderTests(unittest.TestCase):
-    def test_toggle_reranks_cached_prices_without_a_search(self):
-        v = make_view()
-        v._bm['cache'] = cache({'Platinum': [buyer('Near A', 100, x=2), buyer('Sol', 300, x=300)]})
-        with patch('system_finder_api.SystemFinderAPI._batch_get_powerplay', return_value={}), \
-                patch('marketplace_api.MarketplaceAPI.search_buyers') as buyers, \
-                patch('config.save_pp_mode'):
-            v._bm_rerender()
-            first = v._bm_tree.values(v._bm_tree.order[0], 'Station')
-            v._bm_pp_mode_var.set(True)
-            v._bm_on_pp_toggle()
-        buyers.assert_not_called()
-        self.assertEqual(first, 'Port (Near A)')
-        self.assertEqual(v._bm_tree.values(v._bm_tree.order[0], 'Station'), 'Port')
-        self.assertEqual(v._bm_tree.values(v._bm_tree.order[0], 'Price'), '300 CR')
-
     def test_results_show_while_the_search_is_still_marked_busy(self):
         # SearchControl calls the results callback first and clears busy afterwards
         v = make_view()
@@ -154,15 +153,6 @@ class RenderTests(unittest.TestCase):
             v._bm_show_results(cache({'Platinum': [buyer('Near A', 100, x=2)]}))
         self.assertEqual(len(v._bm_tree.order), 1)  # MineB has no buyer within 50 Ly
         self.assertEqual(v._bm['count'], 1)
-
-    def test_pp_mode_without_a_market_shows_hint_not_empty_rows(self):
-        v = make_view(pp_mode=True)
-        v._bm['cache'] = cache({'Platinum': [buyer('Near A', 100, x=2)]})
-        with patch('system_finder_api.SystemFinderAPI._batch_get_powerplay', return_value={}):
-            v._bm_rerender()
-        self.assertEqual(v._bm_tree.order, [])
-        self.assertIn('Sol', v._bm['hint'])
-        self.assertEqual(v._bm['count'], 0)
 
     def test_systems_without_a_buyer_in_range_are_hidden(self):
         v = make_view()
@@ -192,6 +182,7 @@ class RenderTests(unittest.TestCase):
         row = v._bm_tree.order[0]
         self.assertEqual(v._bm_tree.values(row, 'Price'), '123,456 CR')
         self.assertEqual(v._bm_tree.values(row, 'LS'), '1,234')
+        self.assertEqual(v._bm_tree.values(row, 'Demand'), '12,345')
         self.assertEqual(v._bm_tree.values(row, 'Dist'), '5.0')
         self.assertEqual(v._bm_tree.values(row, 'SellDist'), '2.0')  # MineA at x=0, buyer at x=2
         self.assertEqual(v._bm_tree.values(row, 'PowerPlay'), 'Unoccupied')
@@ -213,11 +204,10 @@ class RunTests(unittest.TestCase):
         with patch('best_mining_view.threading.Thread') as thread:
             v._bm_start()
         self.assertEqual(v._results_view_var.value, 'best_mining')
-        self.assertEqual(thread.call_args.kwargs['args'][1:4], ('Sol', 50.0, 'Low Temperature Diamonds'))
+        self.assertEqual(thread.call_args.kwargs['args'][1:5], ('Sol', 50.0, 50.0, 'Low Temperature Diamonds'))
 
     def test_view_click_runs_only_once(self):
         v = make_view()
-        v._bm_sync_pp_mode = Mock()
         v._bm_start = Mock()
         v._bm_on_view_click()
         v._bm['ran'] = True
@@ -226,7 +216,6 @@ class RunTests(unittest.TestCase):
 
     def test_view_click_without_reference_does_not_search(self):
         v = make_view(reference='')
-        v._bm_sync_pp_mode = Mock()
         v._bm_start = Mock()
         v._bm_on_view_click()
         v._bm_start.assert_not_called()
@@ -245,8 +234,10 @@ class RunTests(unittest.TestCase):
         local_db = Mock()
         local_db.is_database_available.return_value = True
         local_db.get_system_coordinates.side_effect = lambda name: {'x': 9, 'y': 9, 'z': 9} if name == 'MineB' else None
-        with patch('marketplace_api.MarketplaceAPI.search_buyers', return_value=[]),                 patch('local_database.LocalSystemsDatabase', return_value=local_db):
-            v._reverse_search_worker('Sol', 50.0, 'Platinum', control)
+        with patch('marketplace_api.MarketplaceAPI.search_buyers', return_value=[]) as buyers, \
+                patch('local_database.LocalSystemsDatabase', return_value=local_db):
+            v._reverse_search_worker('Sol', 50.0, 30.0, 'Platinum', control)
+        self.assertEqual(buyers.call_args.args[2], 80)  # Max Distance + Sell Within
         callback = control.complete.call_args.args[1]
         callback([])
         coords = v._bm_show_results.call_args.args[0]['candidate_coords']
@@ -259,12 +250,34 @@ class RunTests(unittest.TestCase):
         v._get_hotspots = Mock(return_value=[])
         control = Mock()
         control.is_cancelled.return_value = False
-        v._reverse_search_worker('Sol', 50.0, None, control)
+        v._reverse_search_worker('Sol', 50.0, 50.0, None, control)
         rows, callback = control.complete.call_args.args
         self.assertEqual(rows, [])
         v._bm_fill = Mock()
         callback(rows)
         self.assertIn('Sol', v._bm['hint'])
+
+
+class BuyerSearchTests(unittest.TestCase):
+    def test_reference_system_rows_get_its_name_and_position(self):
+        import marketplace_api
+        from marketplace_api import MarketplaceAPI
+
+        def ardent(path, params, is_cancelled=None):
+            if path.endswith('/commodities/imports'):
+                return [{'commodityName': 'platinum', 'marketId': 7, 'stationName': 'Dock', 'sellPrice': 300}]
+            return []
+        with patch.dict(marketplace_api._system_coords_cache, {'Ref Sys': (1.0, 2.0, 3.0)}), \
+                patch.dict(marketplace_api._short_cache, clear=True), \
+                patch.object(MarketplaceAPI, '_fetch_ardent', side_effect=ardent), \
+                patch.object(MarketplaceAPI, '_fetch_spansh_nearby', return_value=[]), \
+                patch.object(MarketplaceAPI, '_fetch_spansh_carriers', return_value=[]), \
+                patch.object(MarketplaceAPI, '_fetch_eddn_cache', return_value=[]), \
+                patch.object(MarketplaceAPI, '_backfill_eddn_cache'):
+            rows = MarketplaceAPI.search_buyers('Platinum', 'Ref Sys', 80, 7, False)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['systemName'], 'Ref Sys')
+        self.assertEqual((rows[0]['systemX'], rows[0]['systemY'], rows[0]['systemZ']), (1.0, 2.0, 3.0))
 
 
 class ClickTests(unittest.TestCase):

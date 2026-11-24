@@ -934,8 +934,7 @@ class BestMineralsMixin:
 
     def _on_results_view_click(self):
         """A click on Best Prices loads the selected hotspot row, unless that ring is already
-        shown. With no row selected it loads the Reference System's whole-system prices when
-        the shown prices are for another system; otherwise it only switches."""
+        shown. With no row selected it only switches to the view."""
         if self._results_view_var.get() == 'acquisition':
             self._acq_on_view_click()
             return
@@ -950,9 +949,6 @@ class BestMineralsMixin:
             return
         selection = self.results_tree.selection()
         if not selection:
-            reference = self.system_var.get().strip()
-            if reference and reference.lower() != bp['system'].lower():
-                self._rank_minerals_for_system('system', system_name=self._saved_system_spelling(reference))
             return
         values = self.results_tree.item(selection[0], 'values')
         if not values or len(values) < 9:

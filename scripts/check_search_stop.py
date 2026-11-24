@@ -409,7 +409,7 @@ class RemainingWorkerTests(unittest.TestCase):
         with patch.object(MarketplaceAPI, 'search_buyers', side_effect=fetch) as buyers, \
                 patch('concurrent.futures.ThreadPoolExecutor', InlinePool), \
                 patch.dict(sys.modules, local_database=local_db):
-            finder._reverse_search_worker('Sol', 50, None, control)
+            finder._reverse_search_worker('Sol', 50, 50, None, control)
         parent.flush()
         self.assertEqual(buyers.call_count, 1)
         self.assertEqual(sum(bool(rows) for rows in finder._bm_show_results.call_args.args[0]['rows_by_material'].values()), 1)

@@ -1190,8 +1190,16 @@ class MarketplaceAPI:
 
             print(f"[BUYERS] local path: {local_path}")
             local_rows = [r for r in local_rows_raw if r.get("commodityName", "").lower() == commodity_normalized]
+            # Scoped to reference_system by the URL; stamp its name and position so callers that
+            # match by system name or measure from another system can use these rows. Cache only:
+            # the Spansh call above already looked the coordinates up.
+            ref_coords = _system_coords_cache.get(reference_system)
             for r in local_rows:
                 r["distance"] = 0
+                if not r.get("systemName"):
+                    r["systemName"] = reference_system
+                if ref_coords and any(r.get(k) is None for k in ("systemX", "systemY", "systemZ")):
+                    r["systemX"], r["systemY"], r["systemZ"] = ref_coords
 
             print(f"[BUYERS] nearby={len(nearby_rows)} local={len(local_rows)}")
             results = MarketplaceAPI._merge_by_freshness(nearby_rows + local_rows)

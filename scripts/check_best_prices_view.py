@@ -192,18 +192,11 @@ class BestPricesClickTests(unittest.TestCase):
         v._on_results_view_click()
         v._rank_minerals_for_system.assert_not_called()
 
-    def test_no_selection_new_reference_loads_its_prices(self):
-        v = self.make((), shown_system='Sol', reference='LTT 4835')
-        v._on_results_view_click()
-        v._rank_minerals_for_system.assert_called_once_with('system', system_name='LTT 4835')
-
-    def test_typed_reference_uses_saved_spelling(self):
-        v = self.make((), shown_system='Sol', reference='ltt 4835')
-        v.results_tree.get_children.return_value = ('r1', 'r2')
-        rows = {'r1': ('1.0', '0', 'Wregoe AB-C d1', '1 A Ring'), 'r2': ('2.0', '0', 'LTT 4835', '2 A Ring')}
-        v.results_tree.item.side_effect = lambda item, option=None: rows[item]
-        v._on_results_view_click()
-        v._rank_minerals_for_system.assert_called_once_with('system', system_name='LTT 4835')
+    def test_no_selection_never_loads_the_reference_system(self):
+        for reference in ('LTT 4835', 'ltt 4835'):
+            v = self.make((), shown_system='Sol', reference=reference)
+            v._on_results_view_click()
+            v._rank_minerals_for_system.assert_not_called()
 
     def test_reference_without_hotspots_clears_old_prices(self):
         v = BestMineralsMixin()

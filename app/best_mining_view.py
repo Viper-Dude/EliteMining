@@ -14,7 +14,6 @@ from column_visibility_helper import displayed_column
 from core.constants import MENU_COLORS
 from ui.search_control import SearchControl
 from ui.striped_treeview import StripedTreeview
-from ui.themed_checkbox import ThemedCheckbutton
 
 try:
     from localization import t
@@ -29,11 +28,13 @@ class _BMOverlayStatus(_OverlayStatus):
 
 
 class BestMiningMixin:
-    BM_COLUMNS = ("System", "Dist", "Mineral", "Price", "Station", "SellDist", "Type", "LS", "PowerPlay", "Updated")
-    BM_DEFAULT_WIDTHS = {"System": 200, "Dist": 80, "Mineral": 130, "Price": 110, "Station": 260, "SellDist": 90,
-                         "Type": 110, "LS": 70, "PowerPlay": 200, "Updated": 90}
-    BM_NUMERIC_COLUMNS = ("Dist", "SellDist", "LS", "Price")
+    BM_COLUMNS = ("System", "Dist", "Mineral", "Price", "Demand", "Station", "SellDist", "Type", "LS", "PowerPlay",
+                  "Updated")
+    BM_DEFAULT_WIDTHS = {"System": 200, "Dist": 80, "Mineral": 130, "Price": 110, "Demand": 90, "Station": 260,
+                         "SellDist": 90, "Type": 110, "LS": 70, "PowerPlay": 200, "Updated": 90}
+    BM_NUMERIC_COLUMNS = ("Dist", "SellDist", "LS", "Price", "Demand")
     BM_DISTANCES = ("10", "20", "30", "50", "100", "150", "200")
+    BM_SELL_DISTANCES = ("10", "20", "30", "50", "100")
     BM_MAX_CANDIDATES = 20
 
     # ---------------------------------------------------------------------------------
@@ -42,12 +43,10 @@ class BestMiningMixin:
 
     def _build_best_mining_view(self, parent, bg: str, select_bg: str, tree_bg: str, tree_fg: str):
         import tkinter.font as tkfont
-        from config import (scaled_font, scaled_px, load_theme, load_pp_mode,
-                            load_reverse_search_mineral)
+        from config import scaled_font, scaled_px, load_theme, load_reverse_search_mineral
         from ui.cell_tooltip import attach_cell_tooltip
 
         current_theme = load_theme()
-        fg = "#ff8c00" if current_theme == "elite_orange" else "#e6e6e6"
 
         self._bm = {
             'busy': False, 'status': '', 'hint': '', 'spin': 0, 'spinning': False, 'ran': False,
@@ -68,11 +67,12 @@ class BestMiningMixin:
                                               command=self._bm_on_search)
         self._bm_search_btn.pack(side="right")
 
-        # Shared with Best Prices, Auto Options and Settings (in-system prices)
-        self._bm_pp_mode_var = tk.BooleanVar(value=load_pp_mode())
-        ThemedCheckbutton(top_row, text=t('ring_finder.where_to_mine_pp_mode'), variable=self._bm_pp_mode_var,
-                          command=self._bm_on_pp_toggle, bg=bg, fg=fg, activebackground=bg,
-                          activeforeground=fg, selectcolor=select_bg, font=scaled_font(9)).pack(side="right", padx=(0, 12))
+        self._bm_sell_distance_var = tk.StringVar(value="50")
+        sell_combo = ttk.Combobox(top_row, textvariable=self._bm_sell_distance_var, width=6, state="readonly",
+                                  values=self.BM_SELL_DISTANCES)
+        sell_combo.pack(side="right", padx=(0, 12))
+        sell_combo.bind('<<ComboboxSelected>>', lambda e: sell_combo.selection_clear(), add='+')
+        ttk.Label(top_row, text=t('ring_finder.where_to_mine_sell_within')).pack(side="right", padx=(0, 4))
 
         self._bm_distance_var = tk.StringVar(value="50")
         distance_combo = ttk.Combobox(top_row, textvariable=self._bm_distance_var, width=6, state="readonly",
@@ -107,6 +107,7 @@ class BestMiningMixin:
             "Dist": t('ring_finder.col_dist'),
             "Mineral": t('ring_finder.col_best_mineral'),
             "Price": t('ring_finder.col_price'),
+            "Demand": t('ring_finder.col_demand'),
             "Station": t('ring_finder.col_sell_here'),
             "SellDist": t('ring_finder.merit_miner_col_sell_dist'),
             "Type": t('ring_finder.col_station_type'),
@@ -143,6 +144,12 @@ class BestMiningMixin:
 
         self.setup_column_visibility(tree=tree, columns=columns, default_widths=default_widths,
                                      config_key='best_mining', use_displaycolumns=True, allow_reorder=True)
+        # A saved order from before Demand existed would put it at the far right
+        from config import load_column_order
+        saved_order = list(load_column_order('best_mining') or [])
+        if saved_order and 'Demand' not in saved_order and 'Price' in saved_order:
+            saved_order.insert(saved_order.index('Price') + 1, 'Demand')
+            self._cv_set_order('best_mining', saved_order, save=False)
         attach_cell_tooltip(tree, "Updated", lambda item: self._bm['source_by_row'].get(item, ''))
 
         v_scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
@@ -206,20 +213,6 @@ class BestMiningMixin:
         self._bm_mineral_combo.selection_clear()
         save_reverse_search_mineral(self._bm_mineral_filter() or "")
 
-    def _bm_on_pp_toggle(self):
-        """Re-rank the fetched prices for the new mode; no new search."""
-        from config import save_pp_mode
-        save_pp_mode(self._bm_pp_mode_var.get())
-        self._bm_rerender()
-
-    def _bm_sync_pp_mode(self):
-        """Pick up the shared in-system setting if Best Prices or Settings changed it."""
-        from config import load_pp_mode
-        pp_mode = load_pp_mode()
-        if self._bm_pp_mode_var.get() != pp_mode:
-            self._bm_pp_mode_var.set(pp_mode)
-            self._bm_rerender()
-
     # --- state and overlay ---------------------------------------------------------
 
     def _bm_refresh_controls(self):
@@ -275,7 +268,6 @@ class BestMiningMixin:
     def _bm_on_view_click(self):
         """A click on Where to Mine shows the view; the first time, it also searches when
         a Reference System is set."""
-        self._bm_sync_pp_mode()
         if not self._bm['ran'] and not self._bm_control.running and self.system_var.get().strip():
             self._bm_start()
 
@@ -297,6 +289,10 @@ class BestMiningMixin:
             max_distance = float(self._bm_distance_var.get())
         except (TypeError, ValueError):
             max_distance = 50.0
+        try:
+            sell_distance = float(self._bm_sell_distance_var.get())
+        except (TypeError, ValueError):
+            sell_distance = 50.0
         mineral_filter = self._bm_mineral_filter()
         bm.update(busy=True, ran=True, hint='', system=reference, count=0, cache=None,
                   status=t('ring_finder.reverse_search_searching').format(system=reference))
@@ -310,13 +306,14 @@ class BestMiningMixin:
             bm['spin'] = 0
             self._bm_spin()
         threading.Thread(target=control.run,
-                         args=(self._reverse_search_worker, reference, max_distance, mineral_filter, control),
+                         args=(self._reverse_search_worker, reference, max_distance, sell_distance,
+                               mineral_filter, control),
                          daemon=True).start()
 
-    def _reverse_search_worker(self, target_system: str, max_distance: float, mineral_filter: Optional[str], control):
+    def _reverse_search_worker(self, target_system: str, max_distance: float, sell_distance: float,
+                               mineral_filter: Optional[str], control):
         """Background worker: find candidate mining systems near target_system and fetch
-        live prices for their hotspot minerals. Ranking happens on the UI thread, so the
-        PowerPlay-mode box can re-rank the same prices without a new search.
+        live prices for their hotspot minerals. Ranking happens on the UI thread.
 
         mineral_filter: None for all minerals, or an exact full mineral name (e.g.
         'Painite') to restrict candidates to that one mineral's hotspots."""
@@ -368,10 +365,14 @@ class BestMiningMixin:
 
         rows_by_material = {}
         unique_materials = list({mat for _, entry in candidate_list for mat in entry['materials']})
+        # Every usable buyer is within Max Distance + Sell Within of the target. A wider radius
+        # loses near buyers: Spansh returns only the most recently updated stations in it.
+        radius = min(500, int(max_distance + sell_distance))
+
         def fetch(mat):
             if control.is_cancelled():
                 return []
-            return MarketplaceAPI.search_buyers(mat, target_system, None, 7, False, is_cancelled=control.is_cancelled)
+            return MarketplaceAPI.search_buyers(mat, target_system, radius, 7, False, is_cancelled=control.is_cancelled)
 
         with ThreadPoolExecutor(max_workers=min(len(unique_materials), 4)) as pool:
             futures = {pool.submit(fetch, mat): mat for mat in unique_materials}
@@ -383,7 +384,7 @@ class BestMiningMixin:
                     rows = []
                 rows_by_material[mat] = [r for r in rows if r.get('sellPrice', 0) > 0]
 
-        # Candidate coordinates for local (non-PP) distance re-ranking. The hotspot rows
+        # Candidate coordinates for measuring each buyer's distance. The hotspot rows
         # carry them; the bundled galaxy database lacks many hotspot systems, so it is only
         # the fallback (local SQLite, no network calls).
         candidate_coords = {sys_name: entry['coords'] for sys_name, entry in candidate_list if entry.get('coords')}
@@ -401,20 +402,21 @@ class BestMiningMixin:
                 pass
 
         cache = {
-            'target_system': target_system,
             'candidates': candidate_list,
             'rows_by_material': rows_by_material,
             'candidate_coords': candidate_coords,
             'max_distance': max_distance,
+            'sell_distance': sell_distance,
         }
         # Partial prices after a Stop still show (SearchControl runs this when rows exist)
         control.complete(candidate_list, lambda rows: self._bm_show_results(cache))
 
     @staticmethod
-    def _rerank_reverse_search_results(target_system: str, candidate_list, rows_by_material: dict,
-                                       candidate_coords: dict, max_distance: float, pp_mode: bool) -> list:
-        """Rank candidates by best-priced mineral from already-fetched price data:
-        [{system, distance, mineral, best}] highest price first."""
+    def _rerank_reverse_search_results(candidate_list, rows_by_material: dict, candidate_coords: dict,
+                                       sell_distance: float) -> list:
+        """Price candidates from already-fetched data with the best price paid for any of
+        their minerals within sell_distance of them, the nearer buyer on equal prices:
+        [{system, distance, mineral, best, sell_distance}] nearest mining system first."""
         def dist_from_candidate(coords, r):
             sx, sy, sz = r.get('systemX'), r.get('systemY'), r.get('systemZ')
             if sx is None or sy is None or sz is None:
@@ -425,49 +427,31 @@ class BestMiningMixin:
             except (TypeError, ValueError):
                 return None
 
-        def best_for(sys_name, mat):
-            priced_rows = rows_by_material.get(mat, [])
-            if pp_mode:
-                # PowerPlay reinforce/undermine/acquisition only pay out for sales made
-                # exactly in target_system.
-                priced_rows = [r for r in priced_rows if r.get('systemName', '') == target_system]
-                return max(priced_rows, key=lambda r: r.get('sellPrice', 0)) if priced_rows else None
-
-            # Outside PP mode, pick the nearest priced station to THIS candidate, capped
-            # to the same Max Distance the user searched with - a station outside that
-            # radius isn't "local" no matter how much closer it is than the target-wide
-            # best price, so it's better to show No data than a misleadingly far seller.
-            coords = candidate_coords.get(sys_name)
-            if coords is None:
-                return None
-
-            rows_with_dist = [(r, dist_from_candidate(coords, r)) for r in priced_rows]
-            rows_with_dist = [(r, d) for r, d in rows_with_dist if d is not None and d <= max_distance]
-            if not rows_with_dist:
-                return None
-            best_row, _ = min(rows_with_dist, key=lambda rd: rd[1])
-            return best_row
+        def rank_key(found):
+            row, dist, _mat = found
+            return row.get('sellPrice', 0), -dist
 
         results = []
         for sys_name, entry in candidate_list:
-            best_mat = None
-            best_price = None
             coords = candidate_coords.get(sys_name)
-            for mat in entry['materials']:
-                priced = best_for(sys_name, mat)
-                if priced and (best_price is None or priced.get('sellPrice', 0) > best_price.get('sellPrice', 0)):
-                    best_mat = mat
-                    best_price = priced
+            best = None
+            if coords is not None:
+                for mat in sorted(entry['materials']):
+                    for row in rows_by_material.get(mat, []):
+                        dist = dist_from_candidate(coords, row)
+                        if dist is not None and dist <= sell_distance:
+                            found = (row, dist, mat)
+                            if best is None or rank_key(found) > rank_key(best):
+                                best = found
             results.append({
                 'system': sys_name,
                 'distance': entry['distance'],
-                'mineral': best_mat,
-                'best': best_price,
-                # Mining system to buyer; Max Distance caps it, so it explains hidden systems
-                'sell_distance': dist_from_candidate(coords, best_price) if coords and best_price else None,
+                'mineral': best[2] if best else None,
+                'best': best[0] if best else None,
+                'sell_distance': best[1] if best else None,
             })
 
-        results.sort(key=lambda r: r['best'].get('sellPrice', 0) if r['best'] else -1, reverse=True)
+        results.sort(key=lambda r: (r['distance'], -r['best'].get('sellPrice', 0) if r['best'] else 1))
         return results
 
     def _bm_show_no_results(self, hint: str):
@@ -479,32 +463,27 @@ class BestMiningMixin:
         self._bm_rerender()
 
     def _bm_rerender(self):
-        """Rank the cached prices for the current PowerPlay-mode setting and show them."""
+        """Rank the cached prices and show them."""
         bm = self._bm
         cache = bm.get('cache')
-        # No busy check: SearchControl runs the results callback before it clears busy, and a
-        # new search clears the cache, so a toggle during a search has nothing to redraw
+        # No busy check: SearchControl runs the results callback before it clears busy
         if cache is None:
             return
-        pp_mode = self._bm_pp_mode_var.get()
         results = self._rerank_reverse_search_results(
-            cache['target_system'], cache['candidates'], cache['rows_by_material'],
-            cache['candidate_coords'], cache['max_distance'], pp_mode)
+            cache['candidates'], cache['rows_by_material'], cache['candidate_coords'], cache['sell_distance'])
         bm['hint'] = ''
         # A system with nowhere to sell nearby is no answer to "where to mine", so only
         # priced rows are listed; the hint says why when none are left
         priced = [r for r in results if r['best']]
         if results and not priced:
-            if pp_mode:
-                bm['hint'] = t('ring_finder.reverse_search_no_market_data').format(system=cache['target_system'])
-            else:
-                bm['hint'] = t('ring_finder.where_to_mine_no_buyers').format(
-                    count=len(results), distance=int(cache['max_distance']))
+            bm['hint'] = t('ring_finder.where_to_mine_no_buyers').format(
+                count=len(results), distance=int(cache['max_distance']),
+                sell_distance=int(cache['sell_distance']))
         results = priced
         bm['count'] = len(results)
-        self._bm_fill(results, pp_mode)
+        self._bm_fill(results)
 
-    def _bm_fill(self, results: list, pp_mode: bool = False):
+    def _bm_fill(self, results: list):
         from app_utils import format_market_source
         from system_finder_api import SystemFinderAPI
         bm = self._bm
@@ -520,24 +499,25 @@ class BestMiningMixin:
             if best and r['mineral']:
                 price = f"{best.get('sellPrice', 0):,} CR"
                 station_system = best.get('systemName', '')
-                if pp_mode or not station_system:
-                    # Always the Reference System in PowerPlay mode, so the name alone is enough
+                if not station_system:
                     station = best.get('stationName', '') or "-"
                 else:
                     station = f"{best.get('stationName', '')} ({station_system})"
                 station_type = self._format_station_type(best.get('stationType'))
+                demand_val = best.get('demand')
+                demand = f"{int(demand_val):,}" if isinstance(demand_val, (int, float)) else "-"
                 station_ls = best.get('distanceToArrival')
                 ls = f"{int(float(station_ls)):,}" if station_ls is not None else "-"
                 updated = self._format_data_age(best.get('updatedAt', ''))
                 powerplay = self._bp_pp_text(pp_data.get(station_system, {}))
             else:
                 price = t('ring_finder.no_data')
-                station = station_type = ls = updated = powerplay = "-"
+                station = station_type = ls = updated = powerplay = demand = "-"
             sell_distance = r.get('sell_distance')
             sell_dist = f"{sell_distance:.1f}" if sell_distance is not None else "-"
             mineral_display = self._format_material_for_display(r['mineral']) if r['mineral'] else "-"
             row_id = tree.insert("", "end", values=(
-                r['system'], f"{r['distance']:.1f}", mineral_display, price, station, sell_dist,
+                r['system'], f"{r['distance']:.1f}", mineral_display, price, demand, station, sell_dist,
                 station_type, ls, powerplay, updated))
             bm['system_by_row'][row_id] = r['system']
             bm['sell_system_by_row'][row_id] = station_system
