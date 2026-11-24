@@ -4,7 +4,7 @@
 ## New Features & Improvements
 
 - Fleet carriers in search results, sell plans and the Auto Prices overlay now show their name next to the callsign when known.
-- The Ship Presets sidebar now opens the group for your new ship and highlights its automatically loaded preset that you have choosen to Auto - Load.
+- The Ship Presets sidebar now opens the group for your new ship and highlights its automatically loaded preset that you have set to Auto - Load.
 
 
 ### VoiceAttack Profile Update (v5.7.1)
