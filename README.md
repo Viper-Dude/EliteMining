@@ -65,7 +65,7 @@
 
 ### Standalone (Without VoiceAttack)
 
-- **Find mining spots** — Search 80,000+ hotspots and galaxy-wide ring data, including overlaps and RES sites.
+- **Find mining spots** — Use the Advanced Hotspots Finder to search 80,000+ hotspots and galaxy-wide ring data, including overlaps and RES sites.
 - **Find buyers** — Compare mineral prices, trade goods, or sale options for your whole cargo hold.
 - **Mine for Powerplay merits** — [Merit Miner](#powerplay-merit-mining) finds the nearest systems of your power where you can mine a mineral for merits, and where to sell it.
 - **Track mining** — Live prospector reports, cargo and engineering materials, session history, charts, and reports.
@@ -295,7 +295,7 @@ Plays a sound or spoken voice for mining events, such as starting or resetting t
 
 ## Hotspot Finder
 
-Search saved hotspots and Spansh ring data by mineral, ring type, and distance. Right-click results for prices, bookmarks, and ring data.
+The Hotspot Finder is an advanced mining search tool. Search saved hotspots and Spansh ring data by mineral, ring type, and distance. Right-click results for prices, bookmarks, and ring data.
 
 ### Key Features
 
