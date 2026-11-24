@@ -342,9 +342,11 @@ class BestMineralsMixin:
         bp = self._bp
         if bp['busy']:
             return bp['loading']
-        if bp['scope'] == 'ring' and bp['ring_name']:
-            return f"{bp['ring_name']} ({bp['system']})"
-        # No This Ring / Whole System switch without a ring, so say what the prices cover
+        # With a ring the This Ring / Whole System switch is shown and already names the scope,
+        # so the label stays short enough to fit beside it
+        if bp['ring_name']:
+            return bp['ring_name'] if bp['scope'] == 'ring' else bp['system']
+        # No switch without a ring, so say what the prices cover
         return t('ring_finder.rank_scope_all_rings').format(system=bp['system']) if bp['system'] else ''
 
     def _bp_set_busy(self, busy: bool, system_name: str = ''):

@@ -338,7 +338,10 @@ Search saved hotspots and Spansh ring data by mineral, ring type, and distance. 
 *Hotspot Finder showing search results with mineral filters, the second mineral box and distance calculations.*
 
 <details>
-<summary>View Merit Miner, acquisition searches and Best Prices examples</summary>
+<summary>View Where to Mine, Merit Miner, acquisition searches and Best Prices examples</summary>
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/where_to_mine.png" alt="Where to Mine view with the nearest mining systems, best sell prices and demand" width="900"><br>
+*Where to Mine view: the nearest mining systems with the best price and demand for their minerals within Sell Within.*
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/merit_miner.png" width="900"><br>
 *Merit Miner view: the nearest mining systems of your power and where to sell for merits.*

@@ -333,5 +333,20 @@ class AddMineralsBoxTests(unittest.TestCase):
         self.assertEqual(v._bp_extra_text.get(), '+ Add Minerals')
 
 
+class ScopeLabelTests(unittest.TestCase):
+    def label(self, scope, ring_name):
+        v = BestMineralsMixin()
+        v._bp = {'busy': False, 'scope': scope, 'ring_name': ring_name, 'system': 'Wregoe CS-S c17-8'}
+        return v._bp_scope_text()
+
+    def test_with_the_switch_the_label_names_only_the_ring_or_system(self):
+        self.assertEqual(self.label('ring', '6 A Ring'), '6 A Ring')
+        self.assertEqual(self.label('system', '6 A Ring'), 'Wregoe CS-S c17-8')
+
+    def test_without_a_ring_the_label_says_all_rings(self):
+        self.assertIn('Wregoe CS-S c17-8', self.label('system', ''))
+        self.assertNotEqual(self.label('system', ''), 'Wregoe CS-S c17-8')
+
+
 if __name__ == '__main__':
     unittest.main()
