@@ -7,15 +7,9 @@
 - The Ship Presets sidebar now opens the group for your new ship and highlights its automatically loaded preset that you have choosen to Auto - Load.
 
 
-
-## Bug Fixes
-
-
-
 ### VoiceAttack Profile Update (v5.7.1)
 
 - Various improvements.
-
 
 
 ### Important Notes 
