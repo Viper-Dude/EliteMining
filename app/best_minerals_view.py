@@ -328,6 +328,7 @@ class BestMineralsMixin:
                                       command=lambda: self._bp_open_url("https://spansh.co.uk/search/{}", selected_system()))
 
         tree.bind("<Button-1>", self._bp_on_click)
+        tree.bind("<Double-1>", self._bp_on_double_click)
         if not hasattr(self, '_context_handlers'):
             self._context_handlers = {}
         self._context_handlers['rank_minerals'] = self._bp_on_right_click
@@ -606,11 +607,18 @@ class BestMineralsMixin:
         if col == "Station":
             tree.selection_set(row_id)
             self._bp_copy_system(row_id)
-        elif col == "PowerPlay":  # open Inara and refresh PP data, same as main table
+
+    def _bp_on_double_click(self, event):
+        """Like the hotspot table: the Station or PowerPlay cell opens the station's system on
+        Inara and refreshes its PowerPlay data."""
+        tree = self._bp_tree
+        if tree.identify_region(event.x, event.y) != "cell":
+            return
+        row_id = tree.identify_row(event.y)
+        system = self._bp['system_by_row'].get(row_id, '') if row_id else ''
+        if system and displayed_column(tree, tree.identify_column(event.x)) in ("Station", "PowerPlay"):
             tree.selection_set(row_id)
-            system = self._bp['system_by_row'].get(row_id, '')
-            if system:
-                self._bp_open_inara_and_fetch_pp(row_id, system)
+            self._bp_open_inara_and_fetch_pp(row_id, system)
 
     def _bp_on_right_click(self, event):
         tree = self._bp_tree

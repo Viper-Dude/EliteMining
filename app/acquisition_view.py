@@ -9,6 +9,7 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Optional
 
+from column_visibility_helper import displayed_column
 from core.constants import MENU_COLORS
 from ui.search_control import SearchControl
 from ui.striped_treeview import StripedTreeview
@@ -32,6 +33,25 @@ class _OverlayStatus:
 
     def config(self, text=''):
         self._view._acq_set_status(text)
+
+
+def set_outdated_tag(tree, row_id, outdated: bool):
+    """Mark or clear a row whose PowerPlay state changed after the search."""
+    tags = [tag for tag in tree.item(row_id, 'tags') if tag != 'pp_outdated']
+    if outdated:
+        tags.append('pp_outdated')
+    tree.item(row_id, tags=tags)
+
+
+def configure_outdated_tag(tree, theme: str):
+    from ui.theme import get_theme_colors
+    tree.tag_configure('pp_outdated', foreground=get_theme_colors(theme)['warning'])
+
+
+def outdated_note(outdated: set, systems) -> str:
+    """Heading note while shown rows use a system whose PowerPlay state changed."""
+    count = len(outdated & set(systems))
+    return ' · ' + t('ring_finder.pp_changed_search_again').format(count=count) if count else ''
 
 
 class AcquisitionMixin:
@@ -61,7 +81,7 @@ class AcquisitionMixin:
         self._acq = {
             'system': '', 'state': '', 'radius': None, 'mineral': None, 'busy': False, 'count': 0, 'owner': '',
             'status': '', 'hint': '', 'spin': 0, 'spinning': False,
-            'system_by_row': {}, 'station_by_row': {}, 'source_by_row': {},
+            'system_by_row': {}, 'station_by_row': {}, 'source_by_row': {}, 'outdated': set(),
         }
 
         frame = ttk.Frame(parent)
@@ -99,6 +119,7 @@ class AcquisitionMixin:
         tree = StripedTreeview(tree_frame, columns=columns, show="headings", selectmode="browse",
                                style="RingFinder.Treeview")
         self._acq_tree = tree
+        configure_outdated_tag(tree, current_theme)
         column_labels = {
             "System": t('ring_finder.acquisition_search_col_system'),
             "Station": t('ring_finder.col_station'),
@@ -178,6 +199,7 @@ class AcquisitionMixin:
             "https://spansh.co.uk/search/{}", selected(self._acq['system_by_row'])))
 
         tree.bind("<Button-1>", self._acq_on_click)
+        tree.bind("<Double-1>", self._acq_on_double_click)
         if not hasattr(self, '_context_handlers'):
             self._context_handlers = {}
         self._context_handlers['acquisition_search'] = self._acq_on_right_click
@@ -206,7 +228,7 @@ class AcquisitionMixin:
                 name += ' · ' + t('ring_finder.acquisition_search_found').format(count=acq['count'])
             if self._acq_other_power():
                 name += ' · ' + t('ring_finder.acquisition_not_my_power').format(power=acq['owner'])
-            return name
+            return name + outdated_note(acq.get('outdated', set()), acq['system_by_row'].values())
         return acq['system']
 
     def _acq_other_power(self) -> bool:
@@ -360,9 +382,12 @@ class AcquisitionMixin:
                 spansh_pp = SystemFinderAPI._fetch_spansh_powerplay_systems(
                     reference_system, 5.0, 'Any', state, is_cancelled=control.is_cancelled)
                 if reference_system in spansh_pp:
-                    power_state = state
-                    owner = spansh_pp[reference_system].get('controlling_power', '')
-                    SystemFinderAPI._store_powerplay_batch({reference_system: spansh_pp[reference_system]})
+                    # A newer saved state (e.g. Unoccupied from an Inara check) wins over Spansh's
+                    found = SystemFinderAPI._prefer_newer_powerplay(
+                        {reference_system: spansh_pp[reference_system]})[reference_system]
+                    if found.get('power_state') == state:
+                        power_state = state
+                        owner = found.get('controlling_power', '')
                     break
 
         radius = self.ACQUISITION_RADIUS_BY_STATE.get(power_state)
@@ -380,6 +405,15 @@ class AcquisitionMixin:
         control.complete(results, lambda rows: self._show_acquisition_search_results(
             reference_system, power_state, radius, rows, mineral_filter, sell_prices, best_mineral, best_rows, owner))
 
+    @staticmethod
+    def _acq_drop_no_longer_unoccupied(nearby: dict) -> dict:
+        """Spansh's Unoccupied systems, minus those a newer saved state (e.g. from an Inara
+        check) shows are no longer Unoccupied."""
+        from system_finder_api import SystemFinderAPI
+        fresh = SystemFinderAPI._prefer_newer_powerplay(nearby)
+        return {name: entry for name, entry in fresh.items()
+                if entry.get('power_state') in ('Unoccupied', nearby[name].get('power_state'))}
+
     def _acq_find_sell_targets(self, mine_system: str, radius: float, minerals: list, is_cancelled,
                                nearby: dict = None):
         """Unoccupied systems within radius of mine_system that buy one of minerals:
@@ -390,7 +424,7 @@ class AcquisitionMixin:
 
         if nearby is None:
             nearby = SystemFinderAPI._fetch_spansh_powerplay_systems(mine_system, radius, 'Any', 'Unoccupied', is_cancelled=is_cancelled)
-            SystemFinderAPI._store_powerplay_batch(nearby)
+            nearby = self._acq_drop_no_longer_unoccupied(nearby)
 
         all_candidates = sorted(nearby.items(), key=lambda kv: kv[1].get('distance', 999999))
 
@@ -462,6 +496,7 @@ class AcquisitionMixin:
         tree.delete(*tree.get_children())
         for mapping in (acq['system_by_row'], acq['station_by_row'], acq['source_by_row']):
             mapping.clear()
+        acq.setdefault('outdated', set()).clear()
 
         tree.heading("Price", text=self._acq_price_header(mineral_filter))
         min_w = self._acq_min_width("Price")
@@ -503,6 +538,48 @@ class AcquisitionMixin:
         if row_id:
             self._acq_tree.selection_set(row_id)
             self._acq_copy_system(row_id)
+
+    def _acq_on_double_click(self, event):
+        """Like the hotspot table: the System or Station cell opens the system on Inara and
+        rechecks its PowerPlay state."""
+        tree = self._acq_tree
+        if tree.identify_region(event.x, event.y) != "cell":
+            return
+        row_id = tree.identify_row(event.y)
+        if row_id and displayed_column(tree, tree.identify_column(event.x)) in ("System", "Station"):
+            self._open_inara_and_check_pp(self._acq['system_by_row'].get(row_id, ''), self._acq_apply_pp_result)
+
+    def _open_inara_and_check_pp(self, system: str, on_result):
+        """Open system on Inara and read its PowerPlay state there (saved, so later searches
+        use it when it is newer); on_result(system, result) runs on the UI thread."""
+        if not system:
+            return
+        self._bp_open_url("https://inara.cz/elite/starsystem/?search={}", system)
+
+        def worker():
+            from system_finder_api import SystemFinderAPI
+            result = SystemFinderAPI.fetch_and_store_powerplay_from_inara(system)
+            self.parent.after(0, lambda: on_result(system, result))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _acq_apply_pp_result(self, system: str, result):
+        """A selling system that is no longer Unoccupied can't earn acquisition merits: mark
+        its rows and show its new PowerPlay state."""
+        if not result:
+            return
+        acq = self._acq
+        tree = self._acq_tree
+        outdated = acq.setdefault('outdated', set())
+        if result.get('power_state') == 'Unoccupied':
+            outdated.discard(system)
+        else:
+            outdated.add(system)
+        for row_id, name in acq['system_by_row'].items():
+            if name == system and tree.exists(row_id):
+                if system in outdated:
+                    tree.set(row_id, 'Power', self._bp_pp_text(result))
+                set_outdated_tag(tree, row_id, system in outdated)
+        self._acq_refresh_controls()
 
     def _acq_on_right_click(self, event):
         row_id = self._acq_tree.identify_row(event.y)

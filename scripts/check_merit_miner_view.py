@@ -355,5 +355,101 @@ class ApplyPledgeTests(unittest.TestCase):
         self.assertNotIn('self.after', worker)
         self.assertIn('self.after(0, self._apply_startup_pledge)', src)
 
+
+class ClickTree:
+    """Just enough of a Treeview for the double-click handler."""
+    def __init__(self, columns, column):
+        self.cfg = {'columns': columns, 'displaycolumns': ('#all',)}
+        self.column = column
+
+    def __getitem__(self, key):
+        return self.cfg[key]
+
+    def identify_region(self, x, y):
+        return 'cell'
+
+    def identify_row(self, y):
+        return 'r1'
+
+    def identify_column(self, x):
+        return self.column
+
+
+class DoubleClickTests(unittest.TestCase):
+    def double_click(self, column_name):
+        v = make_view()
+        v._mm.update(mine_by_row={'r1': 'Mine Sys'}, sell_by_row={'r1': 'Sell Sys'}, station_by_row={'r1': 'Dock'})
+        cols = MeritMinerMixin.MM_COLUMNS
+        v._mm_tree = ClickTree(cols, f'#{cols.index(column_name) + 1}')
+        v._open_inara_and_check_pp = Mock()
+        v._mm_on_double_click(Mock(x=0, y=0))
+        return v
+
+    def test_mining_and_selling_cells_open_and_check_their_system(self):
+        v = self.double_click('MineSystem')
+        v._open_inara_and_check_pp.assert_called_once_with('Mine Sys', v._mm_apply_pp_result)
+        for column in ('SellSystem', 'Station'):
+            v = self.double_click(column)
+            v._open_inara_and_check_pp.assert_called_once_with('Sell Sys', v._mm_apply_pp_result)
+
+    def test_other_cells_do_nothing(self):
+        self.double_click('Price')._open_inara_and_check_pp.assert_not_called()
+
+
+class RowTree:
+    """Rows with values and tags, for the PowerPlay recheck."""
+    def __init__(self, rows):
+        self.rows = {row_id: {'values': {}, 'tags': ()} for row_id in rows}
+
+    def get_children(self, item=''):
+        return tuple(self.rows)
+
+    def set(self, row_id, column, value):
+        self.rows[row_id]['values'][column] = value
+
+    def item(self, row_id, option=None, **kwargs):
+        if 'tags' in kwargs:
+            self.rows[row_id]['tags'] = tuple(kwargs['tags'])
+        return self.rows[row_id]['tags'] if option == 'tags' else None
+
+    def outdated(self):
+        return sorted(r for r, data in self.rows.items() if 'pp_outdated' in data['tags'])
+
+
+class PowerPlayRecheckTests(unittest.TestCase):
+    def make(self):
+        v = make_view()
+        v._mm.update(power='Aisling Duval', mine_by_row={'r1': 'Mine A', 'r2': 'Mine B'},
+                     sell_by_row={'r1': 'Sell X', 'r2': 'Sell X'})
+        v._mm_tree = RowTree(('r1', 'r2'))
+        return v
+
+    def test_mining_system_lost_by_the_power_marks_its_row_and_shows_the_new_state(self):
+        v = self.make()
+        v._mm_apply_pp_result('Mine A', {'controlling_power': 'Zemina Torval', 'power_state': 'Fortified'})
+        self.assertEqual(v._mm_tree.outdated(), ['r1'])
+        self.assertEqual(v._mm_tree.rows['r1']['values']['State'], 'Zemina Torval / Fortified')
+
+    def test_mining_system_still_held_stays_valid(self):
+        v = self.make()
+        v._mm_apply_pp_result('Mine A', {'controlling_power': 'Aisling Duval', 'power_state': 'Stronghold'})
+        self.assertEqual(v._mm_tree.outdated(), [])
+
+    def test_selling_system_no_longer_unoccupied_marks_every_row_selling_there(self):
+        v = self.make()
+        v._mm_apply_pp_result('Sell X', {'controlling_power': 'Aisling Duval', 'power_state': 'Exploited'})
+        self.assertEqual(v._mm_tree.outdated(), ['r1', 'r2'])
+        v._mm_apply_pp_result('Sell X', {'controlling_power': '', 'power_state': 'Unoccupied'})
+        self.assertEqual(v._mm_tree.outdated(), [])
+
+    def test_a_new_search_clears_the_marks(self):
+        v = self.make()
+        v._mm.setdefault('outdated', set()).add('Mine A')
+        v._mm_tree = Mock()
+        v._mm_tree.get_children.return_value = ()
+        MeritMinerMixin._mm_fill(v, [])  # make_view replaces _mm_fill with a Mock
+        self.assertEqual(v._mm['outdated'], set())
+
+
 if __name__ == '__main__':
     unittest.main()

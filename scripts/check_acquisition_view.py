@@ -332,5 +332,141 @@ class StringsTests(unittest.TestCase):
             self.assertNotIn(key, source)
 
 
+class ClickTree:
+    """Just enough of a Treeview for the double-click handler."""
+    def __init__(self, columns, column, region='cell'):
+        self.cfg = {'columns': columns, 'displaycolumns': ('#all',)}
+        self.column, self.region = column, region
+
+    def __getitem__(self, key):
+        return self.cfg[key]
+
+    def identify_region(self, x, y):
+        return self.region
+
+    def identify_row(self, y):
+        return 'r1'
+
+    def identify_column(self, x):
+        return self.column
+
+    def selection_set(self, row_id):
+        pass
+
+
+class DoubleClickTests(unittest.TestCase):
+    def double_click(self, column, region='cell'):
+        v = make_view()
+        v._acq['system_by_row']['r1'] = 'Sell Sys'
+        v._acq_tree = ClickTree(AcquisitionMixin.ACQ_COLUMNS, column, region)
+        v._open_inara_and_check_pp = Mock()
+        v._acq_on_double_click(Mock(x=0, y=0))
+        return v
+
+    def test_system_and_station_cells_open_and_check_the_system(self):
+        for column in ('#1', '#2'):  # System, Station
+            v = self.double_click(column)
+            v._open_inara_and_check_pp.assert_called_once_with('Sell Sys', v._acq_apply_pp_result)
+
+    def test_other_cells_and_headings_do_nothing(self):
+        self.double_click('#9')._open_inara_and_check_pp.assert_not_called()  # Price
+        self.double_click('#1', region='heading')._open_inara_and_check_pp.assert_not_called()
+
+    def test_open_and_check_reads_inara_off_the_ui_thread(self):
+        v = make_view()
+        v.parent = Mock(after=lambda delay, callback: callback())
+        on_result = Mock()
+        result = {'controlling_power': 'Aisling Duval', 'power_state': 'Fortified'}
+        with patch('webbrowser.open') as browser, \
+                patch.object(SystemFinderAPI, 'fetch_and_store_powerplay_from_inara', return_value=result), \
+                patch('acquisition_view.threading.Thread') as thread:
+            v._open_inara_and_check_pp('Sell Sys', on_result)
+            thread.call_args.kwargs['target']()
+        browser.assert_called_once_with('https://inara.cz/elite/starsystem/?search=Sell%20Sys')
+        on_result.assert_called_once_with('Sell Sys', result)
+
+
+class RowTree:
+    """Rows with values and tags, for the PowerPlay recheck."""
+    def __init__(self, columns, rows):
+        self.columns = columns
+        self.rows = {row_id: {'values': {}, 'tags': ()} for row_id in rows}
+
+    def get_children(self, item=''):
+        return tuple(self.rows)
+
+    def exists(self, row_id):
+        return row_id in self.rows
+
+    def set(self, row_id, column, value):
+        self.rows[row_id]['values'][column] = value
+
+    def item(self, row_id, option=None, **kwargs):
+        if 'tags' in kwargs:
+            self.rows[row_id]['tags'] = tuple(kwargs['tags'])
+        return self.rows[row_id]['tags'] if option == 'tags' else None
+
+    def outdated(self):
+        return sorted(r for r, data in self.rows.items() if 'pp_outdated' in data['tags'])
+
+
+class PowerPlayRecheckTests(unittest.TestCase):
+    def make(self):
+        v = make_view('Mine Sys')
+        v._acq['system_by_row'].update(r1='Sell Sys', r2='Sell Sys', r3='Other')
+        v._acq_tree = RowTree(AcquisitionMixin.ACQ_COLUMNS, ('r1', 'r2', 'r3'))
+        return v
+
+    def test_selling_system_no_longer_unoccupied_marks_its_rows(self):
+        v = self.make()
+        v._acq_apply_pp_result('Sell Sys', {'controlling_power': 'Aisling Duval', 'power_state': 'Fortified'})
+        self.assertEqual(v._acq_tree.outdated(), ['r1', 'r2'])
+        self.assertEqual(v._acq_tree.rows['r1']['values']['Power'], 'Aisling Duval / Fortified')
+        self.assertEqual(v._acq['outdated'], {'Sell Sys'})
+
+    def test_still_unoccupied_clears_the_mark(self):
+        v = self.make()
+        v._acq_apply_pp_result('Sell Sys', {'controlling_power': '', 'power_state': 'Fortified'})
+        v._acq_apply_pp_result('Sell Sys', {'controlling_power': '', 'power_state': 'Unoccupied'})
+        self.assertEqual(v._acq_tree.outdated(), [])
+        self.assertEqual(v._acq['outdated'], set())
+
+    def test_failed_lookup_changes_nothing(self):
+        v = self.make()
+        v._acq_apply_pp_result('Sell Sys', None)
+        self.assertEqual(v._acq_tree.outdated(), [])
+
+    def test_heading_asks_for_a_new_search(self):
+        from acquisition_view import outdated_note
+        self.assertIn('1', outdated_note({'Sell Sys'}, ['Sell Sys', 'Sell Sys', 'Other']))
+        self.assertEqual(outdated_note({'Gone'}, ['Sell Sys']), '')
+
+
+class NewerStateTests(unittest.TestCase):
+    def test_newer_saved_state_wins_and_drops_the_system_from_the_selling_list(self):
+        nearby = {'Changed': {'controlling_power': '', 'power_state': 'Unoccupied',
+                              'updated_at': '2026-11-01T00:00:00', 'distance': 5.0},
+                  'Still': {'controlling_power': '', 'power_state': 'Unoccupied',
+                            'updated_at': '2026-11-01T00:00:00', 'distance': 7.0}}
+        saved = {'Changed': {'controlling_power': 'Aisling Duval', 'power_state': 'Fortified',
+                             'updated_at': '2026-11-20T00:00:00'}}
+        with patch.object(SystemFinderAPI, '_batch_get_powerplay', return_value=saved), \
+                patch.object(SystemFinderAPI, '_store_powerplay_batch') as store:
+            kept = AcquisitionMixin._acq_drop_no_longer_unoccupied(nearby)
+        self.assertEqual(list(kept), ['Still'])
+        self.assertEqual(list(store.call_args.args[0]), ['Still'])  # only Spansh's newer entries saved
+
+    def test_older_saved_state_loses_to_spansh(self):
+        nearby = {'Sys': {'controlling_power': '', 'power_state': 'Unoccupied',
+                          'updated_at': '2026-11-20T00:00:00', 'distance': 5.0}}
+        saved = {'Sys': {'controlling_power': 'Aisling Duval', 'power_state': 'Fortified',
+                         'updated_at': '2026-11-01T00:00:00'}}
+        with patch.object(SystemFinderAPI, '_batch_get_powerplay', return_value=saved), \
+                patch.object(SystemFinderAPI, '_store_powerplay_batch'):
+            merged = SystemFinderAPI._prefer_newer_powerplay(nearby)
+        self.assertEqual(merged['Sys']['power_state'], 'Unoccupied')
+        self.assertEqual(merged['Sys']['distance'], 5.0)
+
+
 if __name__ == '__main__':
     unittest.main()

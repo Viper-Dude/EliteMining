@@ -53,6 +53,9 @@ class Tree:
     def values(self, row_id, column):
         return self.rows[row_id][BestMiningMixin.BM_COLUMNS.index(column)]
 
+    def identify_region(self, x, y):
+        return 'cell'
+
     def identify_row(self, y):
         return self.click_row
 
@@ -288,18 +291,34 @@ class ClickTests(unittest.TestCase):
         self.v._bm['system_by_row']['r1'] = 'MineA'
         self.v._bm['sell_system_by_row']['r1'] = 'Near A'
 
-    def test_powerplay_cell_found_by_name_when_columns_are_reordered(self):
+    def double_click(self, column):
+        self.v._bm_tree = Tree(displaycolumns=('PowerPlay', 'System', 'Price', 'Station'))
+        self.v._bm_tree.click_row = 'r1'
+        self.v._bm_tree.click_column = column
+        with patch('webbrowser.open') as browser:
+            self.v._bm_on_double_click(Mock(x=0, y=0))
+        return browser
+
+    def test_double_click_on_powerplay_found_by_name_when_columns_are_reordered(self):
+        self.double_click('#1').assert_not_called()
+        self.v._bm_open_inara_and_fetch_pp.assert_called_once_with('r1', 'Near A')
+
+    def test_double_click_on_selling_station_opens_the_selling_system(self):
+        self.double_click('#4')
+        self.v._bm_open_inara_and_fetch_pp.assert_called_once_with('r1', 'Near A')
+
+    def test_double_click_on_mining_system_opens_it_on_inara(self):
+        self.double_click('#2').assert_called_once_with('https://inara.cz/elite/starsystem/?search=MineA')
+        self.v._bm_open_inara_and_fetch_pp.assert_not_called()
+
+    def test_double_click_on_other_cells_does_nothing(self):
+        self.double_click('#3').assert_not_called()
+        self.v._bm_open_inara_and_fetch_pp.assert_not_called()
+
+    def test_single_click_anywhere_copies_the_mining_system(self):
         self.v._bm_tree = Tree(displaycolumns=('PowerPlay', 'System', 'Price'))
         self.v._bm_tree.click_row = 'r1'
         self.v._bm_tree.click_column = '#1'
-        self.v._bm_on_click(Mock(x=0, y=0))
-        self.v._bm_open_inara_and_fetch_pp.assert_called_once_with('r1', 'Near A')
-        self.v._bm_copy.assert_not_called()
-
-    def test_other_cells_copy_the_mining_system(self):
-        self.v._bm_tree = Tree(displaycolumns=('PowerPlay', 'System', 'Price'))
-        self.v._bm_tree.click_row = 'r1'
-        self.v._bm_tree.click_column = '#3'
         self.v._bm_on_click(Mock(x=0, y=0))
         self.v._bm_copy.assert_called_once_with('MineA')
         self.v._bm_open_inara_and_fetch_pp.assert_not_called()

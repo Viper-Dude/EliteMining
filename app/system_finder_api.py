@@ -241,6 +241,24 @@ class SystemFinderAPI:
         return dict(merged)
 
     @classmethod
+    def _prefer_newer_powerplay(cls, spansh_pp: Dict[str, Dict]) -> Dict[str, Dict]:
+        """spansh_pp with each system's PowerPlay taken from the saved data wherever that is
+        newer (e.g. an Inara check made after Spansh last saw the system); the Spansh entries
+        that win are saved. Other keys such as 'distance' are kept."""
+        if not spansh_pp:
+            return spansh_pp
+        cache = cls._batch_get_powerplay(list(spansh_pp))
+        merged, to_persist = {}, {}
+        for name, entry in spansh_pp.items():
+            cached = cache.get(name)
+            if cls._spansh_pp_should_replace_cache(entry, cached):
+                merged[name] = to_persist[name] = entry
+            else:
+                merged[name] = {**entry, **cached}
+        cls._store_powerplay_batch(to_persist)
+        return merged
+
+    @classmethod
     def _store_powerplay_batch(cls, pp_systems: Dict[str, Dict]) -> None:
         """Persist Spansh-sourced Fortified/Stronghold controlling_power/power_state/updated_at
         into the EDDN cache's system_powerplay table, same INSERT OR REPLACE pattern as the

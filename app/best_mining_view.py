@@ -189,6 +189,7 @@ class BestMiningMixin:
             "https://spansh.co.uk/search/{}", selected_system()))
 
         tree.bind("<Button-1>", self._bm_on_click)
+        tree.bind("<Double-1>", self._bm_on_double_click)
         if not hasattr(self, '_context_handlers'):
             self._context_handlers = {}
         self._context_handlers['best_mining'] = self._bm_on_right_click
@@ -559,17 +560,28 @@ class BestMiningMixin:
             self.parent.update_idletasks()
 
     def _bm_on_click(self, event):
-        """PowerPlay cell: open the selling system on Inara and refresh its PowerPlay data,
-        like the hotspot table. Any other cell copies the mining system."""
+        """A click copies the mining system."""
         tree = self._bm_tree
         row_id = tree.identify_row(event.y)
         if not row_id:
             return
         tree.selection_set(row_id)
-        if displayed_column(tree, tree.identify_column(event.x)) == "PowerPlay":
+        self._bm_copy(self._bm['system_by_row'].get(row_id, ''))
+
+    def _bm_on_double_click(self, event):
+        """Like the hotspot table: the mining system cell opens it on Inara; the selling
+        station and PowerPlay cells open the selling system and refresh its PowerPlay data."""
+        tree = self._bm_tree
+        if tree.identify_region(event.x, event.y) != "cell":
+            return
+        row_id = tree.identify_row(event.y)
+        if not row_id:
+            return
+        column = displayed_column(tree, tree.identify_column(event.x))
+        if column == "System":
+            self._bp_open_url("https://inara.cz/elite/starsystem/?search={}", self._bm['system_by_row'].get(row_id, ''))
+        elif column in ("Station", "PowerPlay"):
             self._bm_open_inara_and_fetch_pp(row_id, self._bm['sell_system_by_row'].get(row_id, ''))
-        else:
-            self._bm_copy(self._bm['system_by_row'].get(row_id, ''))
 
     def _bm_open_inara_and_fetch_pp(self, row_id, system: str):
         if not system:

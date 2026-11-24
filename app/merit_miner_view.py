@@ -9,7 +9,7 @@ import tkinter as tk
 from concurrent.futures import ThreadPoolExecutor
 from tkinter import ttk
 
-from acquisition_view import _OverlayStatus
+from acquisition_view import _OverlayStatus, configure_outdated_tag, outdated_note, set_outdated_tag
 from column_visibility_helper import displayed_column
 from core.constants import MENU_COLORS
 from ui.search_control import SearchControl
@@ -56,7 +56,7 @@ class MeritMinerMixin:
         self._mm = {
             'busy': False, 'status': '', 'hint': '', 'spin': 0, 'spinning': False, 'ran': False,
             'reference': '', 'power': '', 'count': 0,
-            'mine_by_row': {}, 'sell_by_row': {}, 'station_by_row': {}, 'source_by_row': {},
+            'mine_by_row': {}, 'sell_by_row': {}, 'station_by_row': {}, 'source_by_row': {}, 'outdated': set(),
         }
 
         frame = ttk.Frame(parent)
@@ -106,6 +106,7 @@ class MeritMinerMixin:
         tree = StripedTreeview(tree_frame, columns=columns, show="headings", selectmode="browse",
                                style="RingFinder.Treeview")
         self._mm_tree = tree
+        configure_outdated_tag(tree, current_theme)
         column_labels = {
             "Mineral": t('ring_finder.col_mineral'),
             "MineSystem": t('ring_finder.merit_miner_col_mine_system'),
@@ -184,6 +185,7 @@ class MeritMinerMixin:
             "https://spansh.co.uk/search/{}", target['system']))
 
         tree.bind("<Button-1>", self._mm_on_click)
+        tree.bind("<Double-1>", self._mm_on_double_click)
         if not hasattr(self, '_context_handlers'):
             self._context_handlers = {}
         self._context_handlers['merit_miner'] = self._mm_on_right_click
@@ -243,8 +245,12 @@ class MeritMinerMixin:
         mm = self._mm
         if not mm['busy']:
             # The power is shown in the My Power box beside it
-            self._mm_name_label.config(text=t('ring_finder.merit_miner_view_name').format(
-                count=mm['count'], system=mm['reference']) if mm.get('count') else '')
+            name = t('ring_finder.merit_miner_view_name').format(
+                count=mm['count'], system=mm['reference']) if mm.get('count') else ''
+            if name:
+                name += outdated_note(mm.get('outdated', set()),
+                                      list(mm['mine_by_row'].values()) + list(mm['sell_by_row'].values()))
+            self._mm_name_label.config(text=name)
         if not mm['busy']:
             self._mm_search_btn.configure(state="disabled" if self._mm_ready_hint() else "normal")
         self._mm_update_overlay()
@@ -395,7 +401,7 @@ class MeritMinerMixin:
             radius = self.ACQUISITION_RADIUS_BY_STATE[state]
             nearby = SystemFinderAPI._fetch_spansh_powerplay_systems(system, radius, 'Any', 'Unoccupied',
                                                                     is_cancelled=is_cancelled)
-            SystemFinderAPI._store_powerplay_batch(nearby)
+            nearby = self._acq_drop_no_longer_unoccupied(nearby)
             sells, prices, _best, rows = self._acq_find_sell_targets(system, radius, [mineral], is_cancelled,
                                                                      nearby=nearby)
             if not sells:
@@ -428,6 +434,7 @@ class MeritMinerMixin:
         tree.delete(*tree.get_children())
         for key in ('mine_by_row', 'sell_by_row', 'station_by_row', 'source_by_row'):
             mm[key].clear()
+        mm.setdefault('outdated', set()).clear()
         state_labels = {'Fortified': t('ring_finder.merit_miner_state_fortified'),
                         'Stronghold': t('ring_finder.merit_miner_state_stronghold')}
         for hit in results:
@@ -479,6 +486,44 @@ class MeritMinerMixin:
         if row_id:
             self._mm_tree.selection_set(row_id)
             self._mm_copy(self._mm_row_target(row_id, self._mm_tree.identify_column(event.x))['system'])
+
+    def _mm_on_double_click(self, event):
+        """Like the hotspot table: a mining or selling system cell (or the station) opens
+        that system on Inara and rechecks its PowerPlay state."""
+        tree = self._mm_tree
+        if tree.identify_region(event.x, event.y) != "cell":
+            return
+        row_id = tree.identify_row(event.y)
+        column_id = tree.identify_column(event.x)
+        if row_id and displayed_column(tree, column_id) in ("MineSystem", "SellSystem", "Station"):
+            self._open_inara_and_check_pp(self._mm_row_target(row_id, column_id)['system'],
+                                          self._mm_apply_pp_result)
+
+    def _mm_apply_pp_result(self, system: str, result):
+        """Mark rows whose mining system is no longer Fortified/Stronghold of the searched
+        power, or whose selling system is no longer Unoccupied - they no longer earn merits."""
+        if not result:
+            return
+        from system_finder_api import SystemFinderAPI
+        mm = self._mm
+        tree = self._mm_tree
+        outdated = mm.setdefault('outdated', set())
+        state = result.get('power_state', '')
+        if system in mm['mine_by_row'].values():
+            power = SystemFinderAPI._normalize_power_name(result.get('controlling_power', ''))
+            valid = state in self.ACQUISITION_RADIUS_BY_STATE and power == mm.get('power')
+        else:
+            valid = state == 'Unoccupied'
+        if valid:
+            outdated.discard(system)
+        else:
+            outdated.add(system)
+        for row_id in tree.get_children():
+            mine, sell = mm['mine_by_row'].get(row_id), mm['sell_by_row'].get(row_id)
+            if mine == system and not valid:
+                tree.set(row_id, 'State', self._bp_pp_text(result))
+            set_outdated_tag(tree, row_id, mine in outdated or sell in outdated)
+        self._mm_refresh_controls()
 
     def _mm_on_right_click(self, event):
         row_id = self._mm_tree.identify_row(event.y)

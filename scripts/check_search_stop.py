@@ -415,7 +415,8 @@ class RemainingWorkerTests(unittest.TestCase):
         self.assertEqual(sum(bool(rows) for rows in finder._bm_show_results.call_args.args[0]['rows_by_material'].values()), 1)
 
     def test_acquisition_stop_skips_price_searches(self):
-        cls = load_methods('app/acquisition_view.py', 'AcquisitionMixin', {'_acquisition_search_worker', '_acq_find_sell_targets'})
+        cls = load_methods('app/acquisition_view.py', 'AcquisitionMixin', {'_acquisition_search_worker', '_acq_find_sell_targets',
+                                                                         '_acq_drop_no_longer_unoccupied'})
         finder = cls()
         finder.ACQUISITION_RADIUS_BY_STATE = {'Fortified': 20}
         parent, control = self.make_control()

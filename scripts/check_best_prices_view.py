@@ -348,5 +348,54 @@ class ScopeLabelTests(unittest.TestCase):
         self.assertNotEqual(self.label('system', ''), 'Wregoe CS-S c17-8')
 
 
+class ClickTree:
+    """Just enough of a Treeview for the click handlers."""
+    def __init__(self, column):
+        self.cfg = {'columns': BestMineralsMixin.BP_COLUMNS, 'displaycolumns': ('#all',)}
+        self.column = column
+
+    def __getitem__(self, key):
+        return self.cfg[key]
+
+    def identify_region(self, x, y):
+        return 'cell'
+
+    def identify_row(self, y):
+        return 'r1'
+
+    def identify_column(self, x):
+        return self.column
+
+    def selection_set(self, row_id):
+        pass
+
+
+class InaraClickTests(unittest.TestCase):
+    def make(self, column_name):
+        v = BestMineralsMixin()
+        v._bp = {'system_by_row': {'r1': 'Sell Sys'}}
+        v._bp_tree = ClickTree(f'#{BestMineralsMixin.BP_COLUMNS.index(column_name) + 1}')
+        v._bp_open_inara_and_fetch_pp = Mock()
+        v._bp_close_extra_picker = Mock()
+        v._bp_copy_system = Mock()
+        return v
+
+    def test_double_click_on_station_or_powerplay_opens_inara(self):
+        for column in ('Station', 'PowerPlay'):
+            v = self.make(column)
+            v._bp_on_double_click(Mock(x=0, y=0))
+            v._bp_open_inara_and_fetch_pp.assert_called_once_with('r1', 'Sell Sys')
+
+    def test_single_click_on_powerplay_no_longer_opens_inara(self):
+        v = self.make('PowerPlay')
+        v._bp_on_click(Mock(x=0, y=0))
+        v._bp_open_inara_and_fetch_pp.assert_not_called()
+
+    def test_double_click_on_other_cells_does_nothing(self):
+        v = self.make('Price')
+        v._bp_on_double_click(Mock(x=0, y=0))
+        v._bp_open_inara_and_fetch_pp.assert_not_called()
+
+
 if __name__ == '__main__':
     unittest.main()
