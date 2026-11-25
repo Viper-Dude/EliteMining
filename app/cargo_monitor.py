@@ -134,6 +134,7 @@ class CargoMonitor:
         
         # Status.json file path for current ship data  
         self.status_json_path = os.path.join(self.journal_dir, "Status.json")
+        self.fuel_main = None
         
         # Ship information tracking (from LoadGame/Loadout events)
         self.latest_loadout = None
@@ -817,6 +818,7 @@ class CargoMonitor:
                     
                     with open(self.status_json_path, 'r') as f:
                         status_data = json.load(f)
+                    self.fuel_main = (status_data.get("Fuel") or {}).get("FuelMain")
                     
                     # Check for cargo capacity changes (validate it's reasonable)
                     new_capacity = status_data.get("CargoCapacity")
@@ -949,11 +951,11 @@ class CargoMonitor:
                 self.last_journal_file = latest_file
                 self.last_file_size = offset
                 self._journal_initializing = False
-            self.scan_journal_for_cargo_capacity(latest_file, restore_route_boost=skip_existing)
+            self.scan_journal_for_cargo_capacity(latest_file, startup=skip_existing)
         except Exception as e:
             log.error(f"Error finding journal files: {e}")
 
-    def scan_journal_for_cargo_capacity(self, journal_file, *, restore_route_boost=False):
+    def scan_journal_for_cargo_capacity(self, journal_file, *, startup=False):
         """Scan existing journal file for the most recent CargoCapacity, current system location, and ring metadata"""
         try:
             with open(journal_file, 'r', encoding='utf-8') as f:
@@ -962,7 +964,7 @@ class CargoMonitor:
             ship_found = False
             commander_found = False
             loadout_found = False
-            boost_found = not restore_route_boost
+            boost_found = not startup
             for line in reversed(lines):
                 try:
                     event = json.loads(line.strip())
@@ -983,6 +985,9 @@ class CargoMonitor:
                     boost_found = True
                 if ship_found and commander_found and loadout_found and boost_found:
                     break
+
+            if startup and not loadout_found:
+                self.latest_loadout = self._find_previous_loadout(journal_file)
 
             # Detect game language from Fileheader (first few lines)
             for line in lines[:10]:
@@ -1084,6 +1089,26 @@ class CargoMonitor:
                 self.ship_info_changed_callback()
         except Exception:
             log.exception("Journal capacity/ship scan failed")
+
+    def _find_previous_loadout(self, journal_file):
+        paths = glob.glob(os.path.join(self.journal_dir, "Journal.*.log"))
+        for path in sorted(paths, reverse=True):
+            if path >= journal_file:
+                continue
+            try:
+                with open(path, 'r', encoding='utf-8') as stream:
+                    lines = stream.readlines()
+            except OSError:
+                log.warning("Could not read journal for Loadout: %s", path, exc_info=True)
+                continue
+            for line in reversed(lines):
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if event.get("event") == "Loadout":
+                    return event
+        return None
 
     def check_session_end(self):
         """Check if mining session has ended and show refinery dialog if needed"""

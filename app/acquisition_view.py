@@ -191,6 +191,9 @@ class AcquisitionMixin:
             sel = tree.selection()
             return mapping.get(sel[0], '') if sel else ''
 
+        self._acq_row_menu.add_command(label=t('context_menu.plot_route'),
+                                      command=lambda: frame.winfo_toplevel().route_tab.plot_to_system(
+                                          selected(self._acq['system_by_row']), source_view="acquisition"))
         self._acq_row_menu.add_command(label=t('context_menu.copy_system'),
                                        command=lambda: self._acq_copy_system(tree.selection()[0]) if tree.selection() else None)
         self._acq_row_menu.add_command(label=t('context_menu.open_inara'), command=lambda: self._bp_open_url(

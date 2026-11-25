@@ -172,7 +172,7 @@ from overlays import (
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.7.1"
+APP_VERSION = "v5.7.2"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -276,6 +276,7 @@ def detect_va_folder_interactive(parent: tk.Tk) -> Optional[str]:
     return None
 
 from cargo_monitor import CargoMonitor
+from route_tab import RouteTab
 
 from prospector_panel import ProspectorPanel
 
@@ -1188,17 +1189,21 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
         marketplace_tab = ttk.Frame(self.notebook, padding=8)
         self._build_marketplace_tab(marketplace_tab)
         self.notebook.add(marketplace_tab, text=t('tabs.commodity_market'))
+        self.route_tab = RouteTab(self)
+        self.notebook.add(self.route_tab, text=t('tabs.route'))
         
         # System Finder tab
-        system_finder_tab = ttk.Frame(self.notebook, padding=8)
+        self.system_finder_tab = system_finder_tab = ttk.Frame(self.notebook, padding=8)
         self._build_system_finder_tab(system_finder_tab)
         self.notebook.add(system_finder_tab, text=t('tabs.system_finder'))
 
         # Fleet Carrier tab - live FC status from journal events
+        fleet_carrier_tab = None
         try:
             fc_frame = ttk.Frame(self.notebook, padding=0)
             self._build_fleet_carrier_tab(fc_frame)
             self.notebook.add(fc_frame, text=t('fleet_carrier.tab_title'))
+            fleet_carrier_tab = fc_frame
         except Exception as _fce:
             print(f"[DEBUG] Could not create Fleet Carrier tab: {_fce}")
 
@@ -1224,6 +1229,19 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
         self._settings_tab = settings_tab
         self._build_settings_notebook(settings_tab)
         self.notebook.add(settings_tab, text=t('tabs.settings'))
+
+        self._main_tabs = {
+            'mining_session': mining_session_tab,
+            'hotspots_finder': ring_finder_tab,
+            'commodity_market': marketplace_tab,
+            'route': self.route_tab,
+            'system_finder': system_finder_tab,
+            'fleet_carrier': fleet_carrier_tab,
+            'distance_calculator': distance_tab,
+            'voiceattack': voiceattack_tab,
+            'bookmarks': bookmarks_tab,
+            'settings': settings_tab,
+        }
 
         # About tab removed - now accessible via version button in sidebar
 
@@ -2020,6 +2038,7 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
             'MINING': 'mining_session',
             'HOTSPOTS': 'hotspots_finder',
             'MARKET': 'commodity_market',
+            'ROUTE': 'route',
             'SYSTEMS': 'system_finder',
             'DISTANCE': 'distance_calculator',
             'VOICEATTACK': 'voiceattack',
@@ -7219,32 +7238,11 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
                                            duration_ms=duration * 1000, ignore_sc_hide=True)
 
     def switch_to_tab(self, tab_name: str) -> None:
-        """Switch to a specific tab by name
-        
-        Args:
-            tab_name: One of 'mining_session', 'hotspots_finder', 'commodity_market', 
-                      'distance_calculator', 'voiceattack', 'bookmarks', 'settings', 'about'
-        """
+        """Switch to a main tab by its key in self._main_tabs (e.g. 'route', 'system_finder')."""
         try:
-            if not hasattr(self, 'notebook'):
-                return
-            
-            # Map tab names to their indices (based on order added in _build_content_area)
-            tab_indices = {
-                'mining_session': 0,
-                'hotspots_finder': 1,
-                'commodity_market': 2,
-                'system_finder': 3,
-                'fleet_carrier': 4,
-                'distance_calculator': 5,
-                'voiceattack': 6,
-                'bookmarks': 7,
-                'settings': 8,
-                'about': 9
-            }
-            
-            if tab_name in tab_indices:
-                self.notebook.select(tab_indices[tab_name])
+            frame = getattr(self, '_main_tabs', {}).get(tab_name)
+            if frame is not None:
+                self.notebook.select(frame)
                 log.info(f"[AUTO-TAB] Switched to tab: {tab_name}")
         except Exception as e:
             log.error(f"[AUTO-TAB] Error switching to tab {tab_name}: {e}")

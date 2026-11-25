@@ -84,7 +84,8 @@ class ToolTip:
     tooltips_enabled = True  # Global tooltip enable/disable flag
     _tooltip_instances = {}  # Store references to prevent garbage collection
     
-    def __init__(self, widget, text, follow_pointer=False, anchor_above=False, colors=None, wraplength=340):
+    def __init__(self, widget, text, follow_pointer=False, anchor_above=False, colors=None, wraplength=340,
+                 *, preserve_bindings=False):
         self.colors = colors  # optional (background, foreground, border) override
         self.wraplength = wraplength
         self.widget = widget
@@ -98,8 +99,8 @@ class ToolTip:
         if widget in ToolTip._tooltip_instances:
             old_tooltip = ToolTip._tooltip_instances[widget]
             try:
-                widget.unbind("<Enter>")
-                widget.unbind("<Leave>")
+                widget.unbind("<Enter>", old_tooltip._enter_binding)
+                widget.unbind("<Leave>", old_tooltip._leave_binding)
                 # Cancel any existing timer
                 if old_tooltip.tooltip_timer:
                     widget.after_cancel(old_tooltip.tooltip_timer)
@@ -109,8 +110,9 @@ class ToolTip:
         # Store this instance to prevent garbage collection
         ToolTip._tooltip_instances[widget] = self
         
-        self.widget.bind("<Enter>", self.on_enter)
-        self.widget.bind("<Leave>", self.on_leave)
+        add = "+" if preserve_bindings else None
+        self._enter_binding = widget.bind("<Enter>", self.on_enter, add=add)
+        self._leave_binding = widget.bind("<Leave>", self.on_leave, add=add)
         self.tooltip_window = None
 
     def on_enter(self, event=None):

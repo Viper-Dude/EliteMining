@@ -180,6 +180,9 @@ class BestMiningMixin:
             sel = tree.selection()
             return self._bm['system_by_row'].get(sel[0], '') if sel else ''
 
+        self._bm_row_menu.add_command(label=t('context_menu.plot_route'),
+                                      command=lambda: frame.winfo_toplevel().route_tab.plot_to_system(
+                                          selected_system(), source_view="best_mining"))
         self._bm_row_menu.add_command(label=t('context_menu.copy_system'),
                                       command=lambda: self._bm_copy(selected_system()))
         self._bm_row_menu.add_command(label=t('context_menu.open_inara'), command=lambda: self._bp_open_url(

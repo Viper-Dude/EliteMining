@@ -1,7 +1,7 @@
 """Whole-hold sale plans using reported market prices and demand."""
 from ui.striped_treeview import StripedTreeview
 from ui.themed_checkbox import ThemedCheckbutton
-from ui.theme import modern_color
+from ui.theme import get_theme_colors, modern_color
 import math
 import threading
 import tkinter as tk
@@ -178,6 +178,13 @@ class CargoSellPlanner(ColumnVisibilityMixin):
             combo.bind('<FocusOut>', lambda event: event.widget.selection_clear(), add='+')
         self.button = create_action_button(filters, primary=True, text=t('marketplace.search'), command=self.search)
         self.button.pack(side='left', padx=8)
+        colors = get_theme_colors(load_theme())
+        self.plot_button = create_action_button(
+            filters, text=t('context_menu.plot_route'), command=self._plot_selected_route,
+            bg=colors['btn_bg'], fg=colors['btn_fg'], activebackground=colors['btn_bg_hover'],
+            activeforeground=colors['btn_fg'], disabledforeground=colors['btn_fg_disabled'])
+        self.plot_button.configure(state='disabled')
+        self.plot_button.pack(side='left', padx=8)
         if load_theme() not in ("modern", "modern_slate", "modern_orange"):
             self.status = ttk.Label(controls, wraplength=1000)
         self.summary = ttk.Label(controls, wraplength=1000)
@@ -311,6 +318,7 @@ class CargoSellPlanner(ColumnVisibilityMixin):
             self.details.delete(*self.details.get_children())
             self.plans.clear()
             self.destinations.clear()
+            self.plot_button.configure(state='disabled')
             self.status.config(text=t('sell_hold.empty'))
             return
         self._search_control.start()
@@ -350,6 +358,7 @@ class CargoSellPlanner(ColumnVisibilityMixin):
         self.details.delete(*self.details.get_children())
         self.plans.clear()
         self.destinations.clear()
+        self.plot_button.configure(state='disabled')
         baseline = plans[0][1] if plans else None
         for name, plan in plans:
             route = ' → '.join(s['info']['systemName'] + ' / ' + station_display_name(s['info']) for s in plan['stops'])
@@ -372,10 +381,10 @@ class CargoSellPlanner(ColumnVisibilityMixin):
         self.details.delete(*self.details.get_children())
         self.destinations.clear()
         self.sources.clear()
-        selection = self.tree.selection()
-        if not selection or selection[0] not in self.plans:
+        plan = self._selected_plan()
+        self.plot_button.configure(state='normal' if plan else 'disabled')
+        if not plan:
             return
-        plan = self.plans[selection[0]]
         for sale in sorted(plan['sales'], key=lambda sale: sale['stop']):
             row = sale['row']
             stop = plan['stops'][sale['stop']]['info']
@@ -392,6 +401,22 @@ class CargoSellPlanner(ColumnVisibilityMixin):
                 f"{row['sellPrice']:,.0f}", row['demand'], arrival_display, updated))
             self.destinations[item] = stop['systemName']
             self.sources[item] = format_market_source(row)
+
+    def _selected_plan(self):
+        selection = self.tree.selection()
+        return self.plans.get(selection[0]) if selection else None
+
+    def _plot_selected_route(self):
+        plan = self._selected_plan()
+        if not plan:
+            return
+        systems = [stop['info']['systemName'] for stop in plan['stops']]
+        sold_first = 0
+        if len(systems) == 2:
+            _, available, _ = self._cargo()
+            sold_first = sum(min(sale['quantity'], available.get(sale['name'], 0))
+                             for sale in plan['sales'] if sale['stop'] == 0)
+        self.app.route_tab.plot_sale_route(systems, sold_first)
 
     def _row_systems(self, tree, item):
         if tree is self.tree:
@@ -410,6 +435,9 @@ class CargoSellPlanner(ColumnVisibilityMixin):
             return
         colors = get_menu_colors()
         menu = tk.Menu(tree, tearoff=0, **colors)
+        if tree is self.tree:
+            menu.add_command(label=t('context_menu.plot_route'), command=self._plot_selected_route)
+            menu.add_separator()
         for system in systems:
             target = menu
             if len(systems) > 1:

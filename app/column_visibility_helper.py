@@ -30,7 +30,8 @@ class ColumnVisibilityMixin:
     3. Supports multiple trees in same class by using config_key as namespace
     """
     
-    def setup_column_visibility(self, tree, columns, default_widths, config_key, use_displaycolumns=False, on_change=None, allow_reorder=False):
+    def setup_column_visibility(self, tree, columns, default_widths, config_key, use_displaycolumns=False,
+                                on_change=None, allow_reorder=False, *, persist_widths=False):
         """
         Setup column visibility for a treeview
 
@@ -46,6 +47,7 @@ class ColumnVisibilityMixin:
                 tree['displaycolumns'], not tree['columns'].
             on_change: Optional zero-arg callable run after the user toggles a column
                 or resets visibility (e.g. to resize the containing window).
+            persist_widths: Save and restore user widths for a displaycolumns table.
         """
         # Store per-tree data using config_key as namespace
         if not hasattr(self, '_cv_trees'):
@@ -81,6 +83,22 @@ class ColumnVisibilityMixin:
         if allow_reorder:
             from config import load_column_order
             self._cv_set_order(config_key, load_column_order(config_key), save=False)
+        if persist_widths:
+            from config import _load_cfg, update_config_value
+            width_key = f"{config_key}_column_widths"
+            saved = _load_cfg().get(width_key, {})
+            for col in columns:
+                tree.column(col, width=max(tree.column(col, "minwidth"), saved.get(col, default_widths[col])))
+            widths = {col: tree.column(col, "width") for col in columns}
+
+            def save_widths(event):
+                nonlocal widths
+                actual = {col: tree.column(col, "width") for col in columns}
+                if actual != widths:
+                    update_config_value(width_key, actual)
+                    widths = actual
+
+            tree.bind("<ButtonRelease-1>", save_widths, add="+")
     
     def _cv_add_columns_button(self, parent, config_key, **grid_options):
         from config import load_theme, scaled_font, scaled_px

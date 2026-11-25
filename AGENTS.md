@@ -84,6 +84,7 @@
 
 Claude Code ignores this section.
 
+- The user runs Codex on Sol 6.2 by default; recommend only the effort level, and suggest Astra only when the user asks.
 - At session start, read `C:\Users\olmba\.claude\projects\d--My-Apps-Work-Folder-Elitemining-Working-folder-Releases-EliteMining-Dev\memory\MEMORY.md` and the relevant linked files. It is context; don't modify it unless asked, and if the path breaks, report it.
 - At a task boundary (an unrelated task or a new release), suggest a new session (`/new`) in one line, since usage limits are shared.
 - For a requested push, verify the remote URL, the upstream and the remote-tracking reflog, and cite that evidence plus the request in any approval justification. This never authorizes an unrequested push.

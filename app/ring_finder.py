@@ -3432,6 +3432,7 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Mer
             self.context_menu.add_cascade(label=t(label_key) + "  ▸", menu=sub)
 
         # Navigate / Lookup
+        add('plot_route', 'context_menu.plot_route', None)
         add('copy_system', 'context_menu.copy_system', self._copy_system_name)
         add('find_in_star_systems', 'context_menu.find_in_star_systems', self._find_in_star_systems)
         add_submenu('context_menu.submenu_open_in', [
@@ -3567,6 +3568,11 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Mer
                 if has_local_missing_reserve or has_local_with_reserve:
                     print(f"[MENU DEBUG] missing={has_local_missing_reserve}, with_reserve={has_local_with_reserve}, enable={enable_update_reserve}")
                 
+                route_system = self.results_tree.set(item, 'System')
+
+                def plot_route():
+                    self.parent.winfo_toplevel().route_tab.plot_to_system(route_system, source_view="ring_finder")
+
                 if selection_count > 1:
                     # Multi-select mode - show applicable options.
                     # Save is disabled outright in Ring Search mode (see single-select block below).
@@ -3581,7 +3587,7 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Mer
                                 if source and '🌐' in str(source):
                                     spansh_rows_with_hotspots += 1
 
-                    if spansh_rows_with_hotspots > 0 or enable_update_reserve:
+                    if route_system or spansh_rows_with_hotspots > 0 or enable_update_reserve:
                         from config import scaled_font
                         multi_menu = tk.Menu(self.parent, tearoff=0,
                                            bg=self.context_menu.cget('bg'),
@@ -3590,6 +3596,9 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Mer
                                            activeforeground=self.context_menu.cget('activeforeground'),
                                            selectcolor=self.context_menu.cget('selectcolor'),
                                            font=scaled_font(9))
+
+                        if route_system:
+                            multi_menu.add_command(label=t('context_menu.plot_route'), command=plot_route)
 
                         if spansh_rows_with_hotspots > 0:
                             multi_menu.add_command(label=t('context_menu.save_n_entries').format(count=spansh_rows_with_hotspots),
@@ -3676,6 +3685,8 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Mer
                             has_comment = bool(values[15])
                     self.context_menu.entryconfig(self._ctx_idx['comment'], label=t('context_menu.edit_comment') if has_comment else t('context_menu.add_comment'))
 
+                    self.context_menu.entryconfig(self._ctx_idx['plot_route'], command=plot_route,
+                                                  state="normal" if route_system else "disabled")
                     self.context_menu.tk_popup(event.x_root, event.y_root)
         finally:
             if hasattr(self, 'context_menu'):
@@ -3870,8 +3881,8 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Mer
             main_app = self.parent.winfo_toplevel()
             if hasattr(main_app, 'sysfinder_reference_system'):
                 main_app.sysfinder_reference_system.set(system_name)
-            if hasattr(main_app, 'notebook'):
-                main_app.notebook.select(3)  # Star Systems tab index
+            if hasattr(main_app, 'system_finder_tab'):
+                main_app.notebook.select(main_app.system_finder_tab)
             if hasattr(main_app, '_search_systems'):
                 main_app.after(100, main_app._search_systems)
         except Exception as e:

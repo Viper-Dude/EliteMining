@@ -22,6 +22,7 @@ VA_TAB_METHODS = {n.name: n for n in next(n for n in VA_TAB_TREE.body if isinsta
 SELECTED = {
     '_on_voice_set_toggle', '_reset_sound_events', '_save_sound_events',
     '_clear_voice_set', '_apply_mapping', '_save_timer', '_execute_va_command', '_va_switch_tab',
+    'switch_to_tab',
 }
 
 
@@ -118,6 +119,20 @@ class VoiceAttackChecks(unittest.TestCase):
             selected.clear()
             self.app._execute_va_command(f'TAB:{name}')
             self.assertEqual(selected, ['mining_session', f'{name.lower()}-frame'])
+
+    def test_tab_commands_select_frames_by_name(self):
+        selected = []
+        self.app.notebook = types.SimpleNamespace(select=selected.append)
+        self.app._set_status = lambda *args: None
+        self.app._main_tabs = {'route': 'route-frame', 'system_finder': 'systems-frame',
+                               'fleet_carrier': None}
+        for command, frame in (('TAB:ROUTE', 'route-frame'), ('TAB:SYSTEMS', 'systems-frame')):
+            selected.clear()
+            self.app._execute_va_command(command)
+            self.assertEqual(selected, [frame])
+        selected.clear()
+        self.app._execute_va_command('TAB:FLEETCARRIER')
+        self.assertEqual(selected, [])
 
     def test_sidebar_swap_requires_visible_sidebar(self):
         swaps = []

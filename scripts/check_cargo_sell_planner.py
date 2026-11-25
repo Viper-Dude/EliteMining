@@ -3,7 +3,7 @@ import unittest
 import tkinter as tk
 from types import SimpleNamespace
 from tkinter import ttk
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'app'))
@@ -126,11 +126,13 @@ class CargoSellPlannerTests(unittest.TestCase):
             root._scaled_font = lambda size, *style: ('Segoe UI', size, *style)
             root._scaled_px = lambda size: size
             root.get_current_system = lambda: 'Sol'
+            root.route_tab = Mock()
             frame = ttk.Frame(root)
             frame.pack(fill='both', expand=True)
             snapshot = ('Sol', {'Gold': 100}, {})
             with patch.object(CargoSellPlanner, '_cargo', return_value=snapshot):
                 tab = CargoSellPlanner(frame, root)
+                self.assertEqual(str(tab.plot_button.cget('state')), 'disabled')
                 for tree in (tab.tree, tab.details):
                     import tkinter.font as tkfont
                     heading_font = tkfont.Font(font=root._scaled_font(9, 'bold'))
@@ -167,6 +169,10 @@ class CargoSellPlannerTests(unittest.TestCase):
                 plans = build_plans({'Gold': 100}, [('Gold', [market('A', 100)])])
                 tab._complete(snapshot, plans)
                 tab.select()
+                self.assertEqual(str(tab.plot_button.cget('state')), 'normal')
+                for event in ('<Enter>', '<ButtonPress-1>', '<ButtonRelease-1>'):
+                    tab.plot_button.event_generate(event, x=5, y=5)
+                root.route_tab.plot_sale_route.assert_called_once_with(['Sol'], 0)
                 self.assertEqual(len(tab.tree.get_children()), 2)
                 self.assertEqual(len(tab.details.get_children()), 1)
                 row = tab.details.get_children()[0]
@@ -186,6 +192,23 @@ class CargoSellPlannerTests(unittest.TestCase):
                     tab._open_row_system(SimpleNamespace(x=10, y=30), tab.tree)
                     open_url.assert_called_once_with('https://inara.cz/elite/starsystem/?search=Sol')
                 tab.plans[plan_row]['stops'] = original_stops
+                paired_plans = build_plans({'Gold': 100}, [('Gold', [
+                    market('A', 100, 40, distance=10),
+                    market('B', 90, 60, distance=12, system='Achenar'),
+                ])])
+                tab._complete(snapshot, paired_plans)
+                pair_row = tab.tree.get_children()[-1]
+                with patch.object(tab.tree, 'identify_region', return_value='cell'), \
+                     patch.object(tab.tree, 'identify_row', return_value=pair_row), \
+                     patch('cargo_sell_planner.tk.Menu') as menu:
+                    tab._system_menu(SimpleNamespace(x=10, y=30, x_root=10, y_root=30), tab.tree)
+                    menu.return_value.add_command.call_args_list[0].kwargs['command']()
+                root.route_tab.plot_sale_route.assert_called_with(['Sol', 'Achenar'], 40)
+                tab.tree.selection_remove(pair_row)
+                tab.select()
+                self.assertEqual(str(tab.plot_button.cget('state')), 'disabled')
+                tab._complete(snapshot, plans)
+                tab.select()
             with patch.object(CargoSellPlanner, '_cargo', return_value=('Sol', {'Gold': 50}, {})):
                 tab._poll()
                 self.assertEqual(len(tab.tree.get_children()), 2)

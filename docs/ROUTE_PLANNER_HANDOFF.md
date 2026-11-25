@@ -37,7 +37,7 @@ Spansh's API is undocumented and run by one person. Keep traffic low: one plot a
 | `is_supercharged` | 0 | 1 if a `JetConeBoost` event came after the last `FSDJump` |
 | `use_supercharge` | 0 | Checkbox, default **on** |
 | `use_injections` | 0 | Always 0 |
-| `use_injections_when_required` | 0 | Checkbox, default off |
+| `use_injections_when_required` | 0 | 0 with FSD Injection Off (default), 1 with an injection grade selected |
 | `exclude_secondary` | 0 | Hidden, always **1** |
 | `refuel_every_scoopable` | 1 | Hidden, always 1 |
 | `reserve_size` | 0 | Hidden, always 0 |
@@ -53,7 +53,7 @@ Spansh's API is undocumented and run by one person. Keep traffic low: one plot a
 | `cargo` | 144 | Current cargo tons from the Cargo Monitor. |
 | `algorithm` | `beam` | Hidden, always Beam. |
 | `supercharge_multiplier` | 4 | The frontend sends 4 by default and can override it for specific FSDs. |
-| `injection_multiplier` | 2 | The frontend sends 2 by default and can override it for specific FSDs. |
+| `injection_multiplier` | 2 | Basic sends 1.25, Standard 1.5 and Premium 2. The frontend defaults to 2 and supports per-FSD injection overrides. None are defined in its current drive data. |
 | `max_time` | omitted in probe | The frontend sends its plot time setting. The live probe succeeded with the field omitted. |
 
 The website calculates the FSD values itself and sends them, so EliteMining must do the same. The FSD table needs one entry per FSD item (normal, pre-engineered and SCO drives): power constant, linear constant, standard optimal mass and standard max fuel per jump. Copy the values from an open-source source such as the Coriolis data repository (check its licence) and name the source in a comment.
@@ -102,7 +102,7 @@ Use this only for "jump range now" and rough "~N jumps" estimates. An estimate f
 
 ## Steps
 
-Run the steps in order, one per chat where possible, one commit each (`git add -A`). Before each step, name the recommended model and effort and wait for the user to confirm. After each step, update the progress table.
+Run the steps in order, one per chat where possible. Commit once when the route planner is finished (`git add -A`). See Codex Only in AGENTS.md for model recommendations. Before each step, name the recommended effort and wait for the user to confirm. After each step, update the progress table.
 
 ### Step 0 — Confirm the open API details (light model, medium effort)
 
@@ -130,35 +130,54 @@ Write the answers into this document (replace the "Step 0 confirms" notes) befor
 - `build_slef(loadout)` and `build_route_form(...)`, which builds the form fields from the table above.
 - Spansh client: `start_plot(form)` returns the job id; `poll(job, is_cancelled)` waits with backoff until done; then parse the stops.
 - Active route state: stops, current index, source view and time. Save it through `config.py` so it survives a restart.
-- Moving along: on each `FSDJump`, match `SystemAddress` (or `StarSystem`) to the next stop. A system that isn't in the route counts as off route; keep the index.
+- Moving along: on each `FSDJump`, match `SystemAddress` (or `StarSystem`) to the first matching later stop, even if the player skips stops. A system that isn't in the route counts as off route; keep the index.
 - `is_supercharged`: true after `JetConeBoost`, false after the next `FSDJump`.
 - No Tk calls from the worker. All network work runs in a daemon thread.
 - New check script `scripts/check_route_planner.py`: the jump range check values, the SLEF wrapper, the form fields from a Loadout fixture, polling with a fake HTTP layer (202, 202, 200), cancel and timeout, moving along and off route.
 
-### Step 3 — Route tab UI, new module `app/route_tab.py` (strong model, high effort)
+### Step 3 — Route tab UI, new module `app/route_tab.py` (Sol 6.2, high effort)
 
 Read docs/UI_RULES.md and docs/MAIN_SPLIT_HANDOFF.md first. `main.py` only adds the notebook line.
 
+- Inserting Route at position 3 breaks `main_app.notebook.select(3)` in `app/ring_finder.py:3874` (meant for Systems). Change that call to select the Systems tab frame instead of an index. Calls to positions 0–2 (`commodity_market_tab.py:1007`, `main.py:11447`, `mining_missions_tab.py:674/685`, `ring_finder.py:4085/4133`) are unaffected.
+
 - From and To boxes with autocomplete. From defaults to the current system.
 - Two checkboxes: Use Supercharge (on), Use FSD Injections When Required (off).
-- One line: "Jump range now: X ly (full hold: Y ly)".
+- One line in the game's own galaxy-map format: "Jump range: X (Y) ly". X = current range with current fuel (Status.json) and current cargo (`jump_range()`); Y = the Loadout's `MaxJumpRange`. Example from the game: "Jump range: 50.64 (52.91) ly".
 - Plot with Stop (`SearchControl`).
-- Table: current marker (▷), #, System, Jump (ly), Star (scoopable / neutron), Refuel, Jumps left. Totals underneath: jumps and ly travelled. Follow the table rules in AGENTS.md.
+- Table: # (with the ▷ current marker inside it), System, Jump (ly), Star (scoopable / neutron), Refuel, Jumps left. Totals underneath: jumps and ly travelled. Follow the table rules in AGENTS.md.
 - "Copy next system" button and Clear. Transient messages via `_show_notice()`. Replacing a route asks with `centered_yesno_dialog`.
 - Short help text with Spansh's two tips: target the next system rather than plotting to it in the galaxy map; if out of sync, plot to the next refuel stop first.
 - Every new string goes in EN and DE. Theme colours from the active theme.
 
-### Step 4 — "Plot route" from Sell My Hold (strong model, medium effort)
+**User test feedback (25 Nov 2026, first live plot worked: Wregoe JT-Q c18-27 → Sol, 8 jumps).** Changes to make:
+
+1. **"Use Current System" button** beside the From box. Reuse the Distance tab's pattern and string (`distance_calculator.use_current`, `_distance_use_current_system` in `app/distance_calculator_tab.py:179`).
+2. **System boxes too wide.** Use the Distance tab's layout (`app/distance_calculator_tab.py:95-122`): From and To on two rows, the entry column with a fixed minimum width (`px(250)`), not stretching, and the buttons beside the entry.
+3. **Remove the separate marker column.** The user couldn't tell what the empty first column was. Show the ▷ marker inside the # column (for example "▷ 3") instead.
+4. **Column chooser missing.** Use `ColumnVisibilityMixin` like the other tables: `setup_column_visibility(...)` plus the Columns button via `_cv_add_columns_button` (see `app/cargo_sell_planner.py:245/265`). That replaces the tab's own width-saving code. Make the System column's default width fit long names such as "Col 285 Sector MQ-M b38-5".
+5. **FSD injection grade, like the game's "FSD Boost" setting.** Replace the "Use FSD Injections When Required" checkbox with one dropdown: Off / Basic (+25%) / Standard (+50%) / Premium (+100%). Off sends `use_injections_when_required=0`; the others send 1 with `injection_multiplier` 1.25 / 1.5 / 2. The Spansh website always sends 2 and has no grade choice, so first confirm with one test plot that Spansh accepts 1.25 and 1.5 (fewer or equal jumps than Off, more than or equal to Premium) and check in the website's JavaScript whether some FSDs override the multiplier. If Spansh ignores other values, keep the checkbox and tell the user.
+6. **Tooltips** (requested by the user) on: Use Current System (reuse `tooltips.use_current`), Use Supercharge, the FSD injection dropdown, the jump range line (X = with current fuel and cargo, Y = maximum), Plot, Copy next system, Clear, and the table headers (`add_header_tooltips` from `ui/tooltip.py`, as in `app/cargo_sell_planner.py`). EN and DE strings.
+7. **Cargo box** (like EDDiscovery's Route Finder and the game's Cargo Mass slider), so the player can plan a trip for a full hold while still empty. Place the Cargo box and the jump range line together on one row, so it's visible that changing cargo changes the range (EDDiscovery shows "Max jump" and "Cargo" side by side): `Jump range: 29.67 (38.03) ly   Cargo: [144] t`. The range stays read-only text and updates immediately when the Cargo value changes. The Cargo box is filled with the current cargo and following it until the player types a value; limited to 0 – cargo capacity. The jump range line and the Route tab's own Plot use this value. "Plot route" from other views (Sell My Hold, Where to Mine and so on) keeps using the real current cargo. **No editable Max jump box:** the Galaxy Plotter works from the ship build, not a range number, so a typed range would be ignored.
+8. **From the Spansh results page** (compared 25 Nov 2026):
+   - **Inject column** from `must_inject` ("Yes" when the player must use an FSD injection before that jump). Needed now that the injection dropdown exists; without it the player can't know when to synthesise. Header tooltip, EN and DE.
+   - **Estimated time** in the totals line ("8 jumps · 361.69 ly · about 16 min"). The Spansh Galaxy Plotter calculates one minute per jump plus two minutes per refuel stop, excluding the starting system.
+   - **Right-click on a route row: "Copy system name"**, like the copy icon on every Spansh row. Reuse an existing copy string.
+   - **Left out on purpose:** Done checkboxes (the route moves forward by itself from the journal), Remaining (ly), Fuel Left and Fuel Used (refuel stops are already marked), and row colours.
+
+The live Type-11 test from Wregoe JT-Q c18-27 to Sol returned the same 12 jumps without injections at all four grades. Forcing injections on that route for the diagnostic returned 10 jumps with Basic and 8 with Standard, confirming Spansh applies both multipliers. The dropdown uses injections only when needed.
+
+### Step 4 — "Plot route" from Sell My Hold (Sol 6.2, medium effort)
 
 - `app/cargo_sell_planner.py` (Sell My Hold, inside the Market tab via `app/commodity_market_tab.py:46`). Add "Plot route" for the selected plan.
 - One-stop plan: one plot. Two-stop plan: plot leg 1 with the current cargo, then leg 2 with the cargo left after the first sale, and join both legs into one route.
-- Switch to the Route tab after plotting.
+- Add a Plot route button beside the search controls and the same action in the sale plan’s right-click menu. Switch to the Route tab immediately so it shows progress and Stop.
 
-### Step 5 — "Plot route" in the other views (medium model, medium effort)
+### Step 5 — "Plot route" in the other views (Sol 6.2, medium effort)
 
 Right-click "Plot route" in: Where to Mine (`app/best_mining_view.py`), Best Prices (`app/best_minerals_view.py`), Merit Miner (`app/merit_miner_view.py`), Acquisition (`app/acquisition_view.py`), Ring Finder results, and Market search results. Cargo is always the current cargo. Optional: "~N jumps" on the selected row only, using the jump range calculation (no Spansh call).
 
-### Step 6 — Cockpit support (strongest model, high effort)
+### Step 6 — Cockpit support (Sol 6.2, high effort)
 
 Read docs/VOICEATTACK_RULES.md first.
 
@@ -171,10 +190,16 @@ Read docs/VOICEATTACK_RULES.md first.
 
 | Step | Status | Commit | Notes |
 |---|---|---|---|
-| 0 Confirm API details | API verified with synthetic input | This commit | Names, cargo and Beam fields, polling, and stop schema verified. Omitting explicit FSD fields returned HTTP 400. Real journal request blocked by approval review. |
-| 1 Tab renames | Done | This commit | EN and DE labels and help references updated. Positional tab selection is in use, so the Route placeholder and index updates are deferred to step 3. UI verification pending. |
-| 2 Route core | Done | This commit | Route and journal checks passed. One live Spansh plot using the actual Type-11 Loadout with `appName: EliteMining` returned seven jumps from Sol to Paesia. |
-| 3 Route tab UI | Not started | | |
-| 4 Sell My Hold | Not started | | |
-| 5 Other views | Not started | | |
-| 6 Cockpit support | Not started | | |
+| 0 Confirm API details | Done | `445c982` | The live synthetic Sol-to-Paesia probe verified system names, the cargo and Beam fields, polling, and the stop fields. Omitting all explicit FSD fields returned HTTP 400. Individual field requirements and a real Loadout without those fields remain unverified. Step 2 verified a real Loadout with the fields. |
+| 1 Tab renames | Done | `7fcd54b` | Both translation files parsed successfully, and help references were updated. The user later tested plotting in the running app with the Route tab present. A full visual pass of the renamed tabs in both languages was not recorded. |
+| 2 Route core | Done | `9d5be6e` | Syntax, route and journal checks passed. A live Spansh plot using the user's Type-11 Loadout returned seven jumps from Sol to Paesia. Automated checks covered saved progress, skipped stops and off-route jumps. In-game coverage of those edge cases was not recorded. |
+| 3 Route tab UI and user feedback | Done | Release pending | The user's first live plot from Wregoe JT-Q c18-27 to Sol returned eight jumps. All feedback items were implemented, including the Stop column with the current-stop marker, editable planning cargo, Inject column, estimated time and row copy. Live Spansh diagnostics confirmed the Basic and Standard injection multipliers. Route checks and off-screen Tk checks across all five themes passed during implementation. A full visual pass after the feedback changes was not recorded. |
+| 4 Sell My Hold | Done | Release pending | Route, Sell My Hold, Stop and Market checks passed. Off-screen checks used mocked plots for the Route tab handoff and the two-leg sale route, including the reduced cargo on the second leg. Live one-stop and two-stop sale plots were not documented. |
+| 5 Other views | Done | Release pending | Route, journal, cargo and result-view checks passed, including off-screen checks for all eight result menus. The user's test at the game's main menu exposed the missing Loadout and fuel readings. Automated checks verified the older-journal and full-tank fallbacks. Live plots from each result view and an in-game retest of those fallbacks were not documented. |
+| 6 Cockpit support and voice tab commands | Done | Release pending | Route checks simulated jumps and verified the next-system clipboard and overlay calls, the settings gates and the VoiceAttack variable updates. VoiceAttack checks passed for named-tab selection, and the shipped profile contains "Show route". In-game results for clipboard copying and overlay display, and spoken-command results in VoiceAttack, were not documented. |
+
+## Remaining (25 Nov 2026)
+
+1. **User's release test** of the built v5.7.2: clipboard after plotting and after a jump, the "Next: ..." overlay line, `Variables\routeNextSystem.txt` and `routeJumpsLeft.txt` updating, and "Show route" and "Show systems" by voice (after re-importing the profile). Record the results in the progress table and fix anything that fails.
+2. **Commit and push** everything together with the v5.7.2 release (`git add -A`), once the test passes.
+3. **Later, not in v5.7.2:** Fleet Carrier route (`fleetcarrier/route`, phase 2), and an optional "Next system" voice command that reads `routeNextSystem.txt` aloud (the user adds voice commands in VoiceAttack himself).

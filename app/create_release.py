@@ -479,6 +479,10 @@ class ReleaseBuilder:
         """Main method to build the complete release"""
         print("🚀 EliteMining Release Builder")
         print(f"Project root: {self.project_root}")
+        sys.path.insert(0, str(self.project_root))
+        from scripts.update_version import VA_PROFILE_VERSION
+        profile = f"v{VA_PROFILE_VERSION}" if VA_PROFILE_VERSION else "not updated in this release"
+        print(f"App version: v{get_version()} | VA profile: {profile}")
 
         if not self.clear_profile_keybinds():
             print("VoiceAttack keybind cleanup failed. Aborting release process.")

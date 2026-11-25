@@ -178,6 +178,9 @@ class MeritMinerMixin:
         target = self._mm_menu_target
         self._mm_row_menu.add_command(label=t('context_menu.show_all_buyers'), command=self._mm_show_all_buyers)
         self._mm_row_menu.add_separator()
+        self._mm_row_menu.add_command(label=t('context_menu.plot_route'),
+                                      command=lambda: frame.winfo_toplevel().route_tab.plot_to_system(
+                                          target['system'], source_view="merit_miner"))
         self._mm_row_menu.add_command(label=t('context_menu.copy_system'),
                                       command=lambda: self._mm_copy(target['system']))
         self._mm_row_menu.add_command(label=t('context_menu.open_inara'), command=lambda: self._mm_open_inara())
@@ -533,6 +536,8 @@ class MeritMinerMixin:
             self._mm_tree.selection_set(row_id)
             self._mm_menu_target.update(self._mm_row_target(row_id, self._mm_tree.identify_column(event.x)),
                                         mine=self._mm['mine_by_row'].get(row_id, ''))
+            self._mm_row_menu.entryconfigure(t('context_menu.plot_route'),
+                                             state="normal" if self._mm_menu_target['system'] else "disabled")
             try:
                 self._mm_row_menu.tk_popup(event.x_root, event.y_root)
             finally:

@@ -13,7 +13,7 @@ from localization import t
 from ui.search_control import SearchControl
 from carrier_names import station_display_name
 from marketplace_api import MarketplaceAPI
-from core.constants import MINING_COMMODITY_ORDER
+from core.constants import MINING_COMMODITY_ORDER, get_menu_colors
 from app_utils import create_action_button, format_market_pad, format_market_powerplay, format_market_source, format_market_station_type, format_relative_age
 
 MAX_MINERALS = 5
@@ -184,6 +184,9 @@ class MultiMineralTab:
             save_multiple_prices_column_widths(widths)
         self.tree.bind("<ButtonRelease-1>", save_widths)
         self.tree.bind("<Double-1>", lambda e: app._on_commodity_tree_double_click(e, self.tree, refresh_powerplay=False))
+        if not hasattr(app, '_context_handlers'):
+            app._context_handlers = {}
+        app._context_handlers['multiple_prices'] = self._show_context_menu
         self._row_source = {}
         from ui.cell_tooltip import attach_cell_tooltip
         attach_cell_tooltip(self.tree, "updated", lambda item: self._row_source.get(item, ''))
@@ -195,6 +198,22 @@ class MultiMineralTab:
         hsb.grid(row=1, column=0, sticky="ew")
         table.rowconfigure(0, weight=1)
         table.columnconfigure(0, weight=1)
+
+    def _show_context_menu(self, event):
+        item = self.tree.identify_row(event.y)
+        if not item:
+            return
+        system = self.tree.set(self.tree.parent(item) or item, 'system')
+        if not system:
+            return
+        self.tree.selection_set(item)
+        menu = tk.Menu(self.tree, tearoff=0, font=self.app._scaled_font(9), **get_menu_colors())
+        menu.add_command(label=t('context_menu.plot_route'),
+                         command=lambda: self.app.route_tab.plot_to_system(system, source_view="multiple_prices"))
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
 
     # Station rows hold location/pad/distance/LS/powerplay; their mineral rows hold mineral/demand/price/age.
     _PAD_ORDER = {"?": 0, "S": 1, "M": 2, "L": 3}

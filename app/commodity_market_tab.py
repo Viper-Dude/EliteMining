@@ -898,6 +898,11 @@ class CommodityMarketTabMixin:
                                                activeforeground=menu_active_fg,
                                                selectcolor=menu_active_bg,
                                                font=self._scaled_font(9))
+        self.marketplace_context_menu.add_command(
+            label=t('context_menu.plot_route'),
+            command=lambda: self.route_tab.plot_to_system(
+                self._selected_system_station(self.marketplace_tree)[0], source_view="mining_commodities"))
+        self.marketplace_context_menu.add_separator()
         self.marketplace_context_menu.add_command(label=t('context_menu.open_inara'), command=self._open_inara_from_menu)
         self.marketplace_context_menu.add_command(label=t('context_menu.open_edsm'), command=self._open_edsm_from_menu)
         self.marketplace_context_menu.add_command(label=t('context_menu.open_spansh'), command=self._open_spansh_from_menu)
@@ -928,6 +933,11 @@ class CommodityMarketTabMixin:
                                           activeforeground=menu_active_fg,
                                           selectcolor=menu_active_bg,
                                           font=self._scaled_font(9))
+        self.trade_context_menu.add_command(
+            label=t('context_menu.plot_route'),
+            command=lambda: self.route_tab.plot_to_system(
+                self._selected_system_station(self.trade_tree)[0], source_view="trade_commodities"))
+        self.trade_context_menu.add_separator()
         self.trade_context_menu.add_command(label=t('context_menu.open_inara'), command=self._open_inara_from_trade_menu)
         self.trade_context_menu.add_command(label=t('context_menu.open_edsm'), command=self._open_edsm_from_trade_menu)
         self.trade_context_menu.add_command(label=t('context_menu.open_spansh'), command=self._open_spansh_from_trade_menu)
