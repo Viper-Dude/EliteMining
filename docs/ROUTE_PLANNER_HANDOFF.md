@@ -14,7 +14,7 @@ A simple, mining-focused route planner. Spansh does the plotting; EliteMining fi
 
 - **One new top-level tab, "Route"**, placed after Market: Mining | Hotspots | Market | **Route** | Star Systems | Fleet Carrier | Distance Calculator | VoiceAttack | Bookmarks | Settings.
 - **Tab renames** (EN / DE): Hotspots Finder → Hotspots / Hotspots; Commodity Market → Market / Markt; VoiceAttack Controls → VoiceAttack / VoiceAttack. New: Route / Route. Star Systems / Sternensysteme and Distance Calculator / Entfernungsrechner keep their full names.
-- **Other views choose where to go; the Route tab shows the one active route.** Views get "Plot route" in their right-click menu. A new plot replaces the active route after a yes/no confirmation. Only one route at a time.
+- **Other views choose where to go; the Route tab shows the one active route.** Views get "Plot route" in their right-click menu. Plotting replaces the active route only after the new plot succeeds.
 - **Plotter: Spansh Galaxy Plotter only** (`generic/route`). No Neutron, Riches, Trade or Exobiology plotters, no local router.
 - **Fleet Carrier route** (`fleetcarrier/route`) is a later phase 2, not part of this handover.
 - **Left out on purpose:** coordinates and deviation columns, a routing-method choice, multiple routes, a text overlay line, EDSM lookup buttons.
@@ -147,7 +147,7 @@ Read docs/UI_RULES.md and docs/MAIN_SPLIT_HANDOFF.md first. `main.py` only adds 
 - One line in the game's own galaxy-map format: "Jump range: X (Y) ly". X = current range with current fuel (Status.json) and current cargo (`jump_range()`); Y = the Loadout's `MaxJumpRange`. Example from the game: "Jump range: 50.64 (52.91) ly".
 - Plot with Stop (`SearchControl`).
 - Table: # (with the ▷ current marker inside it), System, Jump (ly), Star (scoopable / neutron), Refuel, Jumps left. Totals underneath: jumps and ly travelled. Follow the table rules in AGENTS.md.
-- "Copy next system" button and Clear. Transient messages via `_show_notice()`. Replacing a route asks with `centered_yesno_dialog`.
+- "Copy next system" button and Clear. Transient messages via `_show_notice()`. Importing a route asks for confirmation when it would replace the active route.
 - Short help text with Spansh's two tips: target the next system rather than plotting to it in the galaxy map; if out of sync, plot to the next refuel stop first.
 - Every new string goes in EN and DE. Theme colours from the active theme.
 
@@ -187,6 +187,20 @@ Read docs/VOICEATTACK_RULES.md first.
 - No text overlay line: the user decided on 25 Nov 2026 that the route stays off the text overlay.
 - A voice command needs a `.vap` change: insert the elements in `COMMAND_ELEMENT_ORDER` and remind the user to re-import. Ask the user before adding one.
 
+### Plot next waypoint in VoiceAttack
+
+The shipped v5.7.2 profile adds **Plot next waypoint** under **EliteMining App Commands**. Say it from the ship HUD or assign a hotkey in VoiceAttack. The command reads `Variables/routeNextSystem.txt` on each trigger and says “No route” if it is empty or missing. It works with **Copy after jump** turned off.
+
+The Route tab’s **Plot next system in game** button sends the same command to the running VoiceAttack profile and passes the path of the current app’s waypoint file. VoiceAttack and the EliteAPI plugin must be installed, with the plugin enabled and the updated EliteMining profile loaded. The button brings Elite Dangerous to the foreground and checks that the game has focus before sending the command. The button is disabled once the route has no next stop.
+
+The user verified that the button worked from a second monitor after the focus fix.
+
+The command uses the player's EliteAPI bindings for Galaxy Map, Camera Zoom In and Out, UI Panel Up, UI Panel Right and UI Panel Select. It opens the map, waits 2.5 seconds, zooms in, then presses Up → Select to focus search. VoiceAttack Quick Input enters the waypoint and presses Enter. After a 1-second pause the command presses Right → Select to choose the result, zooms out, waits 2 seconds and holds Select for 1 second to plot. After the hold, it waits 2 seconds for Elite to plot, then closes the Galaxy Map if EliteAPI still reports that it is open.
+
+The first live test opened the map and moved the camera without entering the waypoint. EliteAPI reported that W was shared by UI Panel Up and Galaxy Cam Translate Forward, and D by UI Panel Right and Galaxy Cam Translate Right. The user confirmed that plotting worked after assigning separate bindings. [FAQ troubleshooting](../FAQ.md#troubleshooting) · [Galaxy Map navigation and binding collisions](https://github.com/RatherRude/Elite-Dangerous-AI-Integration/blob/main/src/lib/actions/Plotter.py#L574-L618)
+
+To adjust timing, edit **Plot next waypoint** in VoiceAttack and change the pauses or the hold duration of the final UI Select action. The shipped command uses ship HUD and Galaxy Map focus checks from EliteVA and makes a single attempt.
+
 ## Progress
 
 | Step | Status | Commit | Notes |
@@ -202,5 +216,7 @@ Read docs/VOICEATTACK_RULES.md first.
 ## Remaining (25 Nov 2026)
 
 1. **User's release test** of the built v5.7.2: clipboard after plotting and after a jump, `Variables\routeNextSystem.txt` and `routeJumpsLeft.txt` updating, and "Show route" and "Show systems" by voice (after re-importing the profile). Record the results in the progress table and fix anything that fails.
-2. **Commit and push** everything together with the v5.7.2 release (`git add -A`), once the test passes.
-3. **Later, not in v5.7.2:** Fleet Carrier route (`fleetcarrier/route`, phase 2), and an optional "Next system" voice command that reads `routeNextSystem.txt` aloud (the user adds voice commands in VoiceAttack himself).
+2. **In-game waypoint command test.** Re-import the profile and try **Plot next waypoint** by voice, by a hotkey and from the Route tab button with clipboard copying off. Check that the plotted route matches the next stop, that the Galaxy Map closes after plotting, that clearing or completing the route results in “No route”, and that jumping alone leaves the Galaxy Map closed.
+   - 25 Nov 2026: the Route tab button plotted the correct next stop with the installer build. In the dev run, VoiceAttack received an empty `~passedText1` and fell back to the installed `VariablesouteNextSystem.txt`, so it plotted a stale system. This only affects dev testing. The unconfirmed suspect is the extra quotes around the path in `VAProcessManager.send_command`.
+3. **Commit and push** everything together with the v5.7.2 release (`git add -A`), once the test passes.
+4. **Later, not in v5.7.2:** Fleet Carrier route (`fleetcarrier/route`, phase 2), and an optional "Next system" voice command that reads `routeNextSystem.txt` aloud (the user adds voice commands in VoiceAttack himself).

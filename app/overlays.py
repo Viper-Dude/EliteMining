@@ -33,9 +33,8 @@ def is_game_focused() -> bool:
         return False
 
 
-def _find_game_window_rect():
-    """Find the Elite Dangerous game window rectangle (left, top, right, bottom).
-    Returns None if the game window is not found."""
+def _find_game_window():
+    """Find the Elite Dangerous game window handle."""
     try:
         import ctypes
         import ctypes.wintypes
@@ -49,9 +48,7 @@ def _find_game_window_rect():
                 buf = ctypes.create_unicode_buffer(length + 1)
                 ctypes.windll.user32.GetWindowTextW(hwnd, buf, length + 1)
                 if "Elite - Dangerous" in buf.value:
-                    rect = ctypes.wintypes.RECT()
-                    ctypes.windll.user32.GetWindowRect(hwnd, ctypes.byref(rect))
-                    result[0] = (rect.left, rect.top, rect.right, rect.bottom)
+                    result[0] = hwnd
                     return False  # stop enumerating
             return True
 
@@ -59,6 +56,35 @@ def _find_game_window_rect():
         return result[0]
     except Exception:
         return None
+
+
+def _find_game_window_rect():
+    """Return the Elite Dangerous window bounds if the window exists."""
+    try:
+        import ctypes
+        import ctypes.wintypes
+
+        hwnd = _find_game_window()
+        if hwnd is not None:
+            rect = ctypes.wintypes.RECT()
+            ctypes.windll.user32.GetWindowRect(ctypes.wintypes.HWND(hwnd), ctypes.byref(rect))
+            return rect.left, rect.top, rect.right, rect.bottom
+    except Exception:
+        return None
+
+
+def focus_game_window():
+    """Request that Windows activate the Elite Dangerous game window."""
+    import ctypes
+    import ctypes.wintypes
+
+    hwnd = _find_game_window()
+    if hwnd is not None:
+        handle = ctypes.wintypes.HWND(hwnd)
+        user32 = ctypes.windll.user32
+        if user32.IsIconic(handle):
+            user32.ShowWindow(handle, 9)  # SW_RESTORE
+        user32.SetForegroundWindow(handle)
 
 
 def get_game_monitor_offset():

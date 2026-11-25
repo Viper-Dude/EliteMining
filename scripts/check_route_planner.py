@@ -15,6 +15,7 @@ from cargo_monitor import CargoMonitor
 from localization import t
 import route_planner as route
 from route_tab import RouteTab
+from va_process_manager import VAProcessManager
 
 
 LOADOUT = {
@@ -193,6 +194,79 @@ class RouteTabChecks(unittest.TestCase):
             tab.app._write_var_text.assert_any_call("routeNextSystem", "")
             tab.app._write_var_text.assert_called_with("routeJumpsLeft", "0")
 
+    def test_plot_next_in_game_uses_the_current_waypoint_file(self):
+        tab = RouteTab.__new__(RouteTab)
+        tab.app = Mock(vars_dir=str(Path("Development copy") / "Variables"))
+        tab.planner = Mock(active_route={"stops": STOPS, "current_index": 0, "off_route": False})
+        tab.after = Mock()
+        with patch("route_tab.threading.Thread") as worker, \
+             patch("route_tab.focus_game_window") as focus, \
+             patch("route_tab.is_game_focused", return_value=True):
+            tab._plot_next_in_game()
+            focus.assert_called_once_with()
+            worker.assert_not_called()
+            delay, dispatch = tab.after.call_args.args
+            self.assertGreater(delay, 0)
+            dispatch()
+            tab.app._write_var_text.assert_any_call("routeNextSystem", STOPS[1]["name"])
+            expected_file = Path(tab.app.vars_dir) / "routeNextSystem.txt"
+            worker.assert_called_once_with(target=tab._send_plot_waypoint, args=(expected_file,),
+                                           daemon=True)
+            worker.return_value.start.assert_called_once_with()
+
+            worker.reset_mock()
+            tab.planner.active_route["current_index"] = len(STOPS) - 1
+            tab.app._write_var_text.reset_mock()
+            tab._plot_next_in_game()
+            worker.assert_not_called()
+            tab.app._write_var_text.assert_not_called()
+
+    def test_plot_next_in_game_waits_for_game_focus(self):
+        tab = RouteTab.__new__(RouteTab)
+        tab.app = Mock()
+        tab.notice = Mock()
+        tab.colors = {"warning": "yellow"}
+        tab.planner = Mock(active_route={"stops": STOPS, "current_index": 0})
+        with patch("route_tab.is_game_focused", return_value=False), \
+             patch("route_tab.threading.Thread") as worker:
+            tab._dispatch_plot_waypoint()
+            worker.assert_not_called()
+            tab.app._write_var_text.assert_not_called()
+            tab.app._show_notice.assert_called_once_with(
+                tab.notice, t("route.game_focus_required"), fg="yellow")
+
+    def test_plot_next_in_game_reports_missing_voiceattack(self):
+        tab = RouteTab.__new__(RouteTab)
+        tab.app = Mock()
+        tab.notice = Mock()
+        tab.colors = {"warning": "yellow"}
+        tab.after = lambda delay, callback: callback()
+        with patch.object(VAProcessManager, "send_command", return_value=False) as send:
+            waypoint_file = Path("Variables/routeNextSystem.txt")
+            tab._send_plot_waypoint(waypoint_file)
+            send.assert_called_once_with("Plot next waypoint", passed_text=str(waypoint_file))
+            tab.app._show_notice.assert_called_once_with(
+                tab.notice, t("route.voiceattack_required"), fg="yellow")
+
+    def test_voiceattack_command_targets_the_running_executable(self):
+        waypoint_file = str(Path("App With Spaces") / "Variables" / "routeNextSystem.txt")
+        executable = Path("VoiceAttack 2") / "VoiceAttack.exe"
+        other = Mock(info={"name": "Other.exe"})
+        running = Mock(info={"name": "VoiceAttack.exe"}, **{"exe.return_value": str(executable)})
+        with patch("va_process_manager.psutil.process_iter", return_value=[other, running]) as scan, \
+             patch("va_process_manager.subprocess.Popen") as popen:
+            self.assertTrue(VAProcessManager.send_command("Plot next waypoint", passed_text=waypoint_file))
+            popen.assert_called_once()
+            self.assertEqual(popen.call_args.args[0], [
+                str(executable), "-command", "Plot next waypoint", "-PassedText", f'"{waypoint_file}"',
+            ])
+            other.exe.assert_not_called()
+
+            popen.reset_mock()
+            scan.return_value = [other]
+            self.assertFalse(VAProcessManager.send_command("Plot next waypoint", passed_text=waypoint_file))
+            popen.assert_not_called()
+
     def test_route_button_uses_override_and_other_views_use_live_cargo(self):
         tab = RouteTab.__new__(RouteTab)
         tab.cargo = SimpleNamespace(latest_loadout=LOADOUT, current_cargo=144, max_cargo=344)
@@ -214,6 +288,9 @@ class RouteTabChecks(unittest.TestCase):
         tab._autocomplete = []
         tab._update_buttons = Mock()
         tab._wait_for_plot = Mock()
+        tab._spin_plot_overlay = Mock()
+        tab._plot_overlay = Mock()
+        tab.focus_get = Mock(return_value=None)
         tab.colors = {"fg": "#000000"}
 
         tab._plot_or_stop()

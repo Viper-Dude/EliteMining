@@ -30,6 +30,7 @@
 - [PowerPlay Merit Mining](#powerplay-merit-mining)
 - [Commodity Market](#commodity-market)
   - [Sell My Hold](#sell-my-hold)
+- [Route Planner](#route-planner)
 - [Mining Missions](#mining-missions)
 - [Ring Mining Reference](#ring-mining-reference)
 - [Star Systems](#star-systems)
@@ -418,6 +419,27 @@ Drag the divider to resize the tables, and use **Columns** to reorder or hide co
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/commodity_market_trade.png" width="900"><br>
 *Trade Commodities tab with 15 categories covering all tradeable goods in Elite Dangerous.*
+
+[Back to Top](#top)
+
+---
+
+## Route Planner
+
+Plot a jump route from one system to another in the **Route** tab. Enter a start and destination (or click **Use Current System**) and click **Plot Route**. EliteMining uses your current ship's jump range and cargo, so the route fits your ship.
+
+- **Cargo** — Plans with your current cargo by default. Type a weight to plan with a different load, or clear the box to follow your hold again.
+- **Use Supercharge / FSD Injection** — Use neutron stars and FSD injections to reach further per jump.
+- **Route list** — Shows each stop, jump distance, star type, where to refuel or inject, and jumps left. Your current stop is marked, and the total jumps, distance and estimated time are shown below the list.
+- **Copy next system** — Copies the next system's name so you can paste it into the Galaxy Map. Tick **Copy next system automatically** to do this after each jump.
+- **Plot next system in game** — Sets the next stop in the Galaxy Map using VoiceAttack (needs the EliteAPI plugin). The VoiceAttack command **Show route** opens the Route tab.
+- **Export route / Import route** — Save a route to a file or load one, including routes from Spansh.
+- **Plot route from other views** — Right-click a system in Hotspots, Market, Sell My Hold, Where to Mine or the other result views and choose **Plot route** to jump straight to the Route tab with the route plotted.
+
+If you leave the route, plot a new one from where you are. Routes are planned with Spansh.
+
+<img src="Screenshot/route_planner.png" alt="Route tab showing a plotted route with stops, jump distances, scoopable stars and refuel stops" width="900"><br>
+*Route tab with a plotted route, jump range and cargo, and the next-system buttons.*
 
 [Back to Top](#top)
 

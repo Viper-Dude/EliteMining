@@ -13,6 +13,10 @@ from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'app'))
+from va_keybind_applier import COMMAND_ELEMENT_ORDER
+
+
 TREE = ast.parse((ROOT / 'app/main.py').read_text(encoding='utf-8-sig'))
 APP = next(n for n in TREE.body if isinstance(n, ast.ClassDef) and n.name == 'App')
 METHODS = {n.name: n for n in APP.body if isinstance(n, ast.FunctionDef)}
@@ -24,6 +28,62 @@ SELECTED = {
     '_clear_voice_set', '_apply_mapping', '_save_timer', '_execute_va_command', '_va_switch_tab',
     'switch_to_tab',
 }
+
+
+class VoiceAttackProfileChecks(unittest.TestCase):
+    def test_plot_next_waypoint_element_order_and_condition_pairing(self):
+        profiles = list((ROOT / 'Voiceattack Profile').glob('EliteMining v*-Profile.vap'))
+        self.assertEqual(len(profiles), 1, profiles)
+        profile = ET.parse(profiles[0])
+        commands = profile.findall(".//Command[CommandString='Plot next waypoint']")
+        self.assertEqual(len(commands), 1)
+        command = commands[0]
+        tags = [element.tag for element in command]
+        self.assertEqual(tags, [tag for tag in COMMAND_ELEMENT_ORDER if tag in tags])
+
+        actions = command.findall('ActionSequence/CommandAction')
+        self.assertEqual([action.findtext('ActionType') for action in actions[:8]], [
+            'ConditionStart', 'TextSet', 'ConditionElse', 'TextSet', 'ConditionEnd',
+            'ConditionStart', 'Say', 'ConditionElse',
+        ])
+        self.assertEqual(actions[0].findtext('ConditionStartNameFrom'), '~passedText1')
+        self.assertEqual(actions[1].findtext('Context4'),
+                         r'{VA_APPS}\EliteMining\Variables\routeNextSystem.txt')
+        self.assertEqual(actions[3].findtext('Context4'), '{TXT:~passedText1}')
+        self.assertEqual(actions[6].findtext('Context'), 'No route')
+        self.assertEqual(command.findtext('UseProcessOverride'), 'true')
+        self.assertEqual(command.findtext('ProcessOverride'), 'EliteDangerous64.exe')
+
+        keys = [action for action in actions if action.findtext('ActionType') == 'PressKey']
+        self.assertEqual([action.findtext('Context') for action in keys], [
+            'EliteAPI.GalaxyMapOpen', 'EliteAPI.CamZoomIn', 'EliteAPI.UI_Up', 'EliteAPI.UI_Select',
+            'EliteAPI.UI_Right', 'EliteAPI.UI_Select', 'EliteAPI.CamZoomOut', 'EliteAPI.UI_Select',
+            'EliteAPI.GalaxyMapOpen',
+        ])
+        self.assertTrue(all(action.findtext('X') == '1' for action in keys))
+        self.assertEqual(keys[-2].findtext('Duration'), '1')
+        close_index = actions.index(keys[-1])
+        plot_pause = actions[close_index - 2]
+        self.assertEqual(plot_pause.findtext('ActionType'), 'Pause')
+        self.assertEqual(plot_pause.findtext('Duration'), '2')
+        close_check = actions[close_index - 1]
+        self.assertEqual(close_check.findtext('ActionType'), 'ConditionStart')
+        self.assertEqual(close_check.findtext('ConditionStartNameFrom'), 'EliteAPI.GuiFocus')
+        self.assertEqual(close_check.findtext('ConditionStartValue'), '6')
+        self.assertEqual(close_check.findtext('ConditionStartOperator'), '0')
+        self.assertEqual(int(close_check.findtext('ConditionPairing')), close_index + 1)
+
+        groups = {}
+        for index, action in enumerate(actions):
+            group = int(action.findtext('ConditionGroup'))
+            if group:
+                groups.setdefault(group, []).append(index)
+        self.assertEqual(len(groups), 5)
+        for indices in groups.values():
+            self.assertEqual(actions[indices[0]].findtext('ActionType'), 'ConditionStart')
+            self.assertEqual(actions[indices[-1]].findtext('ActionType'), 'ConditionEnd')
+            self.assertEqual([int(actions[index].findtext('ConditionPairing')) for index in indices],
+                             indices[1:] + indices[:1])
 
 
 class VoiceAttackChecks(unittest.TestCase):

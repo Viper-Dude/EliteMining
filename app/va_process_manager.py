@@ -100,6 +100,24 @@ class VAProcessManager:
                 continue
         return False
     
+    @staticmethod
+    def send_command(phrase: str, *, passed_text: str) -> bool:
+        for proc in psutil.process_iter(["name"]):
+            if (proc.info["name"] or "").lower() != "voiceattack.exe":
+                continue
+            try:
+                exe = proc.exe()
+                if exe:
+                    subprocess.Popen(
+                        [exe, "-command", phrase, "-PassedText", f'"{passed_text}"'],
+                        cwd=str(Path(exe).parent),
+                        creationflags=subprocess.CREATE_NO_WINDOW,
+                    )
+                    return True
+            except (psutil.NoSuchProcess, psutil.AccessDenied, OSError) as exc:
+                logger.warning("Could not send command to VoiceAttack: %s", exc)
+        return False
+
     def close_voiceattack(self, timeout: int = 10) -> bool:
         """
         Gracefully close VoiceAttack

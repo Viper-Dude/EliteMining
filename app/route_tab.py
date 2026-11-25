@@ -1,6 +1,7 @@
 """Plot, share and follow the active route."""
 
 import logging
+import threading
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, font, ttk
@@ -10,14 +11,17 @@ from column_visibility_helper import ColumnVisibilityMixin
 from config import _load_cfg, load_theme, scaled_font, scaled_px, update_config_value
 from core.constants import get_menu_colors
 from localization import t
+from overlays import focus_game_window, is_game_focused
 from route_planner import build_route_form, jump_range, parse_route, serialize_route
 from system_autocomplete import SystemAutocomplete
 from ui.dialogs import centered_yesno_dialog
 from ui.search_control import SearchControl
 from ui.striped_treeview import StripedTreeview
 from ui.theme import get_theme_colors
+from ui.help_link import create_help_link
 from ui.themed_checkbox import ThemedCheckbutton
 from ui.tooltip import ToolTip, add_header_tooltips
+from va_process_manager import VAProcessManager
 
 
 log = logging.getLogger("EliteMining")
@@ -57,12 +61,14 @@ class RouteTab(ttk.Frame, ColumnVisibilityMixin):
             entry = ttk.Entry(fields, textvariable=var, width=1, font=scaled_font(9))
             entry.grid(row=row, column=1, padx=scaled_px(5), pady=scaled_px(3), sticky="ew")
             entry.bind("<FocusOut>", lambda event: event.widget.selection_clear(), add="+")
+            entry.bind("<Return>", lambda event: None if self.search.running else self._plot_or_stop(), add="+")
             entry.bind("<Map>", lambda event: self.after_idle(self._clear_system_focus, event.widget), add="+")
             self._autocomplete.append(SystemAutocomplete(entry, var, app))
         current_button = create_action_button(fields, text=t("distance_calculator.use_current"),
                                               command=self._use_current_system, **button_colors)
         current_button.grid(row=0, column=2, sticky="w", padx=(scaled_px(5), 0))
         ToolTip(current_button, t("tooltips.use_current"), preserve_bindings=True)
+        create_help_link(fields, "route-planner", t("route.help_tooltip"), ToolTip).grid(row=0, column=3, sticky="ne")
 
         options = ttk.Frame(self)
         options.pack(fill="x", pady=scaled_px(5))
@@ -107,19 +113,24 @@ class RouteTab(ttk.Frame, ColumnVisibilityMixin):
                                            command=self._plot_or_stop, **button_colors)
         self.copy_button = create_action_button(actions, text=t("route.copy_next"),
                                                 command=self._copy_next, **button_colors)
+        self.plot_in_game_button = create_action_button(actions, text=t("route.plot_in_game"),
+                                                         command=self._plot_next_in_game, **button_colors)
         self.clear_button = create_action_button(actions, text=t("route.clear"),
                                                  command=self._clear, **button_colors)
-        for button, key in ((plot_button, "plot"), (self.copy_button, "copy_next"), (self.clear_button, "clear")):
+        for button, key in ((plot_button, "plot"), (self.copy_button, "copy_next"),
+                            (self.plot_in_game_button, "plot_in_game"), (self.clear_button, "clear")):
             button.pack(side="left", padx=(0, scaled_px(6)))
             ToolTip(button, t(f"route.tips.{key}"), preserve_bindings=True)
-        self.export_button = create_action_button(actions, text=t("route.export"),
+        file_actions = ttk.Frame(self)
+        file_actions.pack(fill="x", pady=(0, scaled_px(6)))
+        self.export_button = create_action_button(file_actions, text=t("route.export"),
                                                   command=self._export_route, **button_colors)
-        self.import_button = create_action_button(actions, text=t("route.import"),
+        self.import_button = create_action_button(file_actions, text=t("route.import"),
                                                   command=self._import_route, **button_colors)
         for button in (self.export_button, self.import_button):
             button.pack(side="left", padx=(0, scaled_px(6)))
-        self._cv_add_columns_button(actions, "route")
-        self.notice = tk.Label(actions, bg=self.colors["bg"], fg=self.colors["fg"], font=scaled_font(9))
+        self._cv_add_columns_button(file_actions, "route")
+        self.notice = tk.Label(file_actions, bg=self.colors["bg"], fg=self.colors["fg"], font=scaled_font(9))
         self.notice.pack(side="left")
         self.search = SearchControl(self, plot_button, self.notice, on_finish=self._plot_idle)
 
@@ -150,6 +161,16 @@ class RouteTab(ttk.Frame, ColumnVisibilityMixin):
         vertical.grid(row=0, column=1, sticky="ns")
         horizontal.grid(row=1, column=0, sticky="ew")
         self.tree.configure(yscrollcommand=vertical.set, xscrollcommand=horizontal.set)
+        tree_style = ttk.Style(self)
+        overlay_bg = tree_style.lookup("Treeview", "fieldbackground") or self.colors["bg"]
+        overlay_fg = tree_style.lookup("Treeview", "foreground") or self.colors["fg"]
+        self._plot_overlay = tk.Frame(frame, bg=overlay_bg)
+        self._plot_overlay_label = tk.Label(self._plot_overlay, bg=overlay_bg, fg=overlay_fg,
+                                            font=scaled_font(14, "bold"), justify="center",
+                                            wraplength=scaled_px(600))
+        self._plot_overlay_label.place(relx=0.5, rely=0.5, anchor="center")
+        self._plot_overlay_text = ""
+        self._plot_spin = 0
 
         heading_font = font.Font(root=self, font=ttk.Style(self).lookup("Treeview.Heading", "font"))
         for column, width in widths.items():
@@ -270,8 +291,9 @@ class RouteTab(ttk.Frame, ColumnVisibilityMixin):
 
     def _update_buttons(self):
         route = self.planner.active_route
-        has_next = route and route["current_index"] + 1 < len(route["stops"])
+        has_next = self._next_system()
         self.copy_button.configure(state="normal" if has_next else "disabled")
+        self.plot_in_game_button.configure(state="normal" if has_next else "disabled")
         self.clear_button.configure(state="normal" if route and not self.search.running else "disabled")
         self.export_button.configure(state="normal" if route else "disabled")
         self.import_button.configure(state="disabled" if self.search.running else "normal")
@@ -280,6 +302,9 @@ class RouteTab(ttk.Frame, ColumnVisibilityMixin):
         if self.search.running:
             self.search.stop()
             return
+        focused = self.focus_get()
+        if isinstance(focused, ttk.Entry):
+            self._clear_system_focus(focused)
         self._plot(self.source.get().strip(), self.destination.get().strip(), cargo=self._route_cargo())
 
     def plot_sale_route(self, systems, sold_first):
@@ -315,18 +340,28 @@ class RouteTab(ttk.Frame, ColumnVisibilityMixin):
             return
         for autocomplete in self._autocomplete:
             autocomplete.hide()
-        if self.planner.active_route and not centered_yesno_dialog(
-                self.app, t("tabs.route"), t("route.replace")):
-            return
 
         if source_view != "route":
             self.source.set(source)
             self.destination.set(second or destination)
         self.search.start()
         self._update_buttons()
+        self._plot_overlay_text = t("route.plotting_to").format(system=second or destination)
+        self._plot_overlay.grid(row=0, column=0, sticky="nsew")
+        self._plot_overlay.tkraise()
+        self._spin_plot_overlay()
         self.app._show_notice(self.notice, t("route.plotting"), clear_after=0, fg=self.colors["fg"])
         future = self.planner.plot(form, self.search.is_cancelled, second_form=second_form)
         self._wait_for_plot(future, source_view)
+
+    def _spin_plot_overlay(self):
+        if not self.search.running:
+            return
+        chars = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+        self._plot_spin += 1
+        spinner = chars[self._plot_spin % len(chars)]
+        self._plot_overlay_label.configure(text=f"{self._plot_overlay_text}\n\n{spinner}")
+        self.after(100, self._spin_plot_overlay)
 
     def _wait_for_plot(self, future, source_view):
         if future.done():
@@ -354,6 +389,7 @@ class RouteTab(ttk.Frame, ColumnVisibilityMixin):
         self._publish_route_progress()
 
     def _plot_idle(self):
+        self._plot_overlay.grid_remove()
         if self.search.is_cancelled():
             self.app._show_notice(self.notice, t("ring_finder.search_stopped"), fg=self.colors["fg"])
         self._update_buttons()
@@ -411,10 +447,38 @@ class RouteTab(ttk.Frame, ColumnVisibilityMixin):
         finally:
             menu.grab_release()
 
-    def _copy_next(self):
+    def _next_system(self):
         route = self.planner.active_route
         if route and route["current_index"] + 1 < len(route["stops"]):
-            self._copy_system(route["stops"][route["current_index"] + 1]["name"])
+            return route["stops"][route["current_index"] + 1]["name"]
+        return ""
+
+    def _copy_next(self):
+        system = self._next_system()
+        if system:
+            self._copy_system(system)
+
+    def _plot_next_in_game(self):
+        if not self._next_system():
+            return
+        focus_game_window()
+        # Windows may finish activating the game after the foreground request returns.
+        self.after(150, self._dispatch_plot_waypoint)
+
+    def _dispatch_plot_waypoint(self):
+        if not self._next_system():
+            return
+        if not is_game_focused():
+            self.app._show_notice(self.notice, t("route.game_focus_required"), fg=self.colors["warning"])
+            return
+        self._publish_route_progress()
+        waypoint_file = Path(self.app.vars_dir) / "routeNextSystem.txt"
+        threading.Thread(target=self._send_plot_waypoint, args=(waypoint_file,), daemon=True).start()
+
+    def _send_plot_waypoint(self, waypoint_file):
+        if not VAProcessManager.send_command("Plot next waypoint", passed_text=str(waypoint_file)):
+            self.after(0, lambda: self.app._show_notice(
+                self.notice, t("route.voiceattack_required"), fg=self.colors["warning"]))
 
     def _copy_system(self, system):
         self.clipboard_clear()

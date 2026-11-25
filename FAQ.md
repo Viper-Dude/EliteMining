@@ -113,6 +113,14 @@ Without the EliteAPI plugin enabled, game integration won't work.
 </details>
 
 <details>
+<summary><b>VoiceAttack recognizes the command, but the game does the wrong thing. What should I check?</b></summary>
+
+Check for overlapping bindings in Elite Dangerous. VoiceAttack uses your in-game keyboard bindings through EliteAPI. If two controls that are active at the same time share a key, a command can trigger the wrong action or stop partway through.
+
+For example, if **Plot next waypoint** opens the Galaxy Map and moves the camera without entering a system, check whether **UI Panel Up** and **UI Panel Right** share keys with **Galaxy Cam Translate Forward** and **Galaxy Cam Translate Right**. Keep your panel bindings and assign the camera controls unused keys under **Options → General Controls → Galaxy Map**, then try the command again. If your panel keys are **W** and **D**, **Shift+W** and **Shift+D** are possible alternatives for the camera controls.
+</details>
+
+<details>
 <summary><b>A mining sequence got interrupted / out of sync — how do I reset it?</b></summary>
 
 If a mining sequence is interrupted and a toggle ends up in the wrong state (e.g. lasers won't fire when they should), use the **"Stop and Reset"** command (also recognised: *"Stop and reset all profile commands"*, *"Stop all"*, *"Reset all"*) to clear every sequence flag and return the profile to a clean baseline.
