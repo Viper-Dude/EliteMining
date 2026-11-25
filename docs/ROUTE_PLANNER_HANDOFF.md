@@ -172,7 +172,7 @@ Read docs/VOICEATTACK_RULES.md first.
 | Step | Status | Commit | Notes |
 |---|---|---|---|
 | 0 Confirm API details | API verified with synthetic input | This commit | Names, cargo and Beam fields, polling, and stop schema verified. Omitting explicit FSD fields returned HTTP 400. Real journal request blocked by approval review. |
-| 1 Tab renames | Not started | | |
+| 1 Tab renames | Done | This commit | EN and DE labels and help references updated. Positional tab selection is in use, so the Route placeholder and index updates are deferred to step 3. UI verification pending. |
 | 2 Route core | Not started | | |
 | 3 Route tab UI | Not started | | |
 | 4 Sell My Hold | Not started | | |

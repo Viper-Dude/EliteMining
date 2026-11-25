@@ -65,7 +65,7 @@
 
 ### Standalone (Without VoiceAttack)
 
-- **Find mining spots** — Use the Advanced Hotspots Finder to search 80,000+ hotspots and galaxy-wide ring data, including overlaps and RES sites.
+- **Find mining spots** — Use the Hotspots tab to search 80,000+ hotspots and galaxy-wide ring data, including overlaps and RES sites.
 - **Find buyers** — Compare mineral prices, trade goods, or sale options for your whole cargo hold.
 - **Mine for Powerplay merits** — [Merit Miner](#powerplay-merit-mining) finds the nearest systems of your power where you can mine a mineral for merits, and where to sell it.
 - **Track mining** — Live prospector reports, cargo and engineering materials, session history, charts, and reports.
@@ -295,7 +295,7 @@ Plays a sound or spoken voice for mining events, such as starting or resetting t
 
 ## Hotspot Finder
 
-The Hotspot Finder is an advanced mining search tool. Search saved hotspots and Spansh ring data by mineral, ring type, and distance. Right-click results for prices, bookmarks, and ring data.
+The Hotspots tab is an advanced mining search tool. Search saved hotspots and Spansh ring data by mineral, ring type, and distance. Right-click results for prices, bookmarks, and ring data.
 
 ### Key Features
 
@@ -321,7 +321,7 @@ The Hotspot Finder is an advanced mining search tool. Search saved hotspots and 
 #### Saving and Automatic Updates
 
 - Journal scans are imported automatically, and newly discovered hotspots are tracked.
-- **Auto Options** (Hotspots Finder) holds the Auto-Search, Auto Switch and Auto Prices checkboxes in one dropdown.
+- **Auto Options** (Hotspots tab) holds the Auto-Search, Auto Switch and Auto Prices checkboxes in one dropdown.
 - **Auto-Search** searches after jumps and refreshes after ring scans; your choice is remembered.
 - Right-click Spansh results to save up to 50 selected rows locally or update missing reserve levels.
 - **Auto-Save** (Spansh/Both only, off by default) saves new hotspots without changing existing entries.
@@ -336,7 +336,7 @@ The Hotspot Finder is an advanced mining search tool. Search saved hotspots and 
 *Edit Ring Data, opened from the right-click menu.*
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/ring_finder.png" width="900"><br>
-*Hotspot Finder showing search results with mineral filters, the second mineral box and distance calculations.*
+*Hotspots tab showing search results with mineral filters, the second mineral box and distance calculations.*
 
 <details>
 <summary>View Where to Mine, Merit Miner, acquisition searches and Best Prices examples</summary>
@@ -369,7 +369,7 @@ Where you sell your mined goods matters just as much as where you mine them.
 - **Reinforcing your own Power's system or Undermining a rival's** — you must mine and sell in that same system. Selling elsewhere earns no Powerplay merits for that cargo.
 - **Acquiring an Unoccupied system** — you sell in the Unoccupied system itself, but the goods can be mined anywhere within 20 ly of it if your nearest system is Fortified, or 30 ly if it's a Stronghold.
 
-How the app helps (all in the [Hotspot Finder](#hotspot-finder)):
+How the app helps (all on the [Hotspots tab](#hotspot-finder)):
 1. **Power/State filter** – find Fortified or Stronghold systems to mine in.
 2. **Best Minerals to Mine / Auto Prices** – see the best sell prices for your minerals.
 3. **Find Acquisition Systems** – right-click a Fortified or Stronghold system to list nearby Unoccupied systems buying your mineral in the **Acquisition** view.
@@ -400,7 +400,7 @@ Find buyers for your mined cargo or stations selling trade goods. Choose a refer
 Prices combine Ardent, Spansh, and reports from other commanders. Coverage varies, and prices and demand can change before you arrive. Check the price age before travelling.
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/commodity_market.png" width="900"><br>
-*Commodity Market showing mining commodities search results with filters and distance calculations.*
+*Market tab showing mining commodities search results with filters and distance calculations.*
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/commodity_market_multiple_prices.png" width="900"><br>
 *Multiple Prices tab ranking stations by how many of your chosen minerals they buy, with demand and price per mineral. In Ring Finder, Find Sell Station opens it with a ring's minerals pre-selected.*
@@ -463,11 +463,11 @@ Search for nearby star systems with detailed status information. Perfect for fin
 - **Current System Info** – View detailed status of your current system (security, allegiance, government, state, economy, population)
 - **Nearby System Search** – Find systems within range of your reference system
 - **Server-Side Filtering** – Filter by Security, Allegiance, Government, State, Economy, Population
-- **My Power** – Your pledged power, set automatically from your game journal each time you log in. It is shared with the Merit Miner view in the Hotspots Finder
+- **My Power** – Your pledged power, set automatically from your game journal each time you log in. It is shared with the Merit Miner view on the Hotspots tab
 - **Nearest Material Trader** – Find the closest Encoded, Manufactured, or Raw material trader, showing station name, type, landing pad size, and distance to arrival
 - **Distance Sorting** – Results sorted by distance from reference system
 - **Quick Actions:**
-  - Right-click → **Find Hotspots** to jump directly to Hotspots Finder with the selected system as reference and trigger a search
+  - Right-click → **Find Hotspots** to jump directly to the Hotspots tab with the selected system as reference and trigger a search
   - Right-click to copy system name or open in Inara/EDSM/Spansh
   - Double-click a System cell to open the system on Inara
   - **Use Current System** fills the reference system instantly
@@ -477,7 +477,7 @@ Search for nearby star systems with detailed status information. Perfect for fin
 **Note:** The Elite Dangerous journal does not report the Unoccupied Powerplay state. The app infers this state when no controlling Power is present and updates it automatically when newer EDDN data becomes available.
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/star_systems.png" width="900"><br>
-*Star Systems tab showing current system info and nearby system search with filters.*
+*Systems tab showing current system info and nearby system search with filters.*
 
 [Back to Top](#top)
 
@@ -500,7 +500,7 @@ Calculate distances between any two systems using real-time EDSM data. Perfect f
   - Press Enter to calculate without clicking
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/distance_calculator.png" width="900"><br>
-*Distance Calculator showing system distances with Home and Fleet Carrier tracking.*
+*Distance tab showing system distances with Home and Fleet Carrier tracking.*
 
 [Back to Top](#top)
 
@@ -531,10 +531,10 @@ Monitor your fleet carrier status at a glance — populated automatically from y
 ### Standalone Quick Start
 
 1. Start EliteMining and log into Elite Dangerous so the app can read your current system and ship.
-2. Use [Hotspot Finder](#hotspot-finder) to choose a mining location.
+2. Use the [Hotspots tab](#hotspot-finder) to choose a mining location.
 3. In **Mining → Session**, enable **Auto-start**, then fire a prospector limpet to begin tracking.
 4. Configure minerals and thresholds in [Settings → Announcements](#announcement-panel).
-5. End the session to save it, review [Reports](#reports), and use [Commodity Market](#commodity-market) to find buyers.
+5. End the session to save it, review [Reports](#reports), and use the [Market tab](#commodity-market) to find buyers.
 
 ### VoiceAttack Setup
 
@@ -605,7 +605,7 @@ Tick these under the Start / End buttons:
 - **Auto-end** – Ends and saves the session when you enter supercruise or jump. The refinery and comment questions are skipped, and anything still in your refinery is not counted. Sessions with nothing mined are discarded. Not available with Multi-Session.
 - **Prompt when full** – Asks if you want to end the session when your cargo hold has been 100% full and idle for 1 minute. Turn this off if you want Auto-end to run with no pop-ups. Not available with Multi-Session.
 - **Multi-Session** – Keeps one session running across several cargo loads (mine, sell, return) and reports them as one. The session only ends when you press End.
-- **Auto Switch** – Switches to the Mining Session tab when you fire a prospector and back to Hotspots Finder after the session ends, only after 10 seconds without app activity and while no search or modal dialog is open; skipped switches wait for the next trigger.
+- **Auto Switch** – Switches to the Mining Session tab when you fire a prospector and back to the Hotspots tab after the session ends, only after 10 seconds without app activity and while no search or modal dialog is open; skipped switches wait for the next trigger.
 
 For a fully hands-free setup, tick **Auto-start** and **Auto-end** and turn off **Prompt when full**. Sessions then start and save by themselves.
 
@@ -707,7 +707,7 @@ The My Mining Data heading shows your commander name when known, and the summary
 
 Both location tables include **Dist (LY)** from your current system and **LS** from the arrival star. Use **Columns** to reorder or hide columns, and hover over headers for descriptions.
 
-Right-click a location to copy its system, open Inara/EDSM/Spansh, view its report, or search in Hotspots Finder. Double-click a system to open Inara, or another cell to open the report.
+Right-click a location to copy its system, open Inara/EDSM/Spansh, view its report, or search on the Hotspots tab. Double-click a system to open Inara, or another cell to open the report.
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/mining_statistics_overview.png" alt="Mining Statistics overview with session averages, records and recent progress" width="900"><br>
 *Overview: totals, averages, records, and recent progress.*
@@ -783,8 +783,8 @@ Open **Settings → Announcements** to choose which minerals trigger alerts and 
 
 **Auto Prices on the overlay:**
 
-- In Hotspots Finder, open **Auto Options > Auto Prices Options** and tick **Show on overlay**, or enable it in General Settings.
-- Requires **Enable Text Overlay**. The prices also appear in the **Best Prices** view of the Hotspots Finder either way.
+- On the Hotspots tab, open **Auto Options > Auto Prices Options** and tick **Show on overlay**, or enable it in General Settings.
+- Requires **Enable Text Overlay**. The prices also appear in the **Best Prices** view on the Hotspots tab either way.
 - Appears only in supercruise, ignores **Hide in Supercruise**, and uses its own display duration (10–60 seconds).
 - Use **+ Add Minerals** in the Best Prices view to include minerals without hotspots.
 
@@ -824,7 +824,7 @@ These commands trigger in-game actions. Configure your keybinds in the "Custom K
 #### Repeated Mining Cycles
 Configure how many times the laser mining extra sequence runs:
 - Adjustable repeat count (1-10 cycles)
-- Set in VoiceAttack Controls → Mining Controls tab
+- Set in the VoiceAttack tab → Mining Controls tab
 - Default: 1 cycle (standard mining)
 - Higher values: automated repeated mining without manual restart
 
@@ -852,7 +852,7 @@ Configure how many times the laser mining extra sequence runs:
 | Hide sidebar | Hide Ship Presets and Cargo Monitor |
 | Show sidebar | Show Ship Presets and Cargo Monitor |
 | Swap sidebar panels | Swap Ship Presets and Cargo Monitor while the sidebar is visible |
-| Find best mining system | Show the Where to Mine view in the Hotspot Finder |
+| Find best mining system | Show the Where to Mine view on the Hotspots tab |
 | Bookmark this location | Open the bookmark dialog with the current system and body filled in |
 
 ### UI Navigation
@@ -862,12 +862,12 @@ Configure how many times the laser mining extra sequence runs:
 | Show mining reports | Switch to the mining Reports sub-tab |
 | Show mining statistics | Switch to the mining Statistics sub-tab |
 | Show mining missions | Switch to the Mining Missions sub-tab |
-| Show hotspots | Switch to Hotspots Finder tab |
-| Show market | Switch to Commodity Market tab |
+| Show hotspots | Switch to the Hotspots tab |
+| Show market | Switch to the Market tab |
 | Show missions | Switch to Mining Missions tab |
 | Show ring guide | Switch to Ring Mining Reference tab |
-| Show systems | Switch to Star Systems tab |
-| Show distance | Switch to Distance Calculator tab |
+| Show systems | Switch to the Systems tab |
+| Show distance | Switch to the Distance tab |
 | Show voice attack | Switch to VoiceAttack tab |
 | Show bookmarks | Switch to Bookmarks tab |
 | Show settings | Switch to Settings tab |
