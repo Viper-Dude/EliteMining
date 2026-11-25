@@ -42,8 +42,10 @@
     "edit": "Bearbeiten",
     "add": "Hinzufügen",
     "remove": "Entfernen",
+    "cut": "Ausschneiden",
     "copy": "Kopieren",
     "paste": "Einfügen",
+    "select_all": "Alles auswählen",
     "no_data": "Keine Daten"
   },
   "tabs": {
@@ -79,8 +81,6 @@
     "plot": "Route planen",
     "copy_next": "Nächstes System kopieren",
     "copy_after_jump": "Nächstes System automatisch kopieren",
-    "overlay_next": "Als Nächstes: {system} ({jumps} Sprünge)",
-    "overlay_next_one": "Als Nächstes: {system} (1 Sprung)",
     "clear": "Löschen",
     "export": "Route exportieren",
     "import": "Route importieren",

@@ -3,12 +3,14 @@
 
 ## New Features & Improvements
 
+- New Route Planner: plot routes in the new Route tab, including your ship's jump range with a full hold, and export or import routes to 
 - Shortened three main tab names.
-- New Route Planner: plot routes in the new Route tab, including your ship's jump range with a full hold, and export or import routes to share them with Spansh, EDDiscovery and other route tools.
+- Export/import route options.
 - Start a route straight from Sell My Hold, Where to Mine and the other result views with "Plot route".
-- The Route Planner can copy the next system after each jump and show it on the text overlay.
+- The Route Planner can copy the next system after each jump.
+- Text boxes now have a right-click menu for cut, copy and paste.
 
-### Voiceattack Profile
+### Voiceattack Profile Update (v5.7.2)
 
 - New "Show route" command in the EliteMining app commands opens the Route tab.
 

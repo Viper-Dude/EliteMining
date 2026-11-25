@@ -12,12 +12,13 @@ A simple, mining-focused route planner. Spansh does the plotting; EliteMining fi
 
 ## Settled Decisions
 
-- **One new top-level tab, "Route"**, placed after Market: Mining | Hotspots | Market | **Route** | Systems | Fleet Carrier | Distance | VoiceAttack | Bookmarks | Settings.
-- **Tab renames** (EN / DE): Hotspots Finder → Hotspots / Hotspots; Commodity Market → Market / Markt; Star Systems → Systems / Systeme; Distance Calculator → Distance / Entfernung; VoiceAttack Controls → VoiceAttack / VoiceAttack. New: Route / Route.
+- **One new top-level tab, "Route"**, placed after Market: Mining | Hotspots | Market | **Route** | Star Systems | Fleet Carrier | Distance Calculator | VoiceAttack | Bookmarks | Settings.
+- **Tab renames** (EN / DE): Hotspots Finder → Hotspots / Hotspots; Commodity Market → Market / Markt; VoiceAttack Controls → VoiceAttack / VoiceAttack. New: Route / Route. Star Systems / Sternensysteme and Distance Calculator / Entfernungsrechner keep their full names.
 - **Other views choose where to go; the Route tab shows the one active route.** Views get "Plot route" in their right-click menu. A new plot replaces the active route after a yes/no confirmation. Only one route at a time.
 - **Plotter: Spansh Galaxy Plotter only** (`generic/route`). No Neutron, Riches, Trade or Exobiology plotters, no local router.
 - **Fleet Carrier route** (`fleetcarrier/route`) is a later phase 2, not part of this handover.
-- **Left out on purpose:** coordinates and deviation columns, a routing-method choice, saving or exporting routes, multiple routes, EDSM lookup buttons.
+- **Left out on purpose:** coordinates and deviation columns, a routing-method choice, multiple routes, a text overlay line, EDSM lookup buttons.
+- **Export and import** of the active route as Spansh JSON, Spansh CSV or a plain system list (.txt), added after the original plan; sample files are in `scripts/fixtures/`.
 - **EDSM** is used only as the existing coordinate fallback. Never call it on the UI thread.
 
 ## Spansh Galaxy Plotter API (confirmed 25 Nov 2026 from the website's own request)
@@ -183,7 +184,7 @@ Read docs/VOICEATTACK_RULES.md first.
 
 - Optional setting: copy the next system to the clipboard after each jump.
 - VoiceAttack variables for the next system and jumps left on our route. Use new file names; don't reuse the existing jumps-left variables, which follow the game's route.
-- Optional text overlay line "Next: <system> (N jumps)". "Enable Text Overlay" is the master switch.
+- No text overlay line: the user decided on 25 Nov 2026 that the route stays off the text overlay.
 - A voice command needs a `.vap` change: insert the elements in `COMMAND_ELEMENT_ORDER` and remind the user to re-import. Ask the user before adding one.
 
 ## Progress
@@ -196,10 +197,10 @@ Read docs/VOICEATTACK_RULES.md first.
 | 3 Route tab UI and user feedback | Done | Release pending | The user's first live plot from Wregoe JT-Q c18-27 to Sol returned eight jumps. All feedback items were implemented, including the Stop column with the current-stop marker, editable planning cargo, Inject column, estimated time and row copy. Live Spansh diagnostics confirmed the Basic and Standard injection multipliers. Route checks and off-screen Tk checks across all five themes passed during implementation. A full visual pass after the feedback changes was not recorded. |
 | 4 Sell My Hold | Done | Release pending | Route, Sell My Hold, Stop and Market checks passed. Off-screen checks used mocked plots for the Route tab handoff and the two-leg sale route, including the reduced cargo on the second leg. Live one-stop and two-stop sale plots were not documented. |
 | 5 Other views | Done | Release pending | Route, journal, cargo and result-view checks passed, including off-screen checks for all eight result menus. The user's test at the game's main menu exposed the missing Loadout and fuel readings. Automated checks verified the older-journal and full-tank fallbacks. Live plots from each result view and an in-game retest of those fallbacks were not documented. |
-| 6 Cockpit support and voice tab commands | Done | Release pending | Route checks simulated jumps and verified the next-system clipboard and overlay calls, the settings gates and the VoiceAttack variable updates. VoiceAttack checks passed for named-tab selection, and the shipped profile contains "Show route". In-game results for clipboard copying and overlay display, and spoken-command results in VoiceAttack, were not documented. |
+| 6 Cockpit support and voice tab commands | Done | Release pending | Route checks simulated jumps and verified the next-system clipboard calls, the settings gates and the VoiceAttack variable updates. VoiceAttack checks passed for named-tab selection, and the shipped profile contains "Show route". In-game results for clipboard copying, and spoken-command results in VoiceAttack, were not documented. |
 
 ## Remaining (25 Nov 2026)
 
-1. **User's release test** of the built v5.7.2: clipboard after plotting and after a jump, the "Next: ..." overlay line, `Variables\routeNextSystem.txt` and `routeJumpsLeft.txt` updating, and "Show route" and "Show systems" by voice (after re-importing the profile). Record the results in the progress table and fix anything that fails.
+1. **User's release test** of the built v5.7.2: clipboard after plotting and after a jump, `Variables\routeNextSystem.txt` and `routeJumpsLeft.txt` updating, and "Show route" and "Show systems" by voice (after re-importing the profile). Record the results in the progress table and fix anything that fails.
 2. **Commit and push** everything together with the v5.7.2 release (`git add -A`), once the test passes.
 3. **Later, not in v5.7.2:** Fleet Carrier route (`fleetcarrier/route`, phase 2), and an optional "Next system" voice command that reads `routeNextSystem.txt` aloud (the user adds voice commands in VoiceAttack himself).

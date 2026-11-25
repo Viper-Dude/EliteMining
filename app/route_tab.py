@@ -178,7 +178,7 @@ class RouteTab(ttk.Frame, ColumnVisibilityMixin):
             self.app._distance_fill(self._autocomplete[0], self.source, current)
             self._default_source = current
             self.app._show_notice(self.notice, t("distance_calculator.using_current").format(system=current),
-                                  fg=self.colors["info"])
+                                  fg=self.colors["fg"])
         else:
             self.app._show_notice(self.notice, t("distance_calculator.no_current"), fg=self.colors["warning"])
 
@@ -437,12 +437,8 @@ class RouteTab(ttk.Frame, ColumnVisibilityMixin):
         self.app._write_var_text("routeNextSystem", system)
         self.app._write_var_text("routeJumpsLeft", str(jumps))
 
-        if jumped and system and not route["off_route"]:
-            if self.copy_after_jump.get():
-                self._copy_system(system)
-            if self.app.text_overlay_enabled.get():
-                key = "route.overlay_next_one" if jumps == 1 else "route.overlay_next"
-                self.app.text_overlay.show_message(t(key).format(system=system, jumps=jumps))
+        if jumped and system and not route["off_route"] and self.copy_after_jump.get():
+            self._copy_system(system)
 
     def _clear(self):
         self.planner.clear_route()

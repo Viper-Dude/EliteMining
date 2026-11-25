@@ -104,6 +104,7 @@ from journal_parser import JournalParser
 from app_utils import get_app_icon_path, set_window_icon, get_app_data_dir, get_variables_dir, get_ship_presets_dir, compact_classic_button, create_action_button
 
 # Import UI components from ui module
+from ui.entry_context_menu import show_entry_context_menu
 from ui.theme import THEME_ELITE_ORANGE, THEME_DARK_GRAY, get_theme_colors, next_theme
 from ui.tooltip import ToolTip
 from ui.dialogs import centered_yesno_dialog, center_window, centered_info_dialog, set_translate_func
@@ -545,6 +546,8 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
                    foreground=[("disabled", "#666666"), ("readonly", dark_fg)])
 
         self.bind_class("Treeview", "<Escape>", lambda e: e.widget.selection_remove(*e.widget.selection()), add="+")
+        for widget_class in ("Entry", "TEntry", "TCombobox"):
+            self.bind_class(widget_class, "<Button-3>", show_entry_context_menu, add="+")
 
         # Apply dark theme to classic widgets too
         self.option_add("*Listbox.background", dark_bg)

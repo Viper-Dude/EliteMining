@@ -42,8 +42,10 @@
     "edit": "Edit",
     "add": "Add",
     "remove": "Remove",
+    "cut": "Cut",
     "copy": "Copy",
     "paste": "Paste",
+    "select_all": "Select All",
     "no_data": "No data"
   },
   "tabs": {
@@ -79,8 +81,6 @@
     "plot": "Plot",
     "copy_next": "Copy next system",
     "copy_after_jump": "Copy next system automatically",
-    "overlay_next": "Next: {system} ({jumps} jumps)",
-    "overlay_next_one": "Next: {system} (1 jump)",
     "clear": "Clear",
     "export": "Export route",
     "import": "Import route",

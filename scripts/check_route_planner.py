@@ -163,7 +163,6 @@ class RouteTabChecks(unittest.TestCase):
     def test_cockpit_uses_the_next_stop_after_the_planner_advances(self):
         tab = RouteTab.__new__(RouteTab)
         tab.app = Mock()
-        tab.app.text_overlay_enabled.get.return_value = True
         tab.copy_after_jump = Mock(**{"get.return_value": True})
         tab._copy_system = Mock()
         with patch.object(route, "_load_cfg", return_value={}), patch.object(route, "update_config_value"):
@@ -182,14 +181,11 @@ class RouteTabChecks(unittest.TestCase):
             tab.app._write_var_text.assert_any_call("routeNextSystem", next_system)
             tab.app._write_var_text.assert_called_with("routeJumpsLeft", "1")
             tab._copy_system.assert_called_once_with(next_system)
-            tab.app.text_overlay.show_message.assert_called_once_with(
-                t("route.overlay_next_one").format(system=next_system))
 
             tab.copy_after_jump.get.return_value = False
-            tab.app.text_overlay_enabled.get.return_value = False
             tab._on_journal_events(jump)
             tab._copy_system.assert_called_once()
-            tab.app.text_overlay.show_message.assert_called_once()
+            tab.app.text_overlay.show_message.assert_not_called()
 
             arrival = [{"event": "FSDJump", "StarSystem": next_system}]
             tab.planner.handle_journal_events(arrival)
