@@ -4815,36 +4815,15 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin, MiningCardMixin):
                     if item not in selected_items:
                         self.reports_tree_tab.selection_set(item)
                     
-                    # Create context menu with theme-aware colors
-                    from config import load_theme
-                    _menu_theme = load_theme()
-                    if _menu_theme == "elite_orange":
-                        _menu_bg = "#1e1e1e"
-                        _menu_fg = "#ff8c00"
-                        _menu_active_bg = "#ff6600"
-                        _menu_active_fg = "#000000"
-                    elif _menu_theme in ("modern", "modern_slate", "modern_orange"):
-                        _menu_bg = MENU_COLORS["bg"]
-                        _menu_fg = MENU_COLORS["fg"]
-                        _menu_active_bg = MENU_COLORS["activebackground"]
-                        _menu_active_fg = MENU_COLORS["activeforeground"]
-                    else:
-                        _menu_bg = "#2d2d2d"
-                        _menu_fg = "#ffffff"
-                        _menu_active_bg = "#404040"
-                        _menu_active_fg = "#ffffff"
-                    context_menu = tk.Menu(self.reports_tree_tab, tearoff=0,
-                                          bg=_menu_bg, fg=_menu_fg,
-                                          activebackground=_menu_active_bg,
-                                          activeforeground=_menu_active_fg,
-                                          font=scaled_font(9))
+                    context_menu = self._create_location_menu(self.reports_tree_tab)
                     context_menu.add_command(label=t('context_menu.open_report_txt'), command=lambda: open_selected())
                     context_menu.add_command(label=t('context_menu.open_report_html'), command=lambda: self._open_enhanced_report_from_menu(self.reports_tree_tab))
                     context_menu.add_separator()
                     context_menu.add_command(label=t('context_menu.bookmark_location'), command=lambda: bookmark_selected())
                     context_menu.add_command(label=t('context_menu.generate_report_html'), command=lambda: self._generate_enhanced_report_from_menu(self.reports_tree_tab))
                     context_menu.add_separator()
-                    context_menu.add_command(label=t('context_menu.copy_system'), command=lambda: copy_system_name_tab())
+                    system = self.reports_tree_tab.set(item, 'system')
+                    self._add_location_actions(context_menu, system, 'reports', copy_system_name_tab)
                     context_menu.add_separator()
                     context_menu.add_command(label=t('context_menu.share_discord'), command=lambda: self._share_selected_to_discord())
                     _sel = self.reports_tree_tab.selection()
@@ -10297,54 +10276,68 @@ class ProspectorPanel(ttk.Frame, ColumnVisibilityMixin, MiningCardMixin):
                                            for path in self._bookmark_screenshot_paths(bookmark)])
         self._refresh_bookmarks()
 
-    def _setup_bookmark_context_menu(self) -> None:
-        """Setup right-click context menu for bookmarks tree"""
-        # Create context menu with theme-aware colors
+    def _create_location_menu(self, parent) -> tk.Menu:
         from config import load_theme
-        _menu_theme = load_theme()
-        if _menu_theme == "elite_orange":
-            _menu_bg = "#1e1e1e"
-            _menu_fg = "#ff8c00"
-            _menu_active_bg = "#ff6600"
-            _menu_active_fg = "#000000"
+
+        theme = load_theme()
+        if theme == "elite_orange":
+            colors = dict(bg="#1e1e1e", fg="#ff8c00",
+                          activebackground="#ff6600", activeforeground="#000000")
+        elif theme in ("modern", "modern_slate", "modern_orange"):
+            colors = {key: MENU_COLORS[key] for key in ("bg", "fg", "activebackground", "activeforeground")}
         else:
-            _menu_bg = "#2d2d2d"
-            _menu_fg = "#ffffff"
-            _menu_active_bg = "#404040"
-            _menu_active_fg = "#ffffff"
-        self.bookmark_context_menu = tk.Menu(self, tearoff=0,
-                                            bg=_menu_bg, fg=_menu_fg,
-                                            activebackground=_menu_active_bg,
-                                            activeforeground=_menu_active_fg,
-                                            font=scaled_font(9))
-        self.bookmark_context_menu.add_command(label=t('context_menu.copy_system'), command=self._copy_system_to_clipboard)
-        self.bookmark_context_menu.add_separator()
-        self.bookmark_context_menu.add_command(label=t('context_menu.edit_bookmark'), command=self._edit_bookmark_dialog)
-        self.bookmark_context_menu.add_command(label=t('context_menu.delete_selected'), command=self._delete_bookmark)
-        
-        # Register context menu handler for bookmarks tree
+            colors = dict(bg="#2d2d2d", fg="#ffffff",
+                          activebackground="#404040", activeforeground="#ffffff")
+        return tk.Menu(parent, tearoff=0, font=scaled_font(9), **colors)
+
+    def _add_location_actions(self, menu, system, source_view, copy_system) -> None:
+        from app_utils import open_system_website
+
+        system = system.strip()
+        has_system = system.casefold() not in ("", "unknown", "unknown system", "-", "—")
+        route_tab = getattr(self.main_app, 'route_tab', None)
+        menu.add_command(label=t('context_menu.plot_route'),
+                         state="normal" if has_system and route_tab is not None else "disabled",
+                         command=lambda: route_tab.plot_to_system(system, source_view=source_view))
+        menu.add_command(label=t('context_menu.copy_system'), command=copy_system)
+
+        submenu = tk.Menu(menu, tearoff=0, **{
+            key: menu.cget(key) for key in ("bg", "fg", "activebackground", "activeforeground", "font")
+        })
+        for site in ('inara', 'edsm', 'spansh'):
+            submenu.add_command(label=t(f'context_menu.open_{site}'),
+                                command=lambda site=site: open_system_website(system, site))
+        menu.add_cascade(label=t('context_menu.submenu_open_in') + "  ▸", menu=submenu,
+                         state="normal" if has_system else "disabled")
+
+    def _setup_bookmark_context_menu(self) -> None:
+        self.bookmark_context_menu = None
         if not hasattr(self, '_context_handlers'):
             self._context_handlers = {}
         self._context_handlers['bookmarks'] = self._show_bookmark_context_menu
-        
-        # Note: Right-click binding handled by column visibility mixin
 
     def _show_bookmark_context_menu(self, event) -> None:
-        """Show context menu on right-click"""
-        # Check if click is on an actual item
         item = self.bookmarks_tree.identify('item', event.x, event.y)
-        if item:
-            # If item is not already selected, clear selection and select it
-            selected_items = self.bookmarks_tree.selection()
-            if item not in selected_items:
-                self.bookmarks_tree.selection_set(item)
-            self.bookmarks_tree.focus(item)
-            
-            # Show context menu
-            try:
-                self.bookmark_context_menu.tk_popup(event.x_root, event.y_root)
-            finally:
-                self.bookmark_context_menu.grab_release()
+        if not item:
+            return
+        if item not in self.bookmarks_tree.selection():
+            self.bookmarks_tree.selection_set(item)
+        self.bookmarks_tree.focus(item)
+
+        if self.bookmark_context_menu is not None:
+            self.bookmark_context_menu.destroy()
+        menu = self._create_location_menu(self.bookmarks_tree)
+        self.bookmark_context_menu = menu
+        system = self.bookmarks_tree.set(item, 'system')
+        self._add_location_actions(menu, system, 'bookmarks', self._copy_system_to_clipboard)
+        menu.add_separator()
+        menu.add_command(label=t('context_menu.edit_bookmark'), command=self._edit_bookmark_dialog)
+        menu.add_command(label=t('context_menu.delete_selected'), command=self._delete_bookmark)
+
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
 
     def _copy_system_to_clipboard(self) -> None:
         """Copy selected system name to clipboard"""

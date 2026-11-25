@@ -5,16 +5,35 @@ import tkinter.font as tkfont
 from ui.themed_slider import text_on
 
 
+def view_switch_style(theme, scaled_font, scaled_px):
+    """Colours/font for a gapped view switch: rounded like the Modern action buttons in Modern themes,
+    with the selected segment toned towards the button grey so it doesn't shout."""
+    from ui.themed_slider import slider_colors
+    if theme not in ("modern", "modern_slate", "modern_orange"):
+        return dict(accent=slider_colors(theme)["accent"], font=scaled_font(8))
+    from ui.theme import get_theme_colors
+    c = get_theme_colors(theme)
+    # Modern Dark is neutral grey, so it uses its own grey accent instead of the slider blue
+    base, weight = (c["accent"], 1 / 3) if theme == "modern_slate" else (slider_colors(theme)["accent"], 1 / 2)
+    grey = c["btn_bg"]
+    soft = "#" + "".join(f"{round(int(base[i:i + 2], 16) * weight + int(grey[i:i + 2], 16) * (1 - weight)):02x}"
+                         for i in (1, 3, 5))
+    return dict(track=grey, accent=soft, fg=c["fg"], selected_fg=c["fg_bright"], outline=c["border"],
+                font=scaled_font(9), radius=scaled_px(6))
+
+
 class SegmentedSelector(tk.Canvas):
     def __init__(self, parent, choices, variable, bg="#1e1e1e", track="#3a3a3a", accent="#ff8c00",
-                 fg="#ffffff", selected_fg=None, disabled="#666666", font=None, scale=1.0, gap=0):
+                 fg="#ffffff", selected_fg=None, disabled="#666666", font=None, scale=1.0, gap=0, radius=0,
+                 outline=""):
         self._choices = list(choices)
+        self._radius = int(radius)
         self._var = variable
         self._enabled = True
         self._font = font
         self._colors = dict(track=track, accent=accent, fg=fg, selected_fg=selected_fg or text_on(accent),
                             disabled=disabled)
-        self._outline = ""
+        self._outline = outline
         pad = int(10 * scale)
         try:
             measure = tkfont.Font(font=font).measure
@@ -41,12 +60,35 @@ class SegmentedSelector(tk.Canvas):
             except (tk.TclError, ValueError):
                 pass
 
+    def _rounded(self, x0, y0, x1, y1, fill, outline):
+        """Rounded box drawn the same way as the Modern RoundedButton, so both look alike."""
+        r = self._radius
+        pts = [x0 + r, y0, x1 - r, y0, x1, y0, x1, y0 + r, x1, y1 - r, x1, y1, x1 - r, y1,
+               x0 + r, y1, x0, y1, x0, y1 - r, x0, y0 + r, x0, y0]
+        self.create_polygon(pts, smooth=True, fill=fill, outline=outline)
+
     def refresh(self):
         if not self.winfo_exists():
             return
         self.delete("all")
         c = self._colors
         m = self._m
+        if self._radius and self._gap:
+            # Each segment is its own rounded button; the selected one is filled with the accent
+            current = self._var.get()
+            for i, (key, label) in enumerate(self._choices):
+                left = i * self._step
+                selected = key == current
+                fill = (c["accent"] if self._enabled else c["disabled"]) if selected else c["track"]
+                self._rounded(left + 1, 1, left + self._seg_w + 2 * m - 1, self._h + 2 * m - 1,
+                              fill, fill if selected else (self._outline or c["track"]))
+                if self._enabled:
+                    color = c["selected_fg"] if selected else c["fg"]
+                else:
+                    color = c["track"] if selected else c["disabled"]
+                self.create_text(left + m + self._seg_w / 2, m + self._h / 2, text=label, fill=color,
+                                 font=self._font)
+            return
         blocks = ([(i * self._step, self._seg_w) for i in range(len(self._choices))] if self._gap
                   else [(0, self._seg_w * len(self._choices))])
         for left, width in blocks:

@@ -6085,15 +6085,20 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
 
         self._ship_update_preset_row_highlight()
 
-    def _select_preset_by_name(self, preset_name: str) -> bool:
+    def _select_preset_by_name(self, preset_name: str, *, collapse_ship_key: Optional[str] = None) -> bool:
         """Find and select a preset by its full name in the hierarchical tree.
         Returns True if found, False otherwise."""
-        # Search through all groups and their children
-        for group_id in self.preset_list.get_children():
+        groups = self.preset_list.get_children()
+        for group_id in groups:
             for item_id in self.preset_list.get_children(group_id):
                 values = self.preset_list.item(item_id, "values")
                 if values and values[0] == preset_name:
-                    # Found it - expand group, select, and scroll to it
+                    if collapse_ship_key:
+                        previous_group_text = f"📁 {collapse_ship_key}"
+                        for other_group_id in groups:
+                            if other_group_id != group_id and self.preset_list.item(other_group_id, "text").casefold() == previous_group_text:
+                                self.preset_list.item(other_group_id, open=False)
+                                break
                     self.preset_list.item(group_id, open=True)
                     self.preset_list.selection_set(item_id)
                     self.preset_list.see(item_id)
@@ -8032,12 +8037,14 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
             self.prospector_panel._update_ship_info_display()
         ship_key = self._current_ship_preset_key()
         ship_identity = (ship_key, self.cargo_monitor.commander_id, self.cargo_monitor.ship_id)
-        if not ship_key or ship_identity == getattr(self, '_last_auto_load_ship', None):
+        previous_ship = getattr(self, '_last_auto_load_ship', None)
+        if not ship_key or ship_identity == previous_ship:
             return
         self._last_auto_load_ship = ship_identity
         name = self._load_ship_preset_auto_load().get(ship_key)
         if name and os.path.exists(self._settings_path(name)) and self._load_ship_preset(name):
-            self._select_preset_by_name(name)
+            previous_ship_key = previous_ship[0] if previous_ship else None
+            self._select_preset_by_name(name, collapse_ship_key=previous_ship_key)
 
     def _current_ship_preset_key(self) -> Optional[str]:
         ship_type = self.cargo_monitor.ship_type

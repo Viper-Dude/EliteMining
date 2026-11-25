@@ -257,14 +257,13 @@ class BestMineralsMixin:
 
         # This Ring | Whole System - only shown for prices that came from a ring row
         from config import scaled_px
-        from ui.segmented_selector import SegmentedSelector
-        from ui.themed_slider import slider_colors
+        from ui.segmented_selector import SegmentedSelector, view_switch_style
         self._bp_scope_var = tk.StringVar(value='ring')
         self._bp_scope_switch = SegmentedSelector(
             top_row, [('ring', t('ring_finder.rank_scope_switch_to_ring')),
                       ('system', t('ring_finder.rank_scope_switch_to_system'))],
-            self._bp_scope_var, bg=bg, accent=slider_colors(current_theme)["accent"],
-            font=scaled_font(8), scale=scaled_px(100) / 100, gap=scaled_px(4))
+            self._bp_scope_var, bg=bg, **view_switch_style(current_theme, scaled_font, scaled_px),
+            scale=scaled_px(100) / 100, gap=scaled_px(4))
         self._bp_scope_var.trace_add('write', lambda *_: self._bp_on_scope_switch())
         from ui.tooltip import add_segment_tooltips
         add_segment_tooltips(self._bp_scope_switch, {

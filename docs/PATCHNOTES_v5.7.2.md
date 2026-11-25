@@ -8,6 +8,8 @@
 - The Route Planner can copy the next system after each jump.
 - Text boxes now have a right-click menu for cut, copy and paste.
 - Shortened three main tab names.
+- Restyled the Hotspots result view buttons in the Modern themes.
+- The Ship Presets sidebar now collapses your previous ship’s group when Auto - Load opens the new one.
 
 ### Voiceattack Profile Update (v5.7.2)
 

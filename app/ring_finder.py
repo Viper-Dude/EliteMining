@@ -1035,7 +1035,7 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Mer
                                  cursor="hand2", font=scaled_font(10))
         results_info.pack(side="left", padx=(6, 2))
         ToolTip(results_info, t('ring_finder.right_click_help'))
-        from ui.segmented_selector import SegmentedSelector
+        from ui.segmented_selector import SegmentedSelector, view_switch_style
         self._results_view_var = tk.StringVar(value='hotspots')
         results_view_switch = SegmentedSelector(
             results_header,
@@ -1043,8 +1043,8 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Mer
              ('best_mining', t('ring_finder.view_where_to_mine')),
              ('acquisition', t('ring_finder.view_acquisition')),
              ('merit_miner', t('ring_finder.view_merit_miner'))],
-            self._results_view_var, bg=_cb_bg, accent=slider_colors(_cb_theme)["accent"],
-            font=scaled_font(8), scale=scaled_px(100) / 100, gap=scaled_px(4))
+            self._results_view_var, bg=_cb_bg, **view_switch_style(_cb_theme, scaled_font, scaled_px),
+            scale=scaled_px(100) / 100, gap=scaled_px(4))
         results_view_switch.pack(side="left", padx=(10, 0))
         from ui.tooltip import add_segment_tooltips
         add_segment_tooltips(results_view_switch, {
