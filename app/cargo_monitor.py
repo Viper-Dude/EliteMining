@@ -15,6 +15,7 @@ from config import _load_cfg
 from journal_parser import JournalParser
 from journal_reader import journal_resume_offset, read_complete_journal_lines
 from localization import t
+from route_planner import RoutePlanner
 from ui.dialogs import centered_yesno_dialog
 from ui.refinery_dialog import RefineryDialog
 from user_database import UserDatabase
@@ -96,6 +97,8 @@ class CargoMonitor:
         self.last_journal_file = None
         self.last_file_size = 0
         self._journal_listeners = []
+        self.route_planner = RoutePlanner()
+        self.add_journal_listener(self.route_planner.handle_journal_events)
         
         # Elite Dangerous journal directory - load from config or use default
         cfg = _load_cfg()
@@ -133,6 +136,7 @@ class CargoMonitor:
         self.status_json_path = os.path.join(self.journal_dir, "Status.json")
         
         # Ship information tracking (from LoadGame/Loadout events)
+        self.latest_loadout = None
         self.ship_id = None
         self.commander_id = None
         self.ship_name = ""  # User-defined ship name (e.g., "Jewel of Parhoon")
@@ -945,11 +949,11 @@ class CargoMonitor:
                 self.last_journal_file = latest_file
                 self.last_file_size = offset
                 self._journal_initializing = False
-            self.scan_journal_for_cargo_capacity(latest_file)
+            self.scan_journal_for_cargo_capacity(latest_file, restore_route_boost=skip_existing)
         except Exception as e:
             log.error(f"Error finding journal files: {e}")
 
-    def scan_journal_for_cargo_capacity(self, journal_file):
+    def scan_journal_for_cargo_capacity(self, journal_file, *, restore_route_boost=False):
         """Scan existing journal file for the most recent CargoCapacity, current system location, and ring metadata"""
         try:
             with open(journal_file, 'r', encoding='utf-8') as f:
@@ -957,6 +961,8 @@ class CargoMonitor:
             
             ship_found = False
             commander_found = False
+            loadout_found = False
+            boost_found = not restore_route_boost
             for line in reversed(lines):
                 try:
                     event = json.loads(line.strip())
@@ -969,7 +975,13 @@ class CargoMonitor:
                 if not ship_found and event_type in ("LoadGame", "Loadout"):
                     self._update_ship_info(event)
                     ship_found = True
-                if ship_found and commander_found:
+                if not loadout_found and event_type == "Loadout":
+                    self.latest_loadout = event
+                    loadout_found = True
+                if not boost_found and event_type in ("JetConeBoost", "FSDJump"):
+                    self.route_planner.is_supercharged = event_type == "JetConeBoost"
+                    boost_found = True
+                if ship_found and commander_found and loadout_found and boost_found:
                     break
 
             # Detect game language from Fileheader (first few lines)
@@ -1433,6 +1445,9 @@ class CargoMonitor:
                 market_handler.process_journal_event(event)
             self.journal_parser.process_carrier_event(event)
             
+            if event_type == "Loadout":
+                self.latest_loadout = event
+
             # Track ship information from LoadGame and Loadout events
             if event_type in ["LoadGame", "Loadout"]:
                 self._update_ship_info(event)

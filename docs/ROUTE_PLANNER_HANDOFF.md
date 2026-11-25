@@ -173,7 +173,7 @@ Read docs/VOICEATTACK_RULES.md first.
 |---|---|---|---|
 | 0 Confirm API details | API verified with synthetic input | This commit | Names, cargo and Beam fields, polling, and stop schema verified. Omitting explicit FSD fields returned HTTP 400. Real journal request blocked by approval review. |
 | 1 Tab renames | Done | This commit | EN and DE labels and help references updated. Positional tab selection is in use, so the Route placeholder and index updates are deferred to step 3. UI verification pending. |
-| 2 Route core | Not started | | |
+| 2 Route core | Done | This commit | Route and journal checks passed. One live Spansh plot using the actual Type-11 Loadout with `appName: EliteMining` returned seven jumps from Sol to Paesia. |
 | 3 Route tab UI | Not started | | |
 | 4 Sell My Hold | Not started | | |
 | 5 Other views | Not started | | |
