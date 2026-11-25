@@ -6,6 +6,7 @@
 - New Route Planner: plot routes in the new Route tab, including your ship's jump range with a full hold, and with export or import options. 
 - Start a route straight from Hotspots, Sell My Hold, Where to Mine and the other result views with "Plot route".
 - The Route Planner can copy the next system after each jump.
+- The Route tab can now plot your next stop in the Galaxy Map when VoiceAttack is running.
 - Text boxes now have a right-click menu for cut, copy and paste.
 - Shortened three main tab names.
 - Restyled the Hotspots result view buttons in the Modern themes.
@@ -14,7 +15,7 @@
 ### Voiceattack Profile Update (v5.7.2)
 
 - New "Show route" command in the EliteMining app commands opens the Route tab.
-- Plot your next Route Planner stop in the Galaxy Map with VoiceAttack or the Route tab’s new button.
+- To plot your next stop in the Galaxy Map, say “Plot next waypoint” or customize the command’s spoken phrases with Plot next waypoint;Plot the next waypoint;Set course for the next waypoint;Navigate to the next waypoint;Take me to the next waypoint.
 
 
 ### Important Notes 
