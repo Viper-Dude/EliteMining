@@ -163,14 +163,12 @@ class FleetCarrierRouteTab(ttk.Frame, RouteTableMixin):
             "fuel_used": 90, "fuel_left": 90, "restock_amount": 90,
             "icy_ring": 95, "tritium_hotspots": 125, "sol": 120,
         }
-        headers = {
-            "sol": "ring_finder.col_sol_dist",
-            "fuel_used": "route.carrier_estimated_fuel_used",
-            "fuel_left": "route.carrier_estimated_fuel_left",
+        self._build_route_table(widths, {"sol": "ring_finder.col_sol_dist"}, _TABLE_KEY)
+        tooltips = {
+            "fuel_left": "route.carrier_fuel_left_tooltip",
+            "tritium_hotspots": "route.tritium_hotspots_tooltip",
         }
-        self._build_route_table(widths, headers, _TABLE_KEY)
-        add_header_tooltips(self.tree, lambda column: t("route.tritium_hotspots_tooltip")
-                            if column == "tritium_hotspots" else "")
+        add_header_tooltips(self.tree, lambda column: t(tooltips[column]) if column in tooltips else "")
 
     def _validate_capacity(self, value):
         if value and (len(value) > 5 or not value.isdecimal() or int(value) > PLAYER_CARRIER_CAPACITY):
@@ -221,7 +219,7 @@ class FleetCarrierRouteTab(ttk.Frame, RouteTableMixin):
         if not self.tree.exists(str(index)):
             return
         if fuel is not None and system.casefold() == stop["name"].casefold():
-            text = t("route.carrier_live_fuel", fuel=_format_amount(fuel))
+            text = _format_amount(fuel)
         else:
             text = _format_amount(stop.get("fuel_in_tank"))
         if self.tree.set(str(index), "fuel_left") != text:
