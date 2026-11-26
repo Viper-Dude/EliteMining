@@ -134,9 +134,13 @@ class ShipRouteTab(ttk.Frame, RouteTableMixin):
             disabledforeground=self.colors["btn_fg_disabled"], state="disabled",
         )
         every_jump.pack(side="left", padx=(scaled_px(8), 0))
-        self.injection_grade.bind("<<ComboboxSelected>>", lambda event: every_jump.configure(
-            state="normal" if self.injection_grade.current() > 0 else "disabled"))
         ToolTip(every_jump, t("route.tips.injection_every_jump"))
+
+        def refresh_injection(_event):
+            every_jump.configure(state="normal" if self.injection_grade.current() > 0 else "disabled")
+            self._update_jump_range(self._route_cargo())
+
+        self.injection_grade.bind("<<ComboboxSelected>>", refresh_injection)
 
         ship_info = ttk.Frame(self)
         ship_info.pack(anchor="w")
@@ -262,6 +266,11 @@ class ShipRouteTab(ttk.Frame, RouteTableMixin):
             try:
                 current_range = jump_range(loadout, fuel, cargo)
                 range_text = t("route.range").format(current=current_range, maximum=loadout["MaxJumpRange"])
+                _, multiplier = _INJECTION_GRADES[self.injection_grade.current()]
+                if multiplier is not None:
+                    range_text = t("route.range_with_injection").format(
+                        range=range_text, boosted=current_range * multiplier,
+                    )
             except (ValueError, KeyError):
                 pass
         self.ship_info_label.configure(text=self.cargo.get_ship_info_string())

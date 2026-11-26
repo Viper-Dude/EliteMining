@@ -618,15 +618,21 @@ class RouteStartupChecks(unittest.TestCase):
         self.cargo.ship_type = ""
         status_path = self.folder / "Status.json"
         self.cargo.status_json_path = str(status_path)
-        tab = SimpleNamespace(cargo=self.cargo, ship_info_label=Mock(), range_label=Mock())
+        tab = SimpleNamespace(cargo=self.cargo, ship_info_label=Mock(), range_label=Mock(), injection_grade=Mock())
         for status, fuel in [({}, 32), ({"Fuel": {"FuelMain": 5.2}}, 5.2), ({"Fuel": {"FuelMain": 0}}, 0)]:
             with self.subTest(status=status):
                 status_path.write_text(json.dumps(status), encoding="utf-8")
                 self.cargo.last_status_mtime = 0
                 self.cargo._check_status_for_ship_changes()
-                ShipRouteTab._update_jump_range(tab, self.cargo.current_cargo)
                 expected = route.jump_range(self.cargo.latest_loadout, fuel, self.cargo.current_cargo)
-                tab.range_label.configure.assert_called_with(text=t("route.range").format(current=expected, maximum=38.03))
+                for grade, multiplier in [(2, 1.5), (0, None), (1, 1.25), (3, 2)]:
+                    with self.subTest(grade=grade):
+                        tab.injection_grade.current.return_value = grade
+                        ShipRouteTab._update_jump_range(tab, self.cargo.current_cargo)
+                        range_text = t("route.range").format(current=expected, maximum=38.03)
+                        if multiplier is not None:
+                            range_text += f" · With injection {expected * multiplier:.2f} ly"
+                        tab.range_label.configure.assert_called_with(text=range_text)
 
 
 def response(status, payload):

@@ -94,6 +94,7 @@
     "injection_standard": "Standard (+50%)",
     "injection_premium": "Premium (+100%)",
     "range": "Jump range: {current:.2f} ({maximum:.2f}) ly",
+    "range_with_injection": "{range} · With injection {boosted:.2f} ly",
     "range_unavailable": "Jump range unavailable",
     "cargo": "Cargo:",
     "cargo_unit": "t",

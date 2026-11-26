@@ -94,6 +94,7 @@
     "injection_standard": "Standard (+50 %)",
     "injection_premium": "Premium (+100 %)",
     "range": "Sprungreichweite: {current:.2f} ({maximum:.2f}) ly",
+    "range_with_injection": "{range} · Mit Injektion {boosted:.2f} ly",
     "range_unavailable": "Sprungreichweite nicht verfügbar",
     "cargo": "Fracht:",
     "cargo_unit": "t",
