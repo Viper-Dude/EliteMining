@@ -439,7 +439,7 @@ Plot a jump route from one system to another in the **Route** tab. Enter a start
 
 If you leave the route, plot a new one from where you are. Routes are planned with Spansh.
 
-<img src="Screenshot/route_planner.png" alt="Route tab showing a plotted route with stops, jump distances, scoopable stars and refuel stops" width="900"><br>
+<img src="Screenshot/route_planner_ship.png" alt="Route tab showing a plotted route with stops, jump distances, scoopable stars and refuel stops" width="900"><br>
 *Route tab with a plotted route, jump range and cargo, and the next-system buttons.*
 
 ### Fleet Carrier Route Planner

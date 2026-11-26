@@ -18,7 +18,7 @@ from system_autocomplete import SystemAutocomplete
 from ui.help_link import create_help_link
 from ui.search_control import SearchControl
 from ui.theme import get_theme_colors
-from ui.tooltip import ToolTip
+from ui.tooltip import ToolTip, add_header_tooltips
 
 
 log = logging.getLogger("EliteMining")
@@ -62,6 +62,7 @@ class FleetCarrierRouteTab(ttk.Frame, RouteTableMixin):
         fields.pack(fill="x")
         fields.columnconfigure(0, minsize=scaled_px(80))
         fields.columnconfigure(1, minsize=scaled_px(250))
+        fields.columnconfigure(2, weight=1)
         for row, (key, variable) in enumerate((("from", self.source), ("to", self.destination))):
             ttk.Label(fields, text=t(f"route.{key}"), font=scaled_font(9)).grid(
                 row=row, column=0, sticky="w", pady=scaled_px(3))
@@ -133,6 +134,8 @@ class FleetCarrierRouteTab(ttk.Frame, RouteTableMixin):
             "icy_ring": 95, "tritium_hotspots": 125, "sol": 120,
         }
         self._build_route_table(widths, {"sol": "ring_finder.col_sol_dist"}, _TABLE_KEY)
+        add_header_tooltips(self.tree, lambda column: t("route.tritium_hotspots_tooltip")
+                            if column == "tritium_hotspots" else "")
         self.tree.bind("<Button-3>", self._show_row_menu)
 
     def _validate_capacity(self, value):
