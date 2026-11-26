@@ -25,7 +25,7 @@ from ui.tooltip import ToolTip, add_header_tooltips
 log = logging.getLogger("EliteMining")
 _TABLE_KEY = "carrier_route"
 _ESTIMATED_TRANSIT_SECONDS = 60
-_COOLDOWN_SECONDS = 300
+_COOLDOWN_SECONDS = 240
 
 
 def _format_amount(value, spec=",.0f"):

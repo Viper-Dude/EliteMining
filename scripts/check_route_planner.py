@@ -963,8 +963,8 @@ class CarrierProgressChecks(unittest.TestCase):
         self.now = departure_at + 59
         self.assertEqual(_jump_status(self.tracker.carrier_data), "Next jump: Paesia · Jumping…")
         self.now = departure_at + 60
-        self.assertEqual(_jump_status(self.tracker.carrier_data), "Cooldown · about 05:00 remaining")
-        self.now = departure_at + 360
+        self.assertEqual(_jump_status(self.tracker.carrier_data), "Cooldown · about 04:00 remaining")
+        self.now = departure_at + 300
         self.assertEqual(_jump_status(self.tracker.carrier_data), "")
 
         self.request(departure="2026-11-26T12:20:00Z")
@@ -983,8 +983,8 @@ class CarrierProgressChecks(unittest.TestCase):
         restarted = JournalParser(self.folder, user_db=Mock())
 
         self.now = datetime.fromisoformat("2026-11-26T12:02:00Z").timestamp()
-        self.assertEqual(_jump_status(restarted.carrier_data), "Cooldown · about 04:03 remaining")
-        self.now = datetime.fromisoformat("2026-11-26T12:06:03Z").timestamp()
+        self.assertEqual(_jump_status(restarted.carrier_data), "Cooldown · about 03:03 remaining")
+        self.now = datetime.fromisoformat("2026-11-26T12:05:03Z").timestamp()
         self.assertEqual(_jump_status(restarted.carrier_data), "")
 
     def test_departure_plus_five_advances_and_saves_request_with_cursor(self):
