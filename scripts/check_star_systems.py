@@ -22,13 +22,13 @@ from ui.striped_treeview import StripedTreeview
 from check_ring_finder_search import load_methods
 
 
-Methods = load_methods('app/main.py', 'App', {
+Methods = load_methods('app/star_systems_tab.py', 'StarSystemsTabMixin', {
     '_create_sysfinder_results_table', '_sysfinder_show_results', '_populate_sysfinder_rows',
     '_sort_sysfinder_column', '_sysfinder_search_complete', '_sysfinder_trader_complete',
     '_on_sysfinder_reference_changed', '_confirm_sysfinder_reference',
     '_update_sysfinder_ref_info', '_sysfinder_ref_info_complete',
     '_update_sysfinder_ref_labels', '_format_sysfinder_population', '_compute_pp_foryou',
-    '_compute_pp_merits', '_save_player_power', '_search_systems_worker',
+    '_compute_pp_merits', '_search_systems_worker',
     '_search_material_traders_worker', '_fetch_sysfinder_pp_complete',
     '_sysfinder_option_label', '_sysfinder_option_value',
     '_search_systems', '_search_material_traders',
@@ -53,7 +53,10 @@ def tearDownModule():
     _config_dir.cleanup()
 
 
-class App(Methods, ColumnVisibilityMixin):
+PledgeMethods = load_methods('app/main.py', 'App', {'_save_player_power'})
+
+
+class App(Methods, PledgeMethods, ColumnVisibilityMixin):
     pass
 
 
@@ -311,13 +314,13 @@ class TableChecks(unittest.TestCase):
                 self.check_full_tab(language)
 
     def check_full_tab(self, language):
-        source = ast.parse((ROOT / 'app/main.py').read_text(encoding='utf-8-sig'))
-        cls = next(node for node in source.body if isinstance(node, ast.ClassDef) and node.name == 'App')
+        source = ast.parse((ROOT / 'app/star_systems_tab.py').read_text(encoding='utf-8-sig'))
+        cls = next(node for node in source.body if isinstance(node, ast.ClassDef) and node.name == 'StarSystemsTabMixin')
         build = next(node for node in cls.body if isinstance(node, ast.FunctionDef) and node.name == '_build_system_finder_tab')
         namespace = dict(tk=tk, ttk=ttk, ToolTip=Mock(), modern_color=lambda color: color, StripedTreeview=StripedTreeview,
                          t=translate(language),
                          create_action_button=lambda parent, primary=False, **kwargs: tk.Button(parent, **kwargs))
-        exec(compile(ast.Module(body=[build], type_ignores=[]), 'app/main.py', 'exec'), namespace)
+        exec(compile(ast.Module(body=[build], type_ignores=[]), 'app/star_systems_tab.py', 'exec'), namespace)
         root = tk.Tk()
         root.geometry('1300x850+-3000+-3000')
         try:

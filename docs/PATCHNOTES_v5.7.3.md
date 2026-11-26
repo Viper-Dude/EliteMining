@@ -7,6 +7,10 @@
 - The Route tab can now plot routes with fewer jumps by using FSD injections on every jump without a neutron boost.
 - The Route tab now shows your current ship and, for each stop, its hotspots, reserve level, distance to Sol and when you last mined there, and right-click opens systems with hotspots in the Hotspots tab.
 
+## Bug Fixes
+
+- Find Hotspots in the Star Systems tab now starts the hotspot search again.
+
 ### Voiceattack Profile - no update (v5.7.2) 
 
 [![Discord](https://img.shields.io/badge/Discord%20Community-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/5dsF3UshRR)

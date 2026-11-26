@@ -231,7 +231,7 @@ App = type('App', (
         '_galaxy_market_limit', '_next_commodity_pp_generation',
         '_found_stations_text',
     }),
-    load_methods('app/main.py', 'App', {'_search_systems', '_search_material_traders'}),
+    load_methods('app/star_systems_tab.py', 'StarSystemsTabMixin', {'_search_systems', '_search_material_traders'}),
 ), {})
 for _method in (App._search_marketplace, App._search_systems):
     _method.__globals__.update(SearchControl=SearchControl, MarketplaceAPI=MarketplaceAPI,
@@ -589,7 +589,7 @@ class NamedSystemPowerplayTests(unittest.TestCase):
 
 class SyntaxTests(unittest.TestCase):
     def test_changed_modules_parse(self):
-        for name in ('main.py', 'commodity_market_tab.py', 'ring_finder.py', 'ring_finder_search.py', 'marketplace_api.py', 'system_finder_api.py',
+        for name in ('main.py', 'commodity_market_tab.py', 'star_systems_tab.py', 'ring_finder.py', 'ring_finder_search.py', 'marketplace_api.py', 'system_finder_api.py',
                      'edsm_integration.py', 'multi_mineral_tab.py', 'cargo_sell_planner.py', 'ui/search_control.py'):
             with self.subTest(name=name):
                 ast.parse((ROOT / 'app' / name).read_text(encoding='utf-8-sig'))

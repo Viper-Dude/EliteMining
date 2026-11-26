@@ -8,7 +8,7 @@ Make `app/main.py` (and later `prospector_panel.py` and `ring_finder.py`) smalle
 
 ## Rules
 
-- Only move code, one step per commit. Never move and change behaviour in the same commit.
+- Move first with no behaviour change and check it, then make the change. No separate commit is needed: the user commits once when the task is finished.
 - Re-import moved names in `main.py` so existing references keep working.
 - Patch with a script outside the repo: normalize to `\n`, assert one match each, restore CRLF, then `py_compile`.
 - Check every moved block for names it used from `main.py` (`t`, `log`, helpers, constants) and import them in the new module. Use a scope-aware scan (Python's `symtable`: report each function's implicit globals the module doesn't define). A flat AST scan misses names that one method imports locally while another relies on `main.py`'s import; that caused the `JournalParser` startup crash in step 2. The check scripts can't catch it either, because they run methods in their own namespaces.
@@ -28,6 +28,7 @@ Make `app/main.py` (and later `prospector_panel.py` and `ring_finder.py`) smalle
 | 3a | VoiceAttack Controls tab into `voiceattack_controls_tab.py` | Done 22 Nov 2026; checks OK, app test pending | 16,734 (−1,116) |
 | 3b | Commodity Market tab into `commodity_market_tab.py` | Done 22 Nov 2026; checks OK, user-tested | 14,275 (−2,363) |
 | 3c | Distance Calculator tab into `distance_calculator_tab.py` | Done 23 Nov 2026 (`6719590`); checks OK | 13,831 (−444 from the move) |
+| 3d | Star Systems tab into `star_systems_tab.py` | Done 26 Nov 2026, checks OK, app test pending | 12,740 (−1,160 from the move) |
 | 4 | `prospector_panel.py`, `ring_finder.py` | Later | — |
 | 4a | Best Minerals to Mine and Auto Prices into `best_minerals_view.py` (`BestMineralsMixin`) | Done 23 Nov 2026; checks OK | ring_finder.py 8,181 (−1,015) |
 | 4b | Find Acquisition Systems into `acquisition_view.py` (`AcquisitionMixin`) | Done 23 Nov 2026; checks OK | ring_finder.py 7,749 (−456) |
@@ -59,9 +60,11 @@ Line counts are physical lines, including blank lines.
 
 The largest builder methods, by size: `_build_interface_options_tab` (710), `_build_announcements_tab` (530), `_create_main_sidebar` (450), `_build_system_finder_tab` (375), `_build_mining_commodities_tab` (305), `_build_trade_commodities_tab` (285), and backup/restore (`_create_backup`, `_show_restore_options_dialog`, about 500 together).
 
+Step 3d covers the 42 Star Systems methods in `StarSystemsTabMixin`. Shared pledge handling and the Powerplay batch limits stay in `main.py`. `check_star_systems.py` and `check_search_stop.py` load the moved methods from the new module.
+
 Step 3c: `DistanceCalculatorTabMixin` holds the builder and all Distance Calculator methods (build, fills, home save, location refresh, calculation and live Home/Carrier updates, `get_distance_info_text`). `_check_market_api_status` and `_queue_search_service_status`, which sat in that section, stay in `main.py`. `check_distance_calculator.py` loads the mixin from the new module.
 
-Step 3b: `CommodityMarketTabMixin` holds the Mining and Trade Commodities builders, tables, context menus, preferences, searches, display, Powerplay fill-in and sorting (55 methods). Star Systems and `_check_market_api_status` stay in `main.py`; Multiple Prices and Sell My Hold were already separate modules. `check_marketplace.py` and `check_search_stop.py` load these methods from the new module. It imports `localization.t` directly, like step 3a, instead of `main.py`'s error-swallowing wrapper.
+Step 3b: `CommodityMarketTabMixin` holds the Mining and Trade Commodities builders, tables, context menus, preferences, searches, display, Powerplay fill-in and sorting (55 methods). Star Systems and `_check_market_api_status` stayed in `main.py` at this step; Multiple Prices and Sell My Hold were already separate modules. `check_marketplace.py` and `check_search_stop.py` load these methods from the new module. It imports `localization.t` directly, like step 3a, instead of `main.py`'s error-swallowing wrapper.
 
 Step 3a: `VoiceAttackControlsTabMixin` holds `_build_voiceattack_controls_tab`, `_build_voice_feedback_tab`, `_build_fg_tab` and `_build_timers_tab` unchanged; the helpers they call (`_save_toggle`, `_update_*_dependencies`, sound-event methods) stay in `main.py`. `check_voiceattack_controls.py` reads `_build_timers_tab` from the new module.
 

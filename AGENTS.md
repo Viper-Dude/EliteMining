@@ -78,7 +78,7 @@
 - Read [docs/VOICEATTACK_RULES.md](docs/VOICEATTACK_RULES.md) before changing VoiceAttack variables, Voice Feedback sounds or the shipped profile.
 - Read [docs/VOICEATTACK_UPDATE_HANDOFF.md](docs/VOICEATTACK_UPDATE_HANDOFF.md) before changing the VoiceAttack profile update flow.
 - Read [docs/BUILD_RELEASE.md](docs/BUILD_RELEASE.md) before changing build scripts, the splash screen, the installer or release packaging.
-- Read [docs/MAIN_SPLIT_HANDOFF.md](docs/MAIN_SPLIT_HANDOFF.md) before changing a tab or dialog in `main.py`, `prospector_panel.py` or `ring_finder.py`; move it into its own module first, as a separate commit.
+- Read [docs/MAIN_SPLIT_HANDOFF.md](docs/MAIN_SPLIT_HANDOFF.md) before changing a tab or dialog in `main.py`, `prospector_panel.py` or `ring_finder.py`; move it into its own module first (move only, then change it; no separate commit, the user commits once per finished task).
 - Read [docs/AGENTS-full-backup.md](docs/AGENTS-full-backup.md) only to recover a rule from the old untrimmed file.
 
 ## Codex Only
