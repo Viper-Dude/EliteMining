@@ -114,6 +114,23 @@ _ROUTE_CSV_COLUMNS = {
     "Neutron Star": "has_neutron",
     "Inject": "must_inject",
 }
+_CARRIER_CSV_COLUMNS = {
+    "System Name": "name",
+    "Distance": "distance",
+    "Distance Remaining": "distance_to_destination",
+    "Fuel Left": "fuel_in_tank",
+    "Fuel Used": "fuel_used",
+    "Restock": "must_restock",
+    "Restock Amount": "restock_amount",
+    "Tritium in Market": "tritium_in_market",
+    "Icy Ring": "has_icy_ring",
+    "Pristine": "is_system_pristine",
+    "Destination": "is_desired_destination",
+    "System Address": "id64",
+    "X": "x",
+    "Y": "y",
+    "Z": "z",
+}
 _ROUTE_CSV_FLAGS = {"must_refuel", "has_neutron", "must_inject"}
 _ROUTE_NUMBERS = ("distance", "distance_to_destination", "fuel_in_tank", "fuel_used", "x", "y", "z")
 _ROUTE_FLAGS = _ROUTE_CSV_FLAGS | {"is_scoopable"}
@@ -121,19 +138,23 @@ _CARRIER_NUMBERS = ("tritium_in_market", "restock_amount")
 _CARRIER_FLAGS = {"has_icy_ring", "is_system_pristine", "is_desired_destination", "must_restock"}
 
 
-def parse_route(text, extension):
-    """Read Spansh JSON, Spansh CSV or a newline-separated system list."""
+def parse_route(text, extension, *, carrier=False):
+    """Read route JSON, the plotter's CSV format or a newline-separated system list."""
     text = text.removeprefix("\ufeff").strip()
     if extension.lower() == ".json":
         stops = json.loads(text)
         if isinstance(stops, dict):
             result = stops.get("result")
+            if carrier and isinstance(result, dict) and result.get("incomplete"):
+                raise ValueError("Incomplete carrier route")
             stops = result.get("jumps") if isinstance(result, dict) else None
     else:
+        columns = _CARRIER_CSV_COLUMNS if carrier else _ROUTE_CSV_COLUMNS
+        flags = _CARRIER_FLAGS if carrier else _ROUTE_CSV_FLAGS
         try:
             rows = csv.reader(io.StringIO(text, newline=""), strict=True)
-            if tuple(next(rows, ())) == tuple(_ROUTE_CSV_COLUMNS):
-                stops = [_parse_csv_stop(row) for row in rows if row]
+            if tuple(next(rows, ())) == tuple(columns):
+                stops = [_parse_csv_stop(row, columns, flags) for row in rows if row]
             else:
                 names = [line.strip() for line in text.splitlines() if line.strip()]
                 if any(not re.fullmatch(r"[\w .()'’+\-]+", name) or not any(c.isalpha() for c in name)
@@ -145,19 +166,19 @@ def parse_route(text, extension):
 
     if not isinstance(stops, list) or not stops:
         raise ValueError("Route has no stops")
-    return [_validated_stop(stop) for stop in stops]
+    return [_validated_stop(stop, carrier=carrier) for stop in stops]
 
 
-def _parse_csv_stop(row):
-    if len(row) != len(_ROUTE_CSV_COLUMNS):
+def _parse_csv_stop(row, columns, flags):
+    if len(row) != len(columns):
         raise ValueError("Invalid route CSV row")
     stop = {}
-    for key, value in zip(_ROUTE_CSV_COLUMNS.values(), row):
+    for key, value in zip(columns.values(), row):
         if not value:
             continue
-        if key == "name":
+        if key in ("name", "id64"):
             stop[key] = value
-        elif key in _ROUTE_CSV_FLAGS:
+        elif key in flags:
             if value not in ("Yes", "No"):
                 raise ValueError("Invalid route CSV flag")
             flag = value == "Yes"
@@ -190,13 +211,13 @@ def _validated_stop(stop, *, carrier=False):
     return {key: value for key, value in stop.items() if key in fields}
 
 
-def serialize_route(stops, extension):
+def serialize_route(stops, extension, *, carrier=False):
     """Write ordered stops without changing the active route."""
     extension = extension.lower()
     if extension == ".txt":
         return "".join(f"{stop['name']}\n" for stop in stops)
 
-    exported = [_validated_stop(stop) for stop in stops]
+    exported = [_validated_stop(stop, carrier=carrier) for stop in stops]
     if any(stop.get("distance") is not None for stop in exported):
         remaining = 0
         for stop in reversed(exported):
@@ -212,12 +233,14 @@ def serialize_route(stops, extension):
     if extension == ".csv":
         output = io.StringIO(newline="")
         writer = csv.writer(output, quoting=csv.QUOTE_ALL, lineterminator="\n")
-        writer.writerow(_ROUTE_CSV_COLUMNS)
+        columns = _CARRIER_CSV_COLUMNS if carrier else _ROUTE_CSV_COLUMNS
+        flags = _CARRIER_FLAGS if carrier else _ROUTE_CSV_FLAGS
+        writer.writerow(columns)
         for stop in exported:
             row = []
-            for key in _ROUTE_CSV_COLUMNS.values():
+            for key in columns.values():
                 value = stop.get(key)
-                if value is not None and key in _ROUTE_CSV_FLAGS:
+                if value is not None and key in flags:
                     value = "Yes" if value else "No"
                 row.append(value)
             writer.writerow(row)

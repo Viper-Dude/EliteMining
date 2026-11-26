@@ -6,7 +6,7 @@ from datetime import datetime
 from itertools import chain
 from pathlib import Path
 import tkinter as tk
-from tkinter import filedialog, ttk
+from tkinter import ttk
 
 from app_utils import create_action_button
 from config import _load_cfg, load_theme, scaled_font, scaled_px, update_config_value
@@ -17,10 +17,9 @@ from localization import t
 from material_utils import abbreviate_material
 from overlays import focus_game_window, is_game_focused
 from ring_finder_search import translate_reserve_level
-from route_planner import build_route_form, jump_range, parse_route, serialize_route
+from route_planner import build_route_form, jump_range
 from route_table import RouteTableMixin
 from system_autocomplete import SystemAutocomplete
-from ui.dialogs import centered_yesno_dialog
 from ui.search_control import SearchControl
 from ui.theme import get_theme_colors
 from ui.help_link import create_help_link
@@ -111,6 +110,9 @@ class ShipRouteTab(ttk.Frame, RouteTableMixin):
                                               command=self._use_current_system, **button_colors)
         current_button.grid(row=0, column=2, sticky="w", padx=(scaled_px(5), 0))
         ToolTip(current_button, t("tooltips.use_current"), preserve_bindings=True)
+        self.reverse_button = create_action_button(fields, text=t("route.reverse"),
+                                                   command=self._reverse_route, **button_colors)
+        self.reverse_button.grid(row=1, column=2, sticky="w", padx=(scaled_px(5), 0))
         create_help_link(fields, "route-planner", t("route.help_tooltip"), ToolTip).grid(row=0, column=3, sticky="ne")
 
         options = ttk.Frame(self)
@@ -176,18 +178,10 @@ class ShipRouteTab(ttk.Frame, RouteTableMixin):
                             (self.plot_in_game_button, "plot_in_game"), (self.clear_button, "clear")):
             button.pack(side="left", padx=(0, scaled_px(6)))
             ToolTip(button, t(f"route.tips.{key}"), preserve_bindings=True)
-        file_actions = ttk.Frame(self)
-        file_actions.pack(fill="x", pady=(0, scaled_px(6)))
-        self.export_button = create_action_button(file_actions, text=t("route.export"),
-                                                  command=self._export_route, **button_colors)
-        self.import_button = create_action_button(file_actions, text=t("route.import"),
-                                                  command=self._import_route, **button_colors)
-        for button in (self.export_button, self.import_button):
-            button.pack(side="left", padx=(0, scaled_px(6)))
-        self._cv_add_columns_button(file_actions, "route")
-        self.notice = tk.Label(file_actions, bg=self.colors["bg"], fg=self.colors["fg"], font=scaled_font(9))
-        self.notice.pack(side="left")
+        self._build_route_file_actions("route", button_colors)
         self.search = SearchControl(self, plot_button, self.notice, on_finish=self._plot_idle)
+        for variable in (self.source, self.destination):
+            variable.trace_add("write", self._update_reverse_button)
 
         help_label = ttk.Label(self, text=t("route.help"), justify="left")
         help_label.pack(side="bottom", fill="x", pady=(scaled_px(4), 0))
@@ -375,6 +369,7 @@ class ShipRouteTab(ttk.Frame, RouteTableMixin):
             self.tree.set(str(index), "last_mined", latest[1] if latest else "")
 
     def _update_buttons(self):
+        self._update_reverse_button()
         route = self.planner.active_route
         has_next = self._next_system()
         self.copy_button.configure(state="normal" if has_next else "disabled")
@@ -459,42 +454,12 @@ class ShipRouteTab(ttk.Frame, RouteTableMixin):
         self._publish_route_progress()
 
     def _export_route(self):
-        route = self.planner.active_route
-        if not route:
-            return
-        filename = filedialog.asksaveasfilename(
-            parent=self.app, title=t("route.export"), defaultextension="",
-            filetypes=[(t("route.json_files"), "*.json"), (t("route.csv_files"), "*.csv"),
-                       (t("route.text_files"), "*.txt")],
-        )
-        if not filename:
-            return
-        path = Path(filename)
-        try:
-            contents = serialize_route(route["stops"], path.suffix)
-            path.write_text(contents, encoding="utf-8", newline="")
-        except (OSError, ValueError):
-            self.app._show_notice(self.notice, t("route.export_failed"), fg=self.colors["error"])
+        self._export_route_file(self.planner.active_route)
 
     def _import_route(self):
-        if self.search.running:
-            return
-        filename = filedialog.askopenfilename(
-            parent=self.app, title=t("route.import"),
-            filetypes=[(t("route.route_files"), ("*.json", "*.csv", "*.txt"))],
-        )
-        if not filename:
-            return
-        path = Path(filename)
-        try:
-            stops = parse_route(path.read_text(encoding="utf-8-sig"), path.suffix)
-        except (OSError, ValueError, RecursionError):
-            self.app._show_notice(self.notice, t("route.import_failed"), fg=self.colors["error"])
-            return
-        if self.planner.active_route and not centered_yesno_dialog(
-                self.app, t("tabs.route"), t("route.replace")):
-            return
-        self._apply_route(stops, source_view="import")
+        stops = self._import_route_file(self.planner.active_route)
+        if stops:
+            self._apply_route(stops, source_view="import")
 
     def _show_row_menu(self, event):
         if self.tree.identify_region(event.x, event.y) != "cell":

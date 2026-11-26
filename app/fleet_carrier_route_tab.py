@@ -15,8 +15,10 @@ from localization import t
 from route_planner import PLAYER_CARRIER_CAPACITY
 from route_table import RouteTableMixin
 from system_autocomplete import SystemAutocomplete
+from ui.help_link import create_help_link
 from ui.search_control import SearchControl
 from ui.theme import get_theme_colors
+from ui.tooltip import ToolTip
 
 
 log = logging.getLogger("EliteMining")
@@ -53,6 +55,9 @@ class FleetCarrierRouteTab(ttk.Frame, RouteTableMixin):
         self.entries = []
         self._autocomplete = []
 
+        button_colors = dict(bg=self.colors["btn_bg"], fg=self.colors["btn_fg"],
+                             activebackground=self.colors["btn_bg_hover"], activeforeground=self.colors["btn_fg"],
+                             disabledforeground=self.colors["btn_fg_disabled"])
         fields = ttk.Frame(self)
         fields.pack(fill="x")
         fields.columnconfigure(0, minsize=scaled_px(80))
@@ -66,6 +71,14 @@ class FleetCarrierRouteTab(ttk.Frame, RouteTableMixin):
             entry.bind("<Return>", lambda event: None if self.search.running else self._plot_or_stop(), add="+")
             self.entries.append(entry)
             self._autocomplete.append(SystemAutocomplete(entry, variable, app))
+        current_button = create_action_button(fields, text=t("distance_calculator.use_current"),
+                                              command=self._use_current_system, **button_colors)
+        current_button.grid(row=0, column=2, sticky="w", padx=(scaled_px(5), 0))
+        self.reverse_button = create_action_button(fields, text=t("route.reverse"),
+                                                   command=self._reverse_route, **button_colors)
+        self.reverse_button.grid(row=1, column=2, sticky="w", padx=(scaled_px(5), 0))
+        create_help_link(fields, "fleet-carrier-route-planner", t("route.help_tooltip"), ToolTip).grid(
+            row=0, column=3, sticky="ne")
 
         capacity_row = ttk.Frame(self)
         capacity_row.pack(anchor="w", pady=(scaled_px(5), 0))
@@ -83,9 +96,6 @@ class FleetCarrierRouteTab(ttk.Frame, RouteTableMixin):
 
         actions = ttk.Frame(self)
         actions.pack(fill="x", pady=scaled_px(6))
-        button_colors = dict(bg=self.colors["btn_bg"], fg=self.colors["btn_fg"],
-                             activebackground=self.colors["btn_bg_hover"], activeforeground=self.colors["btn_fg"],
-                             disabledforeground=self.colors["btn_fg_disabled"])
         plot_button = create_action_button(actions, text=t("route.plot"), primary=True,
                                            command=self._plot_or_stop, **button_colors)
         self.copy_button = create_action_button(actions, text=t("route.copy_next"),
@@ -94,10 +104,10 @@ class FleetCarrierRouteTab(ttk.Frame, RouteTableMixin):
                                                  command=self._clear, **button_colors)
         for button in (plot_button, self.copy_button, self.clear_button):
             button.pack(side="left", padx=(0, scaled_px(6)))
-        self._cv_add_columns_button(actions, _TABLE_KEY)
-        self.notice = tk.Label(actions, bg=self.colors["bg"], fg=self.colors["fg"], font=scaled_font(9))
-        self.notice.pack(side="left")
+        self._build_route_file_actions(_TABLE_KEY, button_colors)
         self.search = SearchControl(self, plot_button, self.notice, on_finish=self._plot_idle)
+        for variable in (self.source, self.destination):
+            variable.trace_add("write", self._update_reverse_button)
 
         summary = ttk.Frame(self)
         summary.pack(side="bottom", fill="x", pady=(scaled_px(5), 0))
@@ -119,7 +129,7 @@ class FleetCarrierRouteTab(ttk.Frame, RouteTableMixin):
     def _build_table(self):
         widths = {
             "number": 55, "system": 280, "jump": 80, "jumps_left": 90,
-            "fuel_used": 90, "fuel_left": 90, "restock": 70, "restock_amount": 110,
+            "fuel_used": 90, "fuel_left": 90, "restock_amount": 90,
             "icy_ring": 95, "tritium_hotspots": 125, "sol": 120,
         }
         self._build_route_table(widths, {"sol": "ring_finder.col_sol_dist"}, _TABLE_KEY)
@@ -130,6 +140,16 @@ class FleetCarrierRouteTab(ttk.Frame, RouteTableMixin):
             return False
         self._capacity_edited = bool(value)
         return True
+
+    def _use_current_system(self):
+        system = (self.tracker.carrier_data or {}).get("system")
+        if system:
+            self.app._distance_fill(self._autocomplete[0], self.source, system)
+            self._default_source = system
+            self.app._show_notice(self.notice, t("distance_calculator.using_current").format(system=system),
+                                  fg=self.colors["fg"])
+        else:
+            self.app._show_notice(self.notice, t("route.carrier_no_system"), fg=self.colors["warning"])
 
     def _refresh_inputs(self):
         data = self.tracker.carrier_data or {}
@@ -232,10 +252,25 @@ class FleetCarrierRouteTab(ttk.Frame, RouteTableMixin):
             log.exception("Fleet Carrier route plot failed")
             self.app._show_notice(self.notice, t("route.plot_failed"), fg=self.colors["error"])
         else:
-            self.planner.set_carrier_route(stops)
-            self.app._show_notice(self.notice, "")
-            self._show_route(self.planner.active_carrier_route)
-            self._sync_carrier_progress()
+            self._apply_route(stops)
+
+    def _apply_route(self, stops):
+        self.planner.set_carrier_route(stops)
+        self.app._show_notice(self.notice, "")
+        self._show_route(self.planner.active_carrier_route)
+        self._sync_carrier_progress()
+
+    def _export_route(self):
+        self._export_route_file(self.planner.active_carrier_route, carrier=True)
+
+    def _import_route(self):
+        stops = self._import_route_file(self.planner.active_carrier_route, carrier=True)
+        if stops:
+            for autocomplete in self._autocomplete:
+                autocomplete.hide()
+            self.source.set(stops[0]["name"])
+            self.destination.set(stops[-1]["name"])
+            self._apply_route(stops)
 
     def _show_route(self, route):
         self.tree.delete(*self.tree.get_children())
@@ -248,12 +283,12 @@ class FleetCarrierRouteTab(ttk.Frame, RouteTableMixin):
                 icy_ring = ""
                 if stop.get("has_icy_ring"):
                     icy_ring = t("ring_finder.reserve_pristine" if stop.get("is_system_pristine") else "common.yes")
+                restock_amount = stop.get("restock_amount") if stop.get("must_restock") else None
                 self.tree.insert("", "end", iid=str(index), values=(
                     index, stop["name"],
                     _format_amount(stop.get("distance"), ".2f"), jumps - index,
                     _format_amount(stop.get("fuel_used")), _format_amount(stop.get("fuel_in_tank")),
-                    t("common.yes") if stop.get("must_restock") else "",
-                    _format_amount(stop.get("restock_amount")), icy_ring, "",
+                    _format_amount(restock_amount or None), icy_ring, "",
                     _format_amount(calculator.calculate_distance(stop, SOL_COORDS), ".2f"),
                 ))
             tonnes = t("route.cargo_unit")
@@ -302,9 +337,12 @@ class FleetCarrierRouteTab(ttk.Frame, RouteTableMixin):
                 self.tree.set(str(index), "tritium_hotspots", _format_amount(count))
 
     def _update_buttons(self):
+        self._update_reverse_button()
         route = self.planner.active_carrier_route
         self.copy_button.configure(state="normal" if self._next_system() else "disabled")
         self.clear_button.configure(state="normal" if route and not self.search.running else "disabled")
+        self.export_button.configure(state="normal" if route else "disabled")
+        self.import_button.configure(state="disabled" if self.search.running else "normal")
 
     def _next_system(self):
         route = self.planner.active_carrier_route

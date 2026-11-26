@@ -143,6 +143,114 @@ class RouteDatabaseChecks(unittest.TestCase):
 
 
 class RouteTabChecks(unittest.TestCase):
+    def test_carrier_table_loads_saved_layout_with_removed_restock_column(self):
+        import config
+        import tkinter as tk
+        from tkinter import ttk
+
+        layout = {
+            "carrier_route_column_order": ["restock", "restock_amount", "system", "fuel_left"],
+            "carrier_route_column_visibility": {"restock": True, "fuel_left": False},
+            "carrier_route_column_widths": {"restock": 114, "restock_amount": 181},
+        }
+        folder = self.enterContext(tempfile.TemporaryDirectory())
+        config_file = Path(folder) / "config.json"
+        config_file.write_text(json.dumps(layout), encoding="utf-8")
+        self.enterContext(patch.multiple(
+            config, CONFIG_FILE=str(config_file), _cached_config={}, _cache_dirty=False,
+            _last_load_time=0,
+        ))
+
+        root = tk.Tk()
+        self.addCleanup(root.destroy)
+        root.withdraw()
+        tab = FleetCarrierRouteTab.__new__(FleetCarrierRouteTab)
+        ttk.Frame.__init__(tab, root)
+        tab.colors = {"bg": "#222222", "fg": "#ffffff"}
+        tab._build_table()
+
+        self.assertNotIn("restock", tab.tree["columns"])
+        displayed = tab.tree["displaycolumns"]
+        self.assertEqual(displayed[:2], ("restock_amount", "system"))
+        self.assertNotIn("restock", displayed)
+        self.assertNotIn("fuel_left", displayed)
+        self.assertEqual(tab.tree.column("restock_amount", "width"), 181)
+
+    def test_reverse_swaps_only_the_endpoints_in_both_plotters(self):
+        import tkinter as tk
+
+        for tab_class in (ShipRouteTab, FleetCarrierRouteTab):
+            with self.subTest(tab=tab_class.__name__):
+                tab = tab_class.__new__(tab_class)
+                root = tk.Tcl()
+                tab.source = tk.StringVar(root, "Sol")
+                tab.destination = tk.StringVar(root)
+                tab.reverse_button = Mock()
+                tab.search = Mock(running=False)
+                tab._autocomplete = [Mock(), Mock()]
+                tab._plot_or_stop = Mock()
+                for variable in (tab.source, tab.destination):
+                    variable.trace_add("write", tab._update_reverse_button)
+
+                tab._update_reverse_button()
+                tab.reverse_button.configure.assert_called_with(state="disabled")
+                tab.destination.set("Paesia")
+                tab.reverse_button.configure.assert_called_with(state="normal")
+                tab.search.running = True
+                tab._update_reverse_button()
+                tab.reverse_button.configure.assert_called_with(state="disabled")
+                tab._reverse_route()
+                self.assertEqual((tab.source.get(), tab.destination.get()), ("Sol", "Paesia"))
+
+                tab.search.running = False
+                tab._reverse_route()
+                self.assertEqual((tab.source.get(), tab.destination.get()), ("Paesia", "Sol"))
+                tab._plot_or_stop.assert_not_called()
+                for autocomplete in tab._autocomplete:
+                    autocomplete.hide.assert_called_once_with()
+
+    def test_carrier_import_updates_endpoints_and_only_the_carrier_route(self):
+        tab = FleetCarrierRouteTab.__new__(FleetCarrierRouteTab)
+        tab.app = Mock()
+        tab.notice = Mock()
+        tab.search = Mock(running=False)
+        tab.colors = {"error": "red"}
+        tab.source, tab.destination = Mock(), Mock()
+        tab._autocomplete = [Mock(), Mock()]
+        tab._show_route = Mock()
+        tab._sync_carrier_progress = Mock()
+        tab.planner = route.RoutePlanner()
+        tab.planner.set_route(STOPS, source_view="route")
+        tab.planner.set_carrier_route(list(reversed(CARRIER_STOPS)))
+        existing_ship_route = tab.planner.active_route
+        existing_carrier_route = tab.planner.active_carrier_route
+
+        with tempfile.TemporaryDirectory() as folder, \
+             patch("route_table.filedialog.askopenfilename") as dialog, \
+             patch("route_table.filedialog.asksaveasfilename") as save, \
+             patch("route_table.centered_yesno_dialog", return_value=False) as confirm:
+            path = Path(folder) / "carrier.csv"
+            dialog.return_value = str(path)
+            path.write_text(route.serialize_route(CARRIER_STOPS, ".csv", carrier=True), encoding="utf-8")
+            tab._import_route()
+            self.assertIs(tab.planner.active_carrier_route, existing_carrier_route)
+            tab._show_route.assert_not_called()
+
+            confirm.return_value = True
+            tab._import_route()
+            self.assertIs(tab.planner.active_route, existing_ship_route)
+            self.assertEqual(tab.planner.active_carrier_route["stops"], CARRIER_STOPS)
+            tab.source.set.assert_called_once_with("Sol")
+            tab.destination.set.assert_called_once_with("Paesia")
+            tab._show_route.assert_called_once_with(tab.planner.active_carrier_route)
+            tab._sync_carrier_progress.assert_called_once_with()
+
+            path = path.with_suffix(".json")
+            save.return_value = str(path)
+            tab._export_route()
+            self.assertEqual(route.parse_route(path.read_text(encoding="utf-8"), ".json", carrier=True),
+                             CARRIER_STOPS)
+
     def test_import_validates_file_before_confirming_replacement(self):
         tab = ShipRouteTab.__new__(ShipRouteTab)
         tab.app = Mock()
@@ -157,8 +265,8 @@ class RouteTabChecks(unittest.TestCase):
             tab.planner, "active_route", {"stops": stops, "source_view": source_view})
 
         with tempfile.TemporaryDirectory() as folder, \
-             patch("route_tab.filedialog.askopenfilename") as dialog, \
-             patch("route_tab.centered_yesno_dialog", return_value=False) as confirm:
+             patch("route_table.filedialog.askopenfilename") as dialog, \
+             patch("route_table.centered_yesno_dialog", return_value=False) as confirm:
             path = Path(folder) / "route.json"
             path.write_bytes(b"{bad json")
             dialog.return_value = str(path)
@@ -760,6 +868,17 @@ class RouteFileChecks(unittest.TestCase):
         self.assertEqual(route.parse_route(csv_text, ".csv"), csv_expected)
         self.assertEqual(stops, original)
 
+    def test_carrier_files_round_trip_and_reject_incomplete_routes(self):
+        for extension in (".json", ".csv", ".txt"):
+            with self.subTest(extension=extension):
+                exported = route.serialize_route(CARRIER_STOPS, extension, carrier=True)
+                expected = ([{"name": stop["name"]} for stop in CARRIER_STOPS]
+                            if extension == ".txt" else CARRIER_STOPS)
+                self.assertEqual(route.parse_route(exported, extension, carrier=True), expected)
+        incomplete = json.dumps({"result": {"incomplete": True, "jumps": CARRIER_STOPS}})
+        with self.assertRaises(ValueError):
+            route.parse_route(incomplete, ".json", carrier=True)
+
     def test_plain_text_and_name_only_routes(self):
         stops = [{"name": "Sol"}, {"name": "Jackson's Lighthouse"}, {"name": "Wregoe XD-E b39-2"}]
         text = "\ufeffSol\r\n\r\n  Jackson's Lighthouse  \nWregoe XD-E b39-2\n"
@@ -972,6 +1091,9 @@ class CarrierProgressChecks(unittest.TestCase):
         tab.search = SimpleNamespace(running=False)
         tab.tree = Mock()
         tab.copy_button, tab.clear_button = Mock(), Mock()
+        tab.reverse_button, tab.export_button, tab.import_button = Mock(), Mock(), Mock()
+        tab.source = SimpleNamespace(get=lambda: "Sol")
+        tab.destination = SimpleNamespace(get=lambda: "Paesia")
         tab._copy_system = Mock()
         self.tracker.set_on_route_updated(tab._on_carrier_updated)
         self.planner.set_route(STOPS, "market")

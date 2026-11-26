@@ -1,15 +1,82 @@
 """Table, plot feedback and clipboard helpers shared by both route panes."""
 
+from pathlib import Path
 import tkinter as tk
-from tkinter import font, ttk
+from tkinter import filedialog, font, ttk
 
+from app_utils import create_action_button
 from column_visibility_helper import ColumnVisibilityMixin
 from config import scaled_font, scaled_px
 from localization import t
+from route_planner import parse_route, serialize_route
+from ui.dialogs import centered_yesno_dialog
 from ui.striped_treeview import StripedTreeview
 
 
 class RouteTableMixin(ColumnVisibilityMixin):
+    def _build_route_file_actions(self, config_key, button_colors):
+        file_actions = ttk.Frame(self)
+        file_actions.pack(fill="x", pady=(0, scaled_px(6)))
+        self.export_button = create_action_button(file_actions, text=t("route.export"),
+                                                  command=self._export_route, **button_colors)
+        self.import_button = create_action_button(file_actions, text=t("route.import"),
+                                                  command=self._import_route, **button_colors)
+        for button in (self.export_button, self.import_button):
+            button.pack(side="left", padx=(0, scaled_px(6)))
+        self._cv_add_columns_button(file_actions, config_key)
+        self.notice = tk.Label(file_actions, bg=self.colors["bg"], fg=self.colors["fg"], font=scaled_font(9))
+        self.notice.pack(side="left")
+
+    def _can_reverse_route(self):
+        return not self.search.running and bool(self.source.get().strip() and self.destination.get().strip())
+
+    def _update_reverse_button(self, *_args):
+        self.reverse_button.configure(state="normal" if self._can_reverse_route() else "disabled")
+
+    def _reverse_route(self):
+        if self._can_reverse_route():
+            source, destination = self.source.get(), self.destination.get()
+            for autocomplete in self._autocomplete:
+                autocomplete.hide()
+            self.source.set(destination)
+            self.destination.set(source)
+
+    def _export_route_file(self, route, *, carrier=False):
+        if not route:
+            return
+        filename = filedialog.asksaveasfilename(
+            parent=self.app, title=t("route.export"), defaultextension="",
+            filetypes=[(t("route.json_files"), "*.json"), (t("route.csv_files"), "*.csv"),
+                       (t("route.text_files"), "*.txt")],
+        )
+        if not filename:
+            return
+        path = Path(filename)
+        try:
+            contents = serialize_route(route["stops"], path.suffix, carrier=carrier)
+            path.write_text(contents, encoding="utf-8", newline="")
+        except (OSError, ValueError):
+            self.app._show_notice(self.notice, t("route.export_failed"), fg=self.colors["error"])
+
+    def _import_route_file(self, route, *, carrier=False):
+        if self.search.running:
+            return
+        filename = filedialog.askopenfilename(
+            parent=self.app, title=t("route.import"),
+            filetypes=[(t("route.route_files"), ("*.json", "*.csv", "*.txt"))],
+        )
+        if not filename:
+            return
+        path = Path(filename)
+        try:
+            stops = parse_route(path.read_text(encoding="utf-8-sig"), path.suffix, carrier=carrier)
+        except (OSError, ValueError, RecursionError):
+            self.app._show_notice(self.notice, t("route.import_failed"), fg=self.colors["error"])
+            return
+        if route and not centered_yesno_dialog(self.app, t("tabs.route"), t("route.replace")):
+            return
+        return stops
+
     def _build_route_table(self, widths, header_keys, config_key):
         frame = ttk.Frame(self)
         frame.pack(fill="both", expand=True)
