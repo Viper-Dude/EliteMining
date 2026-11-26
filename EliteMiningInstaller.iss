@@ -1,6 +1,6 @@
 [Setup]
 AppName=EliteMining
-AppVersion=v5.7.3
+AppVersion=v5.7.4
 AppPublisher=CMDR ViperDude
 DefaultDirName={code:GetDefaultInstallDir}\EliteMining
 DisableDirPage=no
@@ -17,7 +17,7 @@ CloseApplications=no
 ; VA profile update notice — shown before install as a reminder to keep the profile option ticked.
 ; ENABLE  when this release includes a new VA profile:   remove the leading semicolon below
 ; DISABLE when no VA profile update in this release:     add a semicolon at the start of the line below
-;InfoBeforeFile=Voiceattack Profile\VA_PROFILE_UPDATE_NOTICE.txt
+InfoBeforeFile=Voiceattack Profile\VA_PROFILE_UPDATE_NOTICE.txt
 
 ; Place uninstaller in app folder
 UninstallFilesDir={app}
@@ -106,7 +106,7 @@ Source: "NOTICE"; DestDir: "{app}"
 Name: "desktopicon"; Description: "Create a &desktop icon"; GroupDescription: "Additional icons:"
 ; VoiceAttack integration options (only shown if VA detected)
 Name: "installeliteva"; Description: "Install EliteVA v5.0.12 (VoiceAttack plugin)"; GroupDescription: "VoiceAttack Integration:"; Check: IsVADetected
-Name: "installvaprofile"; Description: "Install/Update VoiceAttack profile (v5.7.2)"; GroupDescription: "VoiceAttack Integration:"; Check: IsVADetected
+Name: "installvaprofile"; Description: "Install/Update VoiceAttack profile (v5.7.4)"; GroupDescription: "VoiceAttack Integration:"; Check: IsVADetected
 
 [Icons]
 ; Start Menu shortcut
@@ -490,7 +490,7 @@ begin
     ReleasePage.RichEditViewer.RTFText := AnsiString(BuildNoticeRtf(ReleaseLines, False));
   ExistingEliteAPIPath := '';
   ProfileNeedsUpdate := False;
-  BundledProfileVersion := '5.7.2';
+  BundledProfileVersion := '5.7.4';
   
   { DISABLED - plugin not used }
   { InstallPlugin := VADetected; }

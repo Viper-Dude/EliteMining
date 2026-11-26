@@ -1,12 +1,12 @@
 ============================================================
-  EliteMining v5.7.2 — VoiceAttack Profile Update 
+  EliteMining v5.7.4 — VoiceAttack Profile Update 
 ============================================================
 
-This release includes an updated VoiceAttack profile (v5.7.2).
+This release includes an updated VoiceAttack profile (v5.7.4).
 
 What's changed:
-- New "Show route" command in the EliteMining app commands opens the Route tab.
-- To plot your next stop in the Galaxy Map, say “Plot next waypoint” or customize the command’s spoken phrases with Plot next waypoint;Plot the next waypoint;Set course for the next waypoint;Navigate to the next waypoint;Take me to the next waypoint.
+- Added Plot route command to stop all profile and the reset variables commands.
+- Minor timer adjustment for some mining commands.
 
 Keep the VoiceAttack profile option ticked on the next page to install the updated
 profile. Follow the app's profile update instructions to import it into VoiceAttack.

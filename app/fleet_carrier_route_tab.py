@@ -3,16 +3,17 @@
 import logging
 from math import ceil
 import threading
+from time import time
 import tkinter as tk
 from tkinter import ttk
 
 from app_utils import create_action_button
 from config import load_theme, scaled_font, scaled_px
 from edsm_distance import SOL_COORDS, get_distance_calculator
-from fleet_carrier_tab import _countdown, pending_jump
+from fleet_carrier_tab import _countdown
 from fleet_carrier_tracker import get_fleet_carrier_tracker
 from localization import t
-from route_planner import PLAYER_CARRIER_CAPACITY
+from route_planner import PLAYER_CARRIER_CAPACITY, _carrier_timestamp
 from route_table import RouteTableMixin
 from system_autocomplete import SystemAutocomplete
 from ui.help_link import create_help_link
@@ -23,6 +24,8 @@ from ui.tooltip import ToolTip, add_header_tooltips
 
 log = logging.getLogger("EliteMining")
 _TABLE_KEY = "carrier_route"
+_ESTIMATED_TRANSIT_SECONDS = 60
+_COOLDOWN_SECONDS = 300
 
 
 def _format_amount(value, spec=",.0f"):
@@ -34,6 +37,31 @@ def _route_total(stops, field, unit, spec=",.0f"):
     if None in values:
         return t("route.carrier_unknown")
     return f"{_format_amount(sum(values), spec)} {unit}"
+
+
+def _jump_status(data):
+    now = time()
+    departure = data.get("jump_departure_time")
+    departure_at = _carrier_timestamp(departure)
+    if departure_at is not None:
+        arrival_at = departure_at + _ESTIMATED_TRANSIT_SECONDS
+        if now < arrival_at:
+            return t("route.carrier_next_jump").format(
+                system=data.get("jump_destination") or t("route.carrier_unknown"),
+                countdown=_countdown(departure),
+            )
+    else:
+        arrival_at = _carrier_timestamp(data.get("last_jump_arrival_time"))
+        if arrival_at is None:
+            # Saved carrier data from before the arrival field may have exact jump history.
+            last_jump = next((jump for jump in data.get("jump_history") or [] if jump.get("exact")), {})
+            arrival_at = _carrier_timestamp(last_jump.get("timestamp"))
+
+    if arrival_at is not None and arrival_at <= now < arrival_at + _COOLDOWN_SECONDS:
+        remaining = ceil(arrival_at + _COOLDOWN_SECONDS - now)
+        minutes, seconds = divmod(remaining, 60)
+        return t("route.carrier_cooldown", m=minutes, s=seconds)
+    return ""
 
 
 class FleetCarrierRouteTab(ttk.Frame, RouteTableMixin):
@@ -135,7 +163,12 @@ class FleetCarrierRouteTab(ttk.Frame, RouteTableMixin):
             "fuel_used": 90, "fuel_left": 90, "restock_amount": 90,
             "icy_ring": 95, "tritium_hotspots": 125, "sol": 120,
         }
-        self._build_route_table(widths, {"sol": "ring_finder.col_sol_dist"}, _TABLE_KEY)
+        headers = {
+            "sol": "ring_finder.col_sol_dist",
+            "fuel_used": "route.carrier_estimated_fuel_used",
+            "fuel_left": "route.carrier_estimated_fuel_left",
+        }
+        self._build_route_table(widths, headers, _TABLE_KEY)
         add_header_tooltips(self.tree, lambda column: t("route.tritium_hotspots_tooltip")
                             if column == "tritium_hotspots" else "")
 
@@ -160,13 +193,7 @@ class FleetCarrierRouteTab(ttk.Frame, RouteTableMixin):
         name, callsign = data.get("name"), data.get("callsign")
         identity = f"{name} ({callsign})" if name and callsign else name or callsign or ""
         self.carrier_info_label.configure(text=identity)
-        jump_text = ""
-        jump = pending_jump(data)
-        if jump:
-            destination, departure = jump
-            jump_text = t("route.carrier_next_jump").format(
-                system=destination or t("route.carrier_unknown"), countdown=_countdown(departure))
-        self.next_jump_label.configure(text=jump_text)
+        self.next_jump_label.configure(text=_jump_status(data))
         system = data.get("system") or ""
         if system != self._default_source and self.source.get() == self._default_source:
             self._autocomplete[0].hide()
@@ -181,6 +208,24 @@ class FleetCarrierRouteTab(ttk.Frame, RouteTableMixin):
         fuel_text = (f"{_format_amount(fuel)} {t('route.cargo_unit')}" if fuel is not None
                      else t("route.carrier_unknown"))
         self.tank_fuel.configure(text=t("route.carrier_tank_fuel").format(fuel=fuel_text))
+        latest_jump = next(iter(data.get("jump_history") or ()), {})
+        arrival = max(data.get("last_jump_arrival_time") or "", latest_jump.get("timestamp") or "")
+        fuel_time = data.get("fuel_updated_at") or ""
+        self._refresh_live_fuel(self.planner.active_carrier_route, system, fuel if fuel_time >= arrival else None)
+
+    def _refresh_live_fuel(self, route, system, fuel):
+        if not route or route["off_route"]:
+            return
+        index = route["current_index"]
+        stop = route["stops"][index]
+        if not self.tree.exists(str(index)):
+            return
+        if fuel is not None and system.casefold() == stop["name"].casefold():
+            text = t("route.carrier_live_fuel", fuel=_format_amount(fuel))
+        else:
+            text = _format_amount(stop.get("fuel_in_tank"))
+        if self.tree.set(str(index), "fuel_left") != text:
+            self.tree.set(str(index), "fuel_left", text)
 
     def _refresh(self, event=None):
         self._refresh_inputs()
@@ -321,6 +366,7 @@ class FleetCarrierRouteTab(ttk.Frame, RouteTableMixin):
             old_index = previous["current_index"]
             if old_index == current and previous["off_route"] == off_route:
                 return
+            self.tree.set(str(old_index), "fuel_left", _format_amount(route["stops"][old_index].get("fuel_in_tank")))
             self.tree.set(str(old_index), "number", old_index)
         self.tree.set(str(current), "number", current if off_route else f"▷ {current}")
         self.tree.see(str(current))

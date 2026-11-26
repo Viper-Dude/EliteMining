@@ -238,6 +238,7 @@ class JournalParser:
             'system': None,
             'body_id': None,
             'fuel_level': None,
+            'fuel_updated_at': None,
             'fuel_capacity': 1000,
             'jump_range_curr': None,
             'jump_range_max': None,
@@ -258,6 +259,7 @@ class JournalParser:
             'crew': [],          # list of {CrewRole, Activated, Enabled, CrewName}
             'jump_destination': None,
             'jump_departure_time': None,
+            'last_jump_arrival_time': None,
             'jump_body': None,
             'jump_history': [],  # list of {timestamp, system} most recent first, max 10
             'last_updated': None,
@@ -629,6 +631,8 @@ class JournalParser:
             cd['name']         = event.get('Name', cd['name'])
             cd['callsign']     = event.get('Callsign', cd['callsign'])
             cd['fuel_level']   = event.get('FuelLevel', cd['fuel_level'])
+            if 'FuelLevel' in event:
+                cd['fuel_updated_at'] = event.get('timestamp')
             cd['jump_range_curr'] = event.get('JumpRangeCurr', cd['jump_range_curr'])
             cd['jump_range_max']  = event.get('JumpRangeMax',  cd['jump_range_max'])
             cd['docking_access']  = event.get('DockingAccess', cd['docking_access'])
@@ -759,6 +763,7 @@ class JournalParser:
                         event.get('timestamp'), cd['jump_destination'], cd['jump_departure_time'],
                     )
                 self._record_carrier_location_change(system, event.get('timestamp', ''), exact=True)
+                cd['last_jump_arrival_time'] = event.get('timestamp')
                 cd['system']   = system
                 cd['body_id']  = event.get('BodyID', cd['body_id'])
                 cd['jump_destination']   = None
@@ -780,6 +785,7 @@ class JournalParser:
             total = event.get('Total')
             if total is not None:
                 cd['fuel_level'] = total
+                cd['fuel_updated_at'] = event.get('timestamp')
             cd['last_updated'] = event.get('timestamp')
             log.debug(f"[FC] CarrierDepositFuel: total={cd['fuel_level']}")
             self._notify_carrier_updated()

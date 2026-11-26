@@ -948,6 +948,45 @@ class CarrierProgressChecks(unittest.TestCase):
         self.assertEqual((active["current_index"], active["off_route"]), (index, off_route))
         self.assertEqual(active.get("applied_request"), applied)
 
+    def test_jump_status_uses_the_current_request_and_estimates_cooldown_while_away(self):
+        from fleet_carrier_route_tab import _jump_status
+
+        self.enterContext(patch("fleet_carrier_route_tab.time", side_effect=lambda: self.now))
+        departure_at = datetime.fromisoformat(self.departure).timestamp()
+        timezone = datetime.fromisoformat(self.departure).tzinfo
+        clock = self.enterContext(patch("fleet_carrier_tab.datetime", wraps=datetime))
+        clock.now.side_effect = lambda _: datetime.fromtimestamp(self.now, timezone)
+
+        self.request()
+        self.now = departure_at - 15
+        self.assertEqual(_jump_status(self.tracker.carrier_data), "Next jump: Paesia · in 0m 15s")
+        self.now = departure_at + 59
+        self.assertEqual(_jump_status(self.tracker.carrier_data), "Next jump: Paesia · Jumping…")
+        self.now = departure_at + 60
+        self.assertEqual(_jump_status(self.tracker.carrier_data), "Cooldown · about 05:00 remaining")
+        self.now = departure_at + 360
+        self.assertEqual(_jump_status(self.tracker.carrier_data), "")
+
+        self.request(departure="2026-11-26T12:20:00Z")
+        self.assertIn("Next jump: Paesia", _jump_status(self.tracker.carrier_data))
+        self.event("CarrierJumpCancelled", "12:06:01")
+        self.assertEqual(_jump_status(self.tracker.carrier_data), "")
+
+    def test_confirmed_cooldown_uses_owned_arrival_and_survives_restart(self):
+        from fleet_carrier_route_tab import _jump_status
+
+        self.enterContext(patch("fleet_carrier_route_tab.time", side_effect=lambda: self.now))
+        self.request()
+        self.event("CarrierJump", "12:01:03", StarSystem="Paesia")
+        self.event("CarrierJump", "12:01:20", StarSystem="Sol", MarketID=222)
+        self.event("CarrierLocation", "12:01:25", StarSystem="Paesia")
+        restarted = JournalParser(self.folder, user_db=Mock())
+
+        self.now = datetime.fromisoformat("2026-11-26T12:02:00Z").timestamp()
+        self.assertEqual(_jump_status(restarted.carrier_data), "Cooldown · about 04:03 remaining")
+        self.now = datetime.fromisoformat("2026-11-26T12:06:03Z").timestamp()
+        self.assertEqual(_jump_status(restarted.carrier_data), "")
+
     def test_departure_plus_five_advances_and_saves_request_with_cursor(self):
         self.request()
         self.now = self.due - 1
