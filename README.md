@@ -31,6 +31,7 @@
 - [Commodity Market](#commodity-market)
   - [Sell My Hold](#sell-my-hold)
 - [Route Planner](#route-planner)
+  - [Fleet Carrier Route Planner](#fleet-carrier-route-planner)
 - [Mining Missions](#mining-missions)
 - [Ring Mining Reference](#ring-mining-reference)
 - [Star Systems](#star-systems)
@@ -440,6 +441,15 @@ If you leave the route, plot a new one from where you are. Routes are planned wi
 
 <img src="Screenshot/route_planner.png" alt="Route tab showing a plotted route with stops, jump distances, scoopable stars and refuel stops" width="900"><br>
 *Route tab with a plotted route, jump range and cargo, and the next-system buttons.*
+
+### Fleet Carrier Route Planner
+
+Open **Route → Fleet Carrier**, enter a destination in **To**, and click **Plot Route**. EliteMining fills in your carrier's location and used capacity when available. You can edit **From** and **Used Capacity** to plan a different trip. The planner uses your current Tritium tank level when it is known.
+
+The route shows Tritium used and left after each jump, where and how much to restock, icy rings, known Tritium hotspots, and estimated jump time. EliteMining tracks your carrier's progress along the route. Use **Copy next system** to paste the next stop into the Galaxy Map.
+
+<img src="Screenshot/route_planner_carrier.png" alt="Fleet Carrier route to Colonia showing Tritium levels, restock stops and estimated jump time" width="900"><br>
+*Fleet Carrier route to Colonia with Tritium usage and restock stops.*
 
 [Back to Top](#top)
 

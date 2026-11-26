@@ -1,11 +1,9 @@
-﻿What's new in EliteMining v5.7.2
+﻿What's new in EliteMining v5.7.3
 
 New Features & Improvements
-- New Route Planner: plot routes in the new Route tab, including your ship's jump range with a full hold, and with export or import options. 
-- Start a route straight from Hotspots, Sell My Hold, Where to Mine and the other result views with "Plot route".
-- The Route Planner can copy the next system after each jump.
-- The Route tab can now plot your next stop in the Galaxy Map when VoiceAttack is running.
-- Text boxes now have a right-click menu for cut, copy and paste.
-- Shortened three main tab names.
-- Restyled the Hotspots result view buttons in the Modern themes.
-- The Ship Presets sidebar now collapses your previous ship’s group when Auto - Load opens the new one.
+- New Fleet Carrier route plotter sub-tab under Route.
+- The Route tab can now plot routes with fewer jumps by using FSD injections on every jump without a neutron boost.
+- The Route tab now shows your current ship and, for each stop, its hotspots, reserve level, distance to Sol and when you last mined there, and right-click opens systems with hotspots in the Hotspots tab.
+
+Bug Fixes
+- Find Hotspots in the Star Systems tab now starts the hotspot search again.
