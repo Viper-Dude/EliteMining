@@ -4,8 +4,9 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, font, ttk
 
-from app_utils import create_action_button
-from column_visibility_helper import ColumnVisibilityMixin
+from app_utils import create_action_button, open_system_website
+from column_visibility_helper import ColumnVisibilityMixin, displayed_column
+from core.constants import get_menu_colors
 from config import scaled_font, scaled_px
 from localization import t
 from route_planner import parse_route, serialize_route
@@ -115,6 +116,47 @@ class RouteTableMixin(ColumnVisibilityMixin):
             self.tree, tuple(widths), {column: self.tree.column(column, "width") for column in widths},
             config_key, use_displaycolumns=True, allow_reorder=True, persist_widths=True,
         )
+        self.tree.bind("<Button-3>", self._show_row_menu)
+        self.tree.bind("<Double-1>", self._open_system_inara)
+
+    def _show_row_menu(self, event):
+        if self.tree.identify_region(event.x, event.y) != "cell":
+            return
+        row = self.tree.identify_row(event.y)
+        if not row:
+            return
+        self.tree.selection_set(row)
+        system = self.tree.set(row, "system")
+        menu = tk.Menu(self.tree, tearoff=0, **get_menu_colors())
+        menu.add_command(label=t("context_menu.copy_system"), command=lambda: self._copy_system(system))
+        menu.add_command(label=t("context_menu.find_hotspots"), command=lambda: self._show_system_hotspots(system))
+        menu.add_separator()
+        for site in ("inara", "edsm", "spansh"):
+            menu.add_command(label=t(f"context_menu.open_{site}"),
+                             command=lambda site=site: open_system_website(system, site))
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
+    def _open_system_inara(self, event):
+        if self.tree.identify_region(event.x, event.y) != "cell":
+            return
+        if displayed_column(self.tree, self.tree.identify_column(event.x)) != "system":
+            return
+        row = self.tree.identify_row(event.y)
+        if row:
+            open_system_website(self.tree.set(row, "system"))
+
+    def _show_system_hotspots(self, system):
+        self.app.switch_to_tab("hotspots_finder")
+        ring_finder = self.app.ring_finder
+        ring_finder.system_var.set(system)
+        ring_finder.min_hotspots_var.set("1")
+        ring_finder.distance_var.set("100")
+        ring_finder.max_results_var.set("200")
+        ring_finder._show_results_view("hotspots")
+        self.after(100, ring_finder.search_hotspots)
 
     def _spin_plot_overlay(self):
         if not self.search.running:

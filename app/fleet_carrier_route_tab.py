@@ -8,7 +8,6 @@ from tkinter import ttk
 
 from app_utils import create_action_button
 from config import load_theme, scaled_font, scaled_px
-from core.constants import get_menu_colors
 from edsm_distance import SOL_COORDS, get_distance_calculator
 from fleet_carrier_tracker import get_fleet_carrier_tracker
 from localization import t
@@ -136,7 +135,6 @@ class FleetCarrierRouteTab(ttk.Frame, RouteTableMixin):
         self._build_route_table(widths, {"sol": "ring_finder.col_sol_dist"}, _TABLE_KEY)
         add_header_tooltips(self.tree, lambda column: t("route.tritium_hotspots_tooltip")
                             if column == "tritium_hotspots" else "")
-        self.tree.bind("<Button-3>", self._show_row_menu)
 
     def _validate_capacity(self, value):
         if value and (len(value) > 5 or not value.isdecimal() or int(value) > PLAYER_CARRIER_CAPACITY):
@@ -357,20 +355,6 @@ class FleetCarrierRouteTab(ttk.Frame, RouteTableMixin):
         system = self._next_system()
         if system:
             self._copy_system(system)
-
-    def _show_row_menu(self, event):
-        if self.tree.identify_region(event.x, event.y) != "cell":
-            return
-        row = self.tree.identify_row(event.y)
-        if row:
-            self.tree.selection_set(row)
-            system = self.tree.set(row, "system")
-            menu = tk.Menu(self.tree, tearoff=0, **get_menu_colors())
-            menu.add_command(label=t("context_menu.copy_system"), command=lambda: self._copy_system(system))
-            try:
-                menu.tk_popup(event.x_root, event.y_root)
-            finally:
-                menu.grab_release()
 
     def _clear(self):
         self._cancel_jump_timer()

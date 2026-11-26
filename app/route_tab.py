@@ -10,7 +10,6 @@ from tkinter import ttk
 
 from app_utils import create_action_button
 from config import _load_cfg, load_theme, scaled_font, scaled_px, update_config_value
-from core.constants import get_menu_colors
 from edsm_distance import SOL_COORDS, get_distance_calculator
 from fleet_carrier_route_tab import FleetCarrierRouteTab
 from localization import t
@@ -205,7 +204,6 @@ class ShipRouteTab(ttk.Frame, RouteTableMixin):
         self._build_route_table(widths, header_keys, "route")
         add_header_tooltips(self.tree, lambda column: t(f"route.header_tips.{column}")
                             if column in header_tip_columns else "")
-        self.tree.bind("<Button-3>", self._show_row_menu)
 
     def _current_system(self):
         return self.app.get_current_system() or self.cargo.current_system or ""
@@ -460,34 +458,6 @@ class ShipRouteTab(ttk.Frame, RouteTableMixin):
         stops = self._import_route_file(self.planner.active_route)
         if stops:
             self._apply_route(stops, source_view="import")
-
-    def _show_row_menu(self, event):
-        if self.tree.identify_region(event.x, event.y) != "cell":
-            return
-        row = self.tree.identify_row(event.y)
-        if not row:
-            return
-        self.tree.selection_set(row)
-        system = self.tree.set(row, "system")
-        menu = tk.Menu(self.tree, tearoff=0, **get_menu_colors())
-        menu.add_command(label=t("context_menu.copy_system"), command=lambda: self._copy_system(system))
-        if self.tree.set(row, "hotspots"):
-            menu.add_command(label=t("context_menu.show_in_hotspots"),
-                             command=lambda: self._show_system_hotspots(system))
-        try:
-            menu.tk_popup(event.x_root, event.y_root)
-        finally:
-            menu.grab_release()
-
-    def _show_system_hotspots(self, system):
-        self.app.switch_to_tab("hotspots_finder")
-        ring_finder = self.app.ring_finder
-        ring_finder.system_var.set(system)
-        ring_finder.min_hotspots_var.set("1")
-        ring_finder.distance_var.set("100")
-        ring_finder.max_results_var.set("200")
-        ring_finder._show_results_view("hotspots")
-        self.after(100, ring_finder.search_hotspots)
 
     def _next_system(self):
         route = self.planner.active_route
