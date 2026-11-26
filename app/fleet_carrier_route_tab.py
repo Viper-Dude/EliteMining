@@ -9,6 +9,7 @@ from tkinter import ttk
 from app_utils import create_action_button
 from config import load_theme, scaled_font, scaled_px
 from edsm_distance import SOL_COORDS, get_distance_calculator
+from fleet_carrier_tab import _countdown, pending_jump
 from fleet_carrier_tracker import get_fleet_carrier_tracker
 from localization import t
 from route_planner import PLAYER_CARRIER_CAPACITY
@@ -93,6 +94,8 @@ class FleetCarrierRouteTab(ttk.Frame, RouteTableMixin):
         self.capacity_entry.bind("<FocusOut>", lambda event: self.after_idle(self._refresh_inputs), add="+")
         self.entries.append(self.capacity_entry)
         ttk.Label(capacity_row, text=t("route.cargo_unit")).pack(side="left")
+        self.next_jump_label = ttk.Label(capacity_row)
+        self.next_jump_label.pack(side="left", padx=(scaled_px(16), 0))
 
         actions = ttk.Frame(self)
         actions.pack(fill="x", pady=scaled_px(6))
@@ -157,6 +160,13 @@ class FleetCarrierRouteTab(ttk.Frame, RouteTableMixin):
         name, callsign = data.get("name"), data.get("callsign")
         identity = f"{name} ({callsign})" if name and callsign else name or callsign or ""
         self.carrier_info_label.configure(text=identity)
+        jump_text = ""
+        jump = pending_jump(data)
+        if jump:
+            destination, departure = jump
+            jump_text = t("route.carrier_next_jump").format(
+                system=destination or t("route.carrier_unknown"), countdown=_countdown(departure))
+        self.next_jump_label.configure(text=jump_text)
         system = data.get("system") or ""
         if system != self._default_source and self.source.get() == self._default_source:
             self._autocomplete[0].hide()

@@ -69,6 +69,7 @@
     "ship_tab": "Ship",
     "carrier_tab": "Fleet Carrier",
     "carrier_capacity": "Used Capacity",
+    "carrier_next_jump": "Next jump: {system} · {countdown}",
     "carrier_enter_capacity": "Enter the used capacity in tonnes.",
     "carrier_same_system": "Choose a different destination.",
     "carrier_tank_fuel": "Current tank fuel: {fuel}",

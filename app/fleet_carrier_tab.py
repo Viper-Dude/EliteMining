@@ -62,6 +62,19 @@ def _fmt_ts(ts_str: str) -> str:
         return ts_str
 
 
+def pending_jump(cd: dict) -> tuple[str | None, str] | None:
+    dep = cd.get('jump_departure_time')
+    if not dep:
+        return None
+    try:
+        departure = datetime.fromisoformat(dep.replace('Z', '+00:00'))
+        if (datetime.now(timezone.utc) - departure).total_seconds() > 300:
+            return None
+    except (ValueError, TypeError):
+        return None
+    return cd.get('jump_destination'), dep
+
+
 def _countdown(departure_str: str) -> str:
     if not departure_str:
         return ""
@@ -492,15 +505,8 @@ class FleetCarrierTab(tk.Frame):
         self._refresh_jump(cd or {})
 
     def _refresh_jump(self, cd):
-        dep = cd.get('jump_departure_time')
-        if dep:
-            try:
-                departure = datetime.fromisoformat(dep.replace('Z', '+00:00'))
-                if (datetime.now(timezone.utc) - departure).total_seconds() > 300:
-                    dep = None
-            except (ValueError, TypeError):
-                dep = None
-        self._sv['jump_dest'].set((cd.get('jump_destination') or '-') if dep else t('fleet_carrier.none_scheduled'))
+        destination, dep = pending_jump(cd) or (None, None)
+        self._sv['jump_dest'].set((destination or '-') if dep else t('fleet_carrier.none_scheduled'))
         self._sv['jump_body'].set((cd.get('jump_body') or '-') if dep else '-')
         self._sv['jump_departure'].set(_fmt_ts(dep) if dep else '-')
         self._sv['jump_countdown'].set(_countdown(dep) if dep else '-')

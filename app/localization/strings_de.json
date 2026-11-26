@@ -69,6 +69,7 @@
     "ship_tab": "Schiff",
     "carrier_tab": "Flottenträger",
     "carrier_capacity": "Belegter Platz",
+    "carrier_next_jump": "Nächster Sprung: {system} · {countdown}",
     "carrier_enter_capacity": "Gib den belegten Platz in Tonnen ein.",
     "carrier_same_system": "Wähle ein anderes Zielsystem.",
     "carrier_tank_fuel": "Aktueller Tankinhalt: {fuel}",
