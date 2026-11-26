@@ -1,4 +1,4 @@
-"""Probe the Spansh Galaxy Plotter using a journal's Type-11 loadout."""
+"""Probe the Spansh Galaxy Plotter or Fleet Carrier Plotter."""
 
 import argparse
 import json
@@ -43,7 +43,7 @@ def read_loadout(journal):
 
 
 def request(path, form=None, timeout=15):
-    data = urlencode(form).encode("ascii") if form is not None else None
+    data = urlencode(form, doseq=True).encode("ascii") if form is not None else None
     req = Request(f"{API}/{path}", data=data, headers={"User-Agent": f"EliteMining/{__version__}"})
     try:
         response = urlopen(req, timeout=timeout)
@@ -58,13 +58,56 @@ def request(path, form=None, timeout=15):
         return status, payload
 
 
+def plot(endpoint, form):
+    status, payload = request(endpoint, form)
+    print(f"POST {endpoint}: HTTP {status}, status={payload.get('status')!r}")
+    if status != 202 or not payload.get("job"):
+        print(payload.get("error") or payload.get("message") or "No job returned")
+        return 1
+
+    deadline = time.monotonic() + 120
+    delay = 2
+    path = "results/" + quote(str(payload["job"]), safe="")
+    while deadline - time.monotonic() > delay:
+        time.sleep(delay)
+        status, result = request(path, timeout=min(15, max(0.1, deadline - time.monotonic())))
+        print(f"GET results: HTTP {status}, status={result.get('status')!r}")
+        if status == 200:
+            route = result.get("result")
+            if not isinstance(route, dict):
+                print(result.get("error") or "No route returned")
+                return 1
+            print(json.dumps({
+                key: value for key, value in route.items() if key not in ("ship_build", "parameters")
+            }, indent=2))
+            return 0
+        if status != 202:
+            print(result.get("error") or "Polling failed")
+            return 1
+        delay = min(8, delay * 2)
+    print("Timed out waiting for Spansh")
+    return 1
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("journal", type=Path, nargs="?", help="Send build data from this journal instead of the synthetic example")
     parser.add_argument("--ids", action="store_true", help="Use Sol and Paesia id64s instead of names")
     parser.add_argument("--omit-fsd", action="store_true", help="Omit explicit drive fields, retaining SLEF")
+    parser.add_argument("--carrier", action="store_true", help="Plot one synthetic Sol-to-Paesia carrier route")
     args = parser.parse_args()
+    if args.carrier and args.journal is not None:
+        parser.error("--carrier uses synthetic data and takes no journal")
     try:
+        if args.carrier:
+            return plot("fleetcarrier/route", {
+                "source": 10477373803,
+                "destinations": [3657466647274],
+                "capacity": 25000,
+                "mass": 25000,
+                "capacity_used": 4000,
+                "calculate_starting_fuel": 1,
+            })
         loadout = read_loadout(args.journal) if args.journal else {
             "event": "Loadout",
             "Ship": "lakonminer",
@@ -96,33 +139,7 @@ def main():
         }
         if not args.omit_fsd:
             form.update(FSD_FIELDS)
-        status, payload = request("generic/route", form)
-        print(f"POST generic/route: HTTP {status}, status={payload.get('status')!r}")
-        if status != 202 or not payload.get("job"):
-            print(payload.get("error") or payload.get("message") or "No job returned")
-            return 1
-
-        deadline = time.monotonic() + 120
-        delay = 2
-        path = "results/" + quote(str(payload["job"]), safe="")
-        while deadline - time.monotonic() > delay:
-            time.sleep(delay)
-            status, result = request(path, timeout=min(15, max(0.1, deadline - time.monotonic())))
-            print(f"GET results: HTTP {status}, status={result.get('status')!r}")
-            if status == 200:
-                route = result.get("result")
-                if not isinstance(route, dict):
-                    print(result.get("error") or "No route returned")
-                    return 1
-                print(json.dumps({
-                    key: value for key, value in route.items() if key not in ("ship_build", "parameters")
-                }, indent=2))
-                return 0
-            if status != 202:
-                print(result.get("error") or "Polling failed")
-                return 1
-            delay = min(8, delay * 2)
-        print("Timed out waiting for Spansh")
+        return plot("generic/route", form)
     except (OSError, ValueError, KeyError) as error:
         print(error, file=sys.stderr)
     return 1

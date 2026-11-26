@@ -14,12 +14,22 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'app'))
 
-from va_variables import VAVariablesManager
-
 TREE = ast.parse((ROOT / 'app/main.py').read_text(encoding='utf-8-sig'))
 APP = next(n for n in TREE.body if isinstance(n, ast.ClassDef) and n.name == 'App')
 METHODS = {n.name: n for n in APP.body if isinstance(n, ast.FunctionDef)}
 SELECTED = ('_latest_journal_for_route', '_poll_route_status')
+
+
+def setUpModule():
+    global VAVariablesManager
+
+    if __package__:
+        from .route_check_config import isolated_route_config
+    else:
+        from route_check_config import isolated_route_config
+
+    unittest.enterModuleContext(isolated_route_config())
+    from va_variables import VAVariablesManager
 
 
 class RouteStatusChecks(unittest.TestCase):

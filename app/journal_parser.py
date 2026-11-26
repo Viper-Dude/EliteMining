@@ -263,6 +263,11 @@ class JournalParser:
             'last_updated': None,
         }
         self.on_carrier_updated = None  # set externally to receive update notifications
+        self.on_carrier_progress = None
+        self.carrier_catchup_complete = False
+        # Retain the journal evidence through catch-up, including a request the parser cleared.
+        self.carrier_confirmation = None
+        self.carrier_completed_request = None
         from path_utils import get_app_data_dir
         self._carrier_save_path = os.path.join(get_app_data_dir(), 'last_carrier_data.json')
         self._load_carrier_data()
@@ -519,9 +524,15 @@ class JournalParser:
     }
 
     def process_carrier_event(self, event: Dict[str, Any]) -> None:
-        handler = self._CARRIER_EVENT_HANDLERS.get(event.get('event'))
+        kind = event.get('event')
+        handler = self._CARRIER_EVENT_HANDLERS.get(kind)
         # Squadron carrier events share these event names but must not overwrite the player's own carrier
         if handler and event.get('CarrierType', 'FleetCarrier') == 'FleetCarrier':
+            if (kind in ('CarrierLocation', 'CarrierJumpRequest', 'CarrierJumpCancelled')
+                    and self.carrier_data.get('carrier_id') is not None
+                    and event.get('MarketID', event.get('CarrierID')) is not None
+                    and not self._is_own_carrier(event)):
+                return
             getattr(self, handler)(event)
 
     def _is_own_carrier(self, event: Dict[str, Any]) -> bool:
@@ -552,6 +563,32 @@ class JournalParser:
                 self.on_carrier_updated(self.carrier_data)
             except Exception as e:
                 log.warning(f"on_carrier_updated callback error: {e}")
+        self._notify_carrier_progress()
+
+    def finish_carrier_catchup(self):
+        self.carrier_catchup_complete = True
+        self._notify_carrier_progress()
+
+    def _notify_carrier_progress(self):
+        if self.carrier_catchup_complete and self.on_carrier_progress:
+            try:
+                self.on_carrier_progress()
+            except Exception:
+                log.exception("Carrier route update failed")
+
+    def _record_carrier_confirmation(self, event):
+        timestamp = event.get('timestamp')
+        if not timestamp:
+            return True
+        previous = self.carrier_confirmation
+        if previous:
+            if timestamp < previous['timestamp']:
+                return False
+            if timestamp == previous['timestamp'] and (
+                    previous['event'] == 'CarrierJump' or event['event'] == previous['event']):
+                return False
+        self.carrier_confirmation = event.copy()
+        return True
 
     def _save_carrier_data(self):
         """Persist carrier_data to disk so it survives app restarts."""
@@ -636,6 +673,8 @@ class JournalParser:
     def process_carrier_location(self, event: Dict[str, Any]) -> None:
         """Process CarrierLocation event — where the carrier is parked."""
         try:
+            if event.get('StarSystem') and not self._record_carrier_confirmation(event):
+                return
             cd = self.carrier_data
             new_system = event.get('StarSystem', cd['system'])
             self._record_carrier_location_change(new_system, event.get('timestamp', ''), exact=False)
@@ -714,7 +753,11 @@ class JournalParser:
                 return
             cd = self.carrier_data
             system = event.get('StarSystem', '')
-            if system:
+            if system and self._record_carrier_confirmation(event):
+                if cd['jump_destination'] and cd['jump_departure_time']:
+                    self.carrier_completed_request = (
+                        event.get('timestamp'), cd['jump_destination'], cd['jump_departure_time'],
+                    )
                 self._record_carrier_location_change(system, event.get('timestamp', ''), exact=True)
                 cd['system']   = system
                 cd['body_id']  = event.get('BodyID', cd['body_id'])

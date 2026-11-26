@@ -4,6 +4,7 @@ New Features & Improvements
 - New Route Planner: plot routes in the new Route tab, including your ship's jump range with a full hold, and with export or import options. 
 - Start a route straight from Hotspots, Sell My Hold, Where to Mine and the other result views with "Plot route".
 - The Route Planner can copy the next system after each jump.
+- The Route tab can now plot your next stop in the Galaxy Map when VoiceAttack is running.
 - Text boxes now have a right-click menu for cut, copy and paste.
 - Shortened three main tab names.
 - Restyled the Hotspots result view buttons in the Modern themes.

@@ -173,7 +173,7 @@ from overlays import (
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.7.2"
+APP_VERSION = "v5.7.3"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -12663,6 +12663,7 @@ Your keybinds will need to be reconfigured manually."""
         migration_ran = getattr(self, '_migration_completed', False)
         
         def catchup_scan():
+            full_scan_pending = False
             try:
                 # Check again in case update started while we were waiting
                 if getattr(self, '_update_in_progress', False):
@@ -12708,6 +12709,7 @@ Your keybinds will need to be reconfigured manually."""
                     
                     # Show progress dialog (runs on main thread)
                     self.after(0, lambda j=journals_to_scan, st=scan_type: self._run_full_scan_with_dialog(j, st))
+                    full_scan_pending = True
                     return  # Don't continue - dialog handles the scan
                 else:
                     # Subsequent runs: only scan journal content written since the last
@@ -12747,6 +12749,9 @@ Your keybinds will need to be reconfigured manually."""
                 self.after(0, lambda: self._set_journal_scan_status(t('status_bar.journal_scan_failed')))
                 import traceback
                 traceback.print_exc()
+            finally:
+                if not full_scan_pending:
+                    self.cargo_monitor.journal_parser.finish_carrier_catchup()
         
         # Run on background thread
         thread = threading.Thread(target=catchup_scan, daemon=True)
@@ -13057,6 +13062,7 @@ Your keybinds will need to be reconfigured manually."""
                 # (see journal_parser._upsert_pp_from_event).
                 if hasattr(self, 'cargo_monitor') and self.cargo_monitor and self.cargo_monitor.journal_parser:
                     self.cargo_monitor.journal_parser.is_live_monitoring = True
+                    self.cargo_monitor.journal_parser.finish_carrier_catchup()
                 # Close dialog when done
                 self.after(0, lambda: self._close_full_scan_dialog(progress_dialog))
         

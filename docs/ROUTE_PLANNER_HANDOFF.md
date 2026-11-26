@@ -37,8 +37,8 @@ Spansh's API is undocumented and run by one person. Keep traffic low: one plot a
 | `destination` | `3657466647274` (Paesia) | Same as above |
 | `is_supercharged` | 0 | 1 if a `JetConeBoost` event came after the last `FSDJump` |
 | `use_supercharge` | 0 | Checkbox, default **on** |
-| `use_injections` | 0 | Always 0 |
-| `use_injections_when_required` | 0 | 0 with FSD Injection Off (default), 1 with an injection grade selected |
+| `use_injections` | 0 | 1 when a grade is selected and **Every jump** is checked, otherwise 0 |
+| `use_injections_when_required` | 0 | 1 when a grade is selected and **Every jump** is unchecked, otherwise 0 |
 | `exclude_secondary` | 0 | Hidden, always **1** |
 | `refuel_every_scoopable` | 1 | Hidden, always 1 |
 | `reserve_size` | 0 | Hidden, always 0 |
@@ -157,7 +157,7 @@ Read docs/UI_RULES.md and docs/MAIN_SPLIT_HANDOFF.md first. `main.py` only adds 
 2. **System boxes too wide.** Use the Distance tab's layout (`app/distance_calculator_tab.py:95-122`): From and To on two rows, the entry column with a fixed minimum width (`px(250)`), not stretching, and the buttons beside the entry.
 3. **Remove the separate marker column.** The user couldn't tell what the empty first column was. Show the ▷ marker inside the # column (for example "▷ 3") instead.
 4. **Column chooser missing.** Use `ColumnVisibilityMixin` like the other tables: `setup_column_visibility(...)` plus the Columns button via `_cv_add_columns_button` (see `app/cargo_sell_planner.py:245/265`). That replaces the tab's own width-saving code. Make the System column's default width fit long names such as "Col 285 Sector MQ-M b38-5".
-5. **FSD injection grade, like the game's "FSD Boost" setting.** Replace the "Use FSD Injections When Required" checkbox with one dropdown: Off / Basic (+25%) / Standard (+50%) / Premium (+100%). Off sends `use_injections_when_required=0`; the others send 1 with `injection_multiplier` 1.25 / 1.5 / 2. The Spansh website always sends 2 and has no grade choice, so first confirm with one test plot that Spansh accepts 1.25 and 1.5 (fewer or equal jumps than Off, more than or equal to Premium) and check in the website's JavaScript whether some FSDs override the multiplier. If Spansh ignores other values, keep the checkbox and tell the user.
+5. **FSD injection grade, like the game's "FSD Boost" setting.** Replace the "Use FSD Injections When Required" checkbox with one dropdown: Off / Basic (+25%) / Standard (+50%) / Premium (+100%). Off sends both injection flags as 0 and disables **Every jump**. Basic, Standard and Premium send `injection_multiplier` 1.25 / 1.5 / 2 respectively. **Every jump** selects which injection flag is sent as 1 (see the fields table). The Spansh website always sends 2 and has no grade choice, so first confirm with one test plot that Spansh accepts 1.25 and 1.5 (fewer or equal jumps than Off, more than or equal to Premium) and check in the website's JavaScript whether some FSDs override the multiplier. If Spansh ignores other values, keep the checkbox and tell the user.
 6. **Tooltips** (requested by the user) on: Use Current System (reuse `tooltips.use_current`), Use Supercharge, the FSD injection dropdown, the jump range line (X = with current fuel and cargo, Y = maximum), Plot, Copy next system, Clear, and the table headers (`add_header_tooltips` from `ui/tooltip.py`, as in `app/cargo_sell_planner.py`). EN and DE strings.
 7. **Cargo box** (like EDDiscovery's Route Finder and the game's Cargo Mass slider), so the player can plan a trip for a full hold while still empty. Place the Cargo box and the jump range line together on one row, so it's visible that changing cargo changes the range (EDDiscovery shows "Max jump" and "Cargo" side by side): `Jump range: 29.67 (38.03) ly   Cargo: [144] t`. The range stays read-only text and updates immediately when the Cargo value changes. The Cargo box is filled with the current cargo and following it until the player types a value; limited to 0 – cargo capacity. The jump range line and the Route tab's own Plot use this value. "Plot route" from other views (Sell My Hold, Where to Mine and so on) keeps using the real current cargo. **No editable Max jump box:** the Galaxy Plotter works from the ship build, not a range number, so a typed range would be ignored.
 8. **From the Spansh results page** (compared 25 Nov 2026):
@@ -166,7 +166,7 @@ Read docs/UI_RULES.md and docs/MAIN_SPLIT_HANDOFF.md first. `main.py` only adds 
    - **Right-click on a route row: "Copy system name"**, like the copy icon on every Spansh row. Reuse an existing copy string.
    - **Left out on purpose:** Done checkboxes (the route moves forward by itself from the journal), Remaining (ly), Fuel Left and Fuel Used (refuel stops are already marked), and row colours.
 
-The live Type-11 test from Wregoe JT-Q c18-27 to Sol returned the same 12 jumps without injections at all four grades. Forcing injections on that route for the diagnostic returned 10 jumps with Basic and 8 with Standard, confirming Spansh applies both multipliers. The dropdown uses injections only when needed.
+The live Type-11 test from Wregoe JT-Q c18-27 to Sol returned the same 12 jumps without injections at all four grades. Forcing injections on that route for the diagnostic returned 10 jumps with Basic and 8 with Standard, confirming Spansh applies both multipliers. With a grade selected, **Every jump** plans injections for every jump without a neutron boost. The checkbox starts unchecked, so injections are used only when a jump cannot otherwise be made.
 
 ### Step 4 — "Plot route" from Sell My Hold (Sol 6.2, medium effort)
 
@@ -219,4 +219,101 @@ To adjust timing, edit **Plot next waypoint** in VoiceAttack and change the paus
 2. **In-game waypoint command test.** Re-import the profile and try **Plot next waypoint** by voice, by a hotkey and from the Route tab button with clipboard copying off. Check that the plotted route matches the next stop, that the Galaxy Map closes after plotting, that clearing or completing the route results in “No route”, and that jumping alone leaves the Galaxy Map closed.
    - 25 Nov 2026: the Route tab button plotted the correct next stop with the installer build. In the dev run, VoiceAttack received an empty `~passedText1` and fell back to the installed `VariablesouteNextSystem.txt`, so it plotted a stale system. This only affects dev testing. The unconfirmed suspect is the extra quotes around the path in `VAProcessManager.send_command`.
 3. **Commit and push** everything together with the v5.7.2 release (`git add -A`), once the test passes.
-4. **Later, not in v5.7.2:** Fleet Carrier route (`fleetcarrier/route`, phase 2), and an optional "Next system" voice command that reads `routeNextSystem.txt` aloud (the user adds voice commands in VoiceAttack himself).
+4. **Later, beyond v5.7.2.** See [Fleet Carrier Route (phase 2)](#fleet-carrier-route-phase-2). The optional ship “Next system” voice command can read `routeNextSystem.txt` aloud. The user adds voice commands in VoiceAttack himself.
+
+## Fleet Carrier Route (phase 2)
+
+**Planning, 26 Nov 2026.** Add **Ship** and **Fleet Carrier** inside the existing **Route** tab. Spansh plots the route, and EliteMining follows it. Allow one plot at a time across both sub-tabs, use `EliteMining/<version>` as the User-Agent, and plot only on request. Scope is settled below.
+
+### Step 0 findings — Spansh Fleet Carrier Plotter API
+
+**Request.** `POST https://spansh.co.uk/api/fleetcarrier/route` with `application/x-www-form-urlencoded`. The website repeats the same key for each array value, such as `destinations=A&destinations=B`. It sends each selected system's id64. Poll `GET https://spansh.co.uk/api/results/<job>` with the ship client's existing backoff, timeout and Stop handling. [Spansh frontend](https://spansh.co.uk/assets/elite-dangerous-gui-f1d8f22e101c2fd0c520103f601d1877.js)
+
+| POST field | Determine Tritium Requirements on (website default) | Off |
+|---|---|---|
+| `source` | Source system id64 | Same |
+| `destinations` | Ordered destination id64s, with the key repeated for each system | Same |
+| `capacity` | 25,000 t for Player Carrier, 60,000 t for Squadron Carrier | Same |
+| `mass` | 25,000 t for Player Carrier, 15,000 t for Squadron Carrier | Same |
+| `capacity_used` | Used Capacity in whole tonnes. The UI sends 0 for a blank or invalid value. | Same |
+| `calculate_starting_fuel` | `1`, let Spansh calculate the starting Tritium requirements | `0`, use the entered Tritium stocks |
+| `refuel_destinations` | Optional marked destination id64s, sent as repeated keys | Omitted |
+| `fuel_loaded` | Omitted | Entered starting tank fuel in whole tonnes. The UI sends 0 for a blank or invalid value. |
+| `tritium_stored` | Omitted | Entered starting Tritium in the carrier market in whole tonnes. The UI sends 0 for a blank or invalid value. |
+
+The carrier picker sets the `capacity` and `mass` pair. `carrier_type`, `used_capacity`, `source_system`, `destination_systems`, `tritium_fuel` and `tritium_market` are results-page URL parameters. The frontend converts them to the POST fields above. Legacy market and module capacity inputs can be combined into `capacity_used`. Reorder, Reverse Route and destination import change the list in the browser before submission. [Spansh frontend](https://spansh.co.uk/assets/elite-dangerous-gui-f1d8f22e101c2fd0c520103f601d1877.js)
+
+**Confirmed live.** One `scripts/dev_spansh_route_probe.py --carrier` run sent Sol (`10477373803`) to Paesia (`3657466647274`) with synthetic Used Capacity of 4,000 t and the checkbox on. POST returned HTTP 202 and `queued`. The first poll returned HTTP 200 and `ok`. The route included the source and one 169.76 ly jump that used 30 t. At Sol, Spansh marked a 30 t restock and showed 30 t in the planned tank even though the request supplied no tank or market stock. At Paesia, both tank and market showed 0 t. Keep the source row so the player can see how much to load before departing.
+
+**Live name checks before Step 3 (26 Nov 2026).** The dev probe sent one `GET https://spansh.co.uk/api/search/systems?q=Paesia`. HTTP 200 returned a JSON object with `count`, `query` and a `results` array. The ten matches included the exact record `{"name":"Paesia","id64":3657466647274,"x":107.59375,"y":-15.0625,"z":130.4375}`. This confirmed the lookup shape tested in Step 2, including an integer id64.
+
+One synthetic `POST /api/fleetcarrier/route` with `source=Sol` and `destinations=Paesia` also returned HTTP 202 and `queued`. The first poll returned HTTP 200 and `ok`, with the same 169.76 ly jump, 30 t fuel cost and expected string id64s in the stops. The probe used the same 4,000 t example capacity and automatic Tritium calculation. Both requests used public systems and synthetic values.
+
+**Tank fuel check before Step 4 (26 Nov 2026).** One live synthetic dev probe plotted Sol to Paesia with 4,000 t used capacity, `calculate_starting_fuel=0`, `fuel_loaded=500` and `tritium_stored=0`. The POST returned HTTP 202 (`queued`) and the first poll returned HTTP 200 (`ok`). Spansh showed 500 t at Sol and 470 t at Paesia after the 169.76 ly jump used 30 t. Both stops had zero restock and zero Tritium in the market.
+
+**Decision.** Send an id64 when already available and otherwise submit the selected system name directly. This saves up to two requests per plot and the route result still provides ids for matching. The live check covers the Sol-to-Paesia pair. Compare the entered endpoints case-insensitively and reject identical values before submitting.
+
+**Result fields.** The website uses `result.jumps` in order. Every field in the table except the derived count and totals appeared in the live response.
+
+| Website column | Field or calculation |
+|---|---|
+| System | `name`, with `id64` as a string. `x`, `y`, `z` are also available. `is_desired_destination` highlights plotted endpoints, including the source. |
+| Distance / Remaining | `distance` for the incoming jump and `distance_to_destination` for the remaining distance |
+| Jumps Left | `len(jumps) - 1 - index` |
+| Fuel Left / Tritium in market | `fuel_in_tank` / `tritium_in_market`, planned carrier balances |
+| Fuel Used | `fuel_used`, in tonnes |
+| Icy ring | `has_icy_ring`, with `is_system_pristine` used for the Pristine label |
+| Restock? / Restock Amount | `must_restock` / `restock_amount`, in tonnes |
+| Totals / Estimated time | Sum distance, fuel used and restock amounts. The frontend uses 20 minutes per jump plus 7 hours for each marked restock after the source. EliteMining shows estimated jump time at 20 minutes per jump. |
+
+**Still unverified live.** Individual server-required fields, multiple destinations, marked refuel stops and the incomplete-route response were outside the probes. The frontend renders an `incomplete` result separately. Preserve the prior route on a plot failure or an incomplete replacement. The probes showed zero market Tritium throughout, so behavior with a nonzero stored supply is based on the frontend. [Spansh plotter](https://spansh.co.uk/fleet-carrier) · [Spansh frontend](https://spansh.co.uk/assets/elite-dangerous-gui-f1d8f22e101c2fd0c520103f601d1877.js)
+
+### EliteMining data and reuse
+
+| Need | Existing source and planned use |
+|---|---|
+| From system and carrier identity | `fleet_carrier_tracker.get_fleet_carrier_tracker().carrier_data` exposes `system`, `carrier_id` and `callsign` from `JournalParser`. Prefill From with the carrier's known system. Keep it editable. The player supplies a system when it is unknown. Send the system name from the tracker or `SystemAutocomplete`, or preserve an id64 already available to the caller. |
+| Destination and plot mode | The player chooses one destination. Send the name or known id64 as the single `destinations` value, and the Player Carrier capacity and mass. Select the starting fuel mode from the journal tank fuel. |
+| Used Capacity | `JournalParser.process_carrier_stats()` reads `SpaceUsage.TotalCapacity`, `Cargo` and `FreeSpace` as `space_total`, `space_cargo` and `space_free`. Prefill `space_total - space_free` when both are known. This includes occupied space beyond commodity cargo. The snapshot updates when the player opens carrier management, so the saved value can lag. Follow new snapshots until the player edits the field, as with `RouteTab._route_cargo()` and `_validate_cargo()`. Keep a manual override through refreshes and tab switches. Ask the player for a value when the snapshot is missing, and accept an explicit 0. |
+| Current tank fuel | Show `carrier_data['fuel_level']` next to the totals as a read-only value in tonnes. This game value comes from `CarrierStats` and is updated by an owned `CarrierDepositFuel`. It may lag after a jump. For a known value, including 0, send `calculate_starting_fuel=0`, `fuel_loaded=<fuel_level>` and `tritium_stored=0`. For an unknown value, send `calculate_starting_fuel=1`. |
+| Other journal fields | The parser's `fuel_capacity` is the 1,000 t player-carrier tank default, while `jump_range_curr` and `jump_range_max` describe the carrier's range. Phase 2 uses Spansh's player-carrier capacity and mass for plotting. `space_cargo` is aggregate cargo, and the tracker has no stored Tritium breakdown. |
+| Request, worker and cancellation | In `app/route_planner.py`, extend `SpanshRouteClient.start_plot()` and `poll()` to select the carrier endpoint and retain carrier result fields and the incomplete flag where needed. Reuse `RoutePlanner.plot()`'s daemon worker, Future, lock and cancellation. Keep its ship-specific `destination` shortcut and second-leg handling on the Ship path. Share the existing in-flight guard across both sub-tabs, including while a stopped worker finishes. |
+| Saved routes and matching | Reuse the shape and config path of `RoutePlanner._save_route()`, `set_route()` and `clear_route()`. Save the carrier route in its own slot, `active_carrier_route`, alongside the existing ship `active_route` key and schema. Reuse `_matches_stop()` and the forward match in `_advance_route()` for scheduled jumps. A fresh confirmed carrier location can match any route stop and override the single cursor. |
+| Table and plot feedback | Reuse `app/route_tab.py` patterns in `_build_table()`, `_show_route()`, `_spin_plot_overlay()`, `_wait_for_plot()` and `_plot_idle()`, including `StripedTreeview`, `ColumnVisibilityMixin`, `SearchControl`, inline notices and the in-table plotting overlay. Use a carrier column settings key. Keep EN and DE strings, theme colours and translated header minimums. |
+| Mining details and row menu | Reuse the background read and stale-result guard from `_load_route_details()` / `_apply_route_details()`. Read local Tritium counts via `UserDatabase.bulk_get_hotspot_counts_for_systems()` and leave unknown counts blank. Put them beside Spansh's Icy ring column with its Pristine label. Use `calculate_distance(stop, SOL_COORDS)` for Distance to Sol. Reuse `_show_row_menu()` for Copy system name. |
+| Clipboard and ship VoiceAttack | Reuse `_next_system()`, `_copy_next()`, `_copy_system()` and Copy system name for manual carrier clipboard copy. Enable the copy button while there is a next stop. The player pastes the name into carrier management. The Ship sub-tab owns **Plot next waypoint**, **Plot next system in game**, `routeNextSystem.txt` and `routeJumpsLeft.txt`. |
+
+### Route sub-tabs
+
+- Keep `RouteTab(app)` and the outer `app.route_tab` entry point. In `app/route_tab.py`, make it a small parent for a `ttk.Notebook`. Change the current frame into the Ship child in the same file and pass it the inner notebook as parent. Keep its form, table and callbacks together. Put the carrier child in its own module. Share only small pieces that both actually need.
+- Follow `CommodityMarketTabMixin._build_marketplace_tab()` in `app/commodity_market_tab.py`. Its `_clear_market_sub_focus()` focuses the inner notebook and clears the entry selection on `<<NotebookTabChanged>>`, immediately and again after 50 ms. Apply that to both pages' entries, including numeric inputs. Leave the Ship page's FocusOut handling in place and target the current page in the delayed callback.
+- Keep the top-level `route` key and `switch_to_tab('route')`. **Show route** opens Route on its last selected sub-tab, with Ship selected on first open. The outer `plot_to_system()` and `plot_sale_route()` entry points explicitly select Ship before delegating to its existing code, including the Sell My Hold two-leg flow.
+
+### Carrier route progress
+
+1. Use the shared journal reader and the tracker that already serves `FleetCarrierTab.set_tracker()` / `_on_carrier_updated()`. Today `FleetCarrierTracker.set_on_updated()` owns one callback. Add a second subscriber without replacing the Fleet Carrier tab callback, and use the notification after catch-up as well as live events. Marshal snapshots to Tk with `after` and keep tracking while the carrier sub-tab is hidden. Reuse `JournalParser.process_carrier_event()` and `_is_own_carrier()`. Check the carrier ID where the event provides it. Ignore squadron carriers and rides on another player's carrier.
+2. Keep one current-stop cursor. Reuse the tracker's persisted pending request fields, `jump_destination` and `jump_departure_time`. For an owned `CarrierJumpRequest` whose destination matches a later stop, move the cursor at departure plus five minutes if the request is still current. `CarrierJumpCancelled` clears the pending request and stops its timer. A replacement request supersedes the old one. Use the UTC timing pattern from `FleetCarrierTab._refresh_jump()` and check saved requests after startup catch-up.
+3. An owned `CarrierJump` or fresh owned `CarrierLocation` takes precedence over the timer and sets the same cursor to the confirmed route stop, including an earlier stop if applicable. If the confirmed system is outside the route, keep the cursor and show off-route status as on Ship. A confirmation that resolves the pending request ends its timer. Use the location event's timestamp for freshness because `carrier_data['last_updated']` also changes for finance and stats. Keep duplicate arrival reports idempotent, and compare id64s where the event supplies one.
+4. Read the pending request from the tracker and leave its fields under Fleet Carrier ownership. When the route applies a request or a confirmed location resolves it, save its destination and departure time as the applied request in `active_carrier_route` alongside the cursor. Skip a matching request, including after restart. Route code treats all tracker data as read-only. The Fleet Carrier tab continues to use the tracker's pending fields for its countdown.
+
+### Fleet Carrier sub-tab
+
+- Player Carrier only, matching EliteMining's existing ownership filter. From defaults to the carrier's system. Offer one destination, editable Used Capacity, Plot with Stop, Copy next system and Clear. Use the journal tank fuel when it is known.
+- Show the current-stop marker, System, Jump Distance, Jumps Left, Fuel Used, Fuel Left, Restock and Restock Amount. Put local Tritium Hotspots next to Spansh's Icy ring column and include its Pristine label. Show Distance to Sol. Below the table, show totals, estimated jump time in hours and minutes, and read-only current tank fuel from the journal.
+
+### Implementation steps
+
+1. **API verification (Sol 6.2, medium effort, done).** Read the frontend, extend the dev probe and run one synthetic plot. Use the verified response for local checks.
+2. **Carrier plotting and storage (Sol 6.2, high effort, done).** `RoutePlanner.plot_carrier()` plots one Player Carrier destination with starting-fuel calculation always on. It sends names or known id64s directly and rejects identical endpoints case-insensitively. The caller applies a successful result with `set_carrier_route()`, which saves it in `active_carrier_route`. Mocked HTTP covers the form and result, timeout, cancellation, failed or incomplete replacement, independent saved routes and the shared one-plot limit. The app's carrier path has yet to be exercised live.
+3. **Sub-tabs and controls (Sol 6.2, high effort, done).** The Route notebook hosts Ship and `FleetCarrierRouteTab`. Both panes share the table and plot feedback in `app/route_table.py`. The carrier uses the separate `carrier_route` column settings key and marks the plotted source as its current stop. It shows the agreed columns, read-only journal fuel and manual clipboard actions. Syntax checks and all 37 route-planner checks passed. Withdrawn Tk checks in EN and DE across all five themes covered the ship plotting entry points, named Route tab selection, entry highlighting, carrier inputs, Stop, independent route actions and table settings. The user's in-app visual and voice checks are pending.
+4. **Carrier progress (Sol 6.2, high effort, implemented 26 Nov 2026).** The shared journal and pending request timer update one carrier cursor. The cursor and applied request are saved together in `active_carrier_route`. Route progress reads the Fleet Carrier data without editing it. Carrier totals show hours and minutes in English and German, and plotting uses the journal tank fuel when known. `py_compile`, all 49 route planner checks, and all 12 route status checks passed with isolated config. Coverage includes departure plus five minutes, cancellation and replacement, confirmed arrival before the timer, earlier and off-route corrections, duplicate and foreign events, startup catch-up, hidden tabs, clipboard, independent ship progress and VoiceAttack output, and both fuel branches. One in-game jump aboard and one while away are pending user verification.
+
+### Decisions (open questions answered 26 Nov 2026)
+
+1. Ship and carrier routes can be active at the same time and are saved separately.
+2. One destination for now. Multiple destinations, marked refuel stops, Reverse Route and destination-list import are deferred.
+3. When the game's tank fuel is known, send it to Spansh with **Determine Tritium Requirements** off and zero stored Tritium. When tank fuel is unknown, let Spansh determine the starting requirement. Show the game's tank fuel beside the totals as a read-only value.
+4. Carrier plotting is available from **Route → Fleet Carrier**. An entry in the separate Fleet Carrier tab is deferred.
+5. Carrier route import and export are deferred.
+6. Carrier cockpit support is manual clipboard copy only. Carrier VoiceAttack variables are deferred.
+7. Keep Spansh's Icy ring column with its Pristine label. Add local Tritium Hotspots beside it and include Distance to Sol. Reserve and Last Mined are deferred. The Pristine label covers the reserve detail for this view.

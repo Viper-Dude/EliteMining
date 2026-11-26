@@ -35,6 +35,19 @@ class FleetCarrierTracker:
         if self._journal_parser is not None:
             self._journal_parser.on_carrier_updated = callback
 
+    def set_on_route_updated(self, callback):
+        if self._journal_parser is not None:
+            self._journal_parser.on_carrier_progress = callback
+
+    def route_snapshot(self):
+        parser = self._journal_parser
+        if (parser is None or not parser.carrier_catchup_complete
+                or getattr(parser, "_suppress_carrier_notifications", False)):
+            return None
+        data = parser.carrier_data
+        pending = (data.get("jump_destination"), data.get("jump_departure_time"))
+        return pending, parser.carrier_confirmation, parser.carrier_completed_request
+
 
 # Global instance
 _tracker = None

@@ -1784,6 +1784,33 @@ class UserDatabase:
             log.error(f"Error bulk getting reserve levels: {e}")
         return result
 
+    def bulk_get_hotspot_counts_for_systems(self, system_names: list) -> dict:
+        from contextlib import closing
+        result = {}
+        if not system_names:
+            return result
+        systems = list(set(system_names))
+        try:
+            with closing(sqlite3.connect(self.db_path)) as conn:
+                for offset in range(0, len(systems), 500):
+                    chunk = systems[offset:offset + 500]
+                    placeholders = ','.join('?' for _ in chunk)
+                    rows = conn.execute(
+                        f'SELECT system_name, material_name, hotspot_count, res_tag, overlap_tag FROM hotspot_data '
+                        f'WHERE system_name IN ({placeholders})', chunk)
+                    for system, material, count, res_tag, overlap_tag in rows:
+                        if count == 0:
+                            continue
+                        if count is None or count < 0:
+                            if not (res_tag or overlap_tag):
+                                continue
+                            count = 1
+                        totals = result.setdefault(system, {})
+                        totals[material] = totals.get(material, 0) + count
+        except Exception as e:
+            log.error(f"Error bulk getting hotspot counts: {e}")
+        return result
+
     def get_reserve_level(self, system_name: str, body_name: str) -> Optional[str]:
         """Get reserve level for a ring
         

@@ -12,13 +12,14 @@
 - Flag rule conflicts first (master switches, shared settings, other tabs' behavior) in 1–2 sentences with a recommendation. When asked for an opinion, give one recommendation; say plainly when there is no real fix.
 - Comments only when the WHY is non-obvious; no task/PR references. No emojis unless asked.
 - Reuse first: search the likely modules (including other tabs, e.g. distance/coordinate lookups in `ring_finder.py`) for an existing function and extend it minimally. Text-only edits need no search.
-- Patch notes (`docs/PATCHNOTES_v*.md`): one plain-English sentence per change from the player's view, only what is new or fixed, related changes combined, no dev terms (EDDN, API, cache, database, function names). Use the "New Features & Improvements" and "Bug Fixes" sections from `docs/PATCHNOTES_TEMPLATE.md`.
+- Patch notes (`docs/PATCHNOTES_v*.md`): one plain-English sentence per change from the player's view, with the player benefit first and only the detail needed to explain it. Cover only what is new or fixed, combine related changes, and avoid dev terms (EDDN, API, cache, database, function names). Use the "New Features & Improvements" and "Bug Fixes" sections from `docs/PATCHNOTES_TEMPLATE.md`.
 - At the start of each new task (not follow-ups), recommend a model and effort in one line: lighter for small work, strongest with high effort for threading, DB writes, VoiceAttack contracts or multi-component work. Say whether Plan mode helps. Then wait for the user to confirm before editing any code; reading and searching are fine.
 - When the chat ends, save lasting decisions and open issues to memory or docs, without duplicates and only in authorized files.
 
 ## Validation
 
 - Scale checks to risk, not patch size: `py_compile` for small changes, the matching check scripts for fixes, and failure-path checks for DB, threading or shared config changes.
+- Checks must never write the real app/config.json; isolate config in a temp file.
 - Checks are `unittest` scripts: `app\.venv\Scripts\python.exe scripts\check_<area>.py`. Many create a Tk root, so run only the areas you changed. Syntax check: `app\.venv\Scripts\python.exe -m py_compile <file>`.
 - The user restarts `app/main.py` and tests the UI. Don't duplicate that or assume it passed. When a problem is reported, assume a fresh restart and find the code cause. Give a numbered test list only for non-obvious behavior.
 - Report what was and wasn't verified; never claim visual verification from code inspection.

@@ -6,7 +6,7 @@ This release includes an updated VoiceAttack profile (v5.7.2).
 
 What's changed:
 - New "Show route" command in the EliteMining app commands opens the Route tab.
-- Plot your next Route Planner stop in the Galaxy Map with VoiceAttack or the Route tab’s new button.
+- To plot your next stop in the Galaxy Map, say “Plot next waypoint” or customize the command’s spoken phrases with Plot next waypoint;Plot the next waypoint;Set course for the next waypoint;Navigate to the next waypoint;Take me to the next waypoint.
 
 Keep the VoiceAttack profile option ticked on the next page to install the updated
 profile. Follow the app's profile update instructions to import it into VoiceAttack.

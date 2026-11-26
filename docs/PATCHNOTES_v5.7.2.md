@@ -15,7 +15,7 @@
 ### Voiceattack Profile Update (v5.7.2)
 
 - New "Show route" command in the EliteMining app commands opens the Route tab.
-- To plot your next stop in the Galaxy Map, say “Plot next waypoint” or customize the command’s spoken phrases with Plot next waypoint;Plot the next waypoint;Set course for the next waypoint;Navigate to the next waypoint;Take me to the next waypoint.
+- To plot your next stop in the Galaxy Map, say “Plot next waypoint” (open the voiceattack command to see more options).
 
 
 ### Important Notes 

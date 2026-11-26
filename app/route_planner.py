@@ -1,4 +1,4 @@
-"""Ship range, Spansh Galaxy Plotter requests, and the active route."""
+"""Ship range, Spansh route plots, and active routes."""
 
 import csv
 import io
@@ -8,6 +8,7 @@ import re
 import threading
 import time
 from concurrent.futures import CancelledError, Future
+from datetime import datetime
 from urllib.parse import quote
 
 import requests
@@ -101,6 +102,8 @@ _GUARDIAN_BOOST = {
 _API = "https://spansh.co.uk/api"
 _PLOT_TIMEOUT = 120
 _ACTIVE_ROUTE_KEY = "active_route"
+_ACTIVE_CARRIER_ROUTE_KEY = "active_carrier_route"
+PLAYER_CARRIER_CAPACITY = 25_000
 _ROUTE_CSV_COLUMNS = {
     "System Name": "name",
     "Distance": "distance",
@@ -114,7 +117,8 @@ _ROUTE_CSV_COLUMNS = {
 _ROUTE_CSV_FLAGS = {"must_refuel", "has_neutron", "must_inject"}
 _ROUTE_NUMBERS = ("distance", "distance_to_destination", "fuel_in_tank", "fuel_used", "x", "y", "z")
 _ROUTE_FLAGS = _ROUTE_CSV_FLAGS | {"is_scoopable"}
-_ROUTE_STOP_FIELDS = {"name", "id64", *_ROUTE_NUMBERS, *_ROUTE_FLAGS}
+_CARRIER_NUMBERS = ("tritium_in_market", "restock_amount")
+_CARRIER_FLAGS = {"has_icy_ring", "is_system_pristine", "is_desired_destination", "must_restock"}
 
 
 def parse_route(text, extension):
@@ -163,14 +167,16 @@ def _parse_csv_stop(row):
     return stop
 
 
-def _validated_stop(stop):
+def _validated_stop(stop, *, carrier=False):
     name = stop.get("name") if isinstance(stop, dict) else None
     if not isinstance(name, str) or not name.strip() or not name.isprintable():
         raise ValueError("Route stop has no valid system name")
+    numbers = (*_ROUTE_NUMBERS, *_CARRIER_NUMBERS) if carrier else _ROUTE_NUMBERS
+    flags = _ROUTE_FLAGS | _CARRIER_FLAGS if carrier else _ROUTE_FLAGS
     try:
-        for key in (*_ROUTE_NUMBERS, *_ROUTE_FLAGS):
+        for key in (*numbers, *flags):
             value = stop.get(key)
-            if value is None or (key in _ROUTE_FLAGS and isinstance(value, bool)):
+            if value is None or (key in flags and isinstance(value, bool)):
                 continue
             if type(value) not in (int, float) or not math.isfinite(value):
                 raise ValueError("Invalid route value")
@@ -180,7 +186,8 @@ def _validated_stop(stop):
     if address is not None and not (type(address) is int and address >= 0
                                     or isinstance(address, str) and address.isdecimal()):
         raise ValueError("Invalid route system address")
-    return {key: value for key, value in stop.items() if key in _ROUTE_STOP_FIELDS}
+    fields = {"name", "id64", *numbers, *flags}
+    return {key: value for key, value in stop.items() if key in fields}
 
 
 def serialize_route(stops, extension):
@@ -266,7 +273,7 @@ def build_slef(loadout):
 
 
 def build_route_form(loadout, source, destination, cargo, *, is_supercharged=False,
-                     use_supercharge=True, use_injections_when_required=False, injection_multiplier=None):
+                     use_supercharge=True, injection_mode=None, injection_multiplier=None):
     form = fsd_spec(loadout)
     if injection_multiplier is not None:
         form["injection_multiplier"] = injection_multiplier
@@ -275,8 +282,8 @@ def build_route_form(loadout, source, destination, cargo, *, is_supercharged=Fal
         "destination": destination,
         "is_supercharged": int(is_supercharged),
         "use_supercharge": int(use_supercharge),
-        "use_injections": 0,
-        "use_injections_when_required": int(use_injections_when_required),
+        "use_injections": int(injection_mode == "always"),
+        "use_injections_when_required": int(injection_mode == "required"),
         "exclude_secondary": 1,
         "refuel_every_scoopable": 1,
         "reserve_size": 0,
@@ -295,15 +302,16 @@ class SpanshRouteClient:
         self.session = session
         self.session.headers["User-Agent"] = f"EliteMining/{__version__}"
 
-    def start_plot(self, form):
-        response = self.session.post(f"{_API}/generic/route", data=form, timeout=15)
+    def start_plot(self, form, *, carrier=False):
+        endpoint = "fleetcarrier/route" if carrier else "generic/route"
+        response = self.session.post(f"{_API}/{endpoint}", data=form, timeout=15)
         response.raise_for_status()
         job = response.json().get("job")
         if response.status_code != 202 or not job:
             raise ValueError("Spansh did not return a route job")
         return str(job)
 
-    def poll(self, job, is_cancelled):
+    def poll(self, job, is_cancelled, *, carrier=False):
         deadline = time.monotonic() + _PLOT_TIMEOUT
         delay = 2
         url = f"{_API}/results/{quote(job, safe='')}"
@@ -330,10 +338,15 @@ class SpanshRouteClient:
                 delay = min(delay * 2, 8)
                 continue
             payload = response.json()
-            stops = (payload.get("result") or {}).get("jumps")
+            result = payload.get("result")
+            stops = result.get("jumps") if isinstance(result, dict) else None
             if (response.status_code != 200 or payload.get("status") != "ok"
                     or not isinstance(stops, list) or not stops):
                 raise ValueError("Spansh did not return route stops")
+            if carrier:
+                if result.get("incomplete"):
+                    raise ValueError("Spansh returned an incomplete carrier route")
+                return [_validated_stop(stop, carrier=True) for stop in stops]
             return stops
 
 
@@ -345,19 +358,75 @@ def _matches_stop(event, stop):
     return bool(name and name.casefold() == stop["name"].casefold())
 
 
+def _carrier_timestamp(value):
+    try:
+        timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (AttributeError, ValueError):
+        return None
+    return timestamp.timestamp() if timestamp.tzinfo is not None else None
+
+
 class RoutePlanner:
-    """Owns one active route. The caller applies a plot result on its own thread."""
+    """Owns the active ship and carrier routes. The caller applies plot results."""
 
     def __init__(self):
-        self.active_route = _load_cfg().get(_ACTIVE_ROUTE_KEY)
+        config = _load_cfg()
+        self.active_route = config.get(_ACTIVE_ROUTE_KEY)
+        self.active_carrier_route = config.get(_ACTIVE_CARRIER_ROUTE_KEY)
         self.is_supercharged = False
         self._plot_lock = threading.Lock()
         self._plot = None
+
+    @property
+    def plot_running(self):
+        with self._plot_lock:
+            return self._plot is not None and not self._plot.done()
 
     def plot(self, form, is_cancelled, *, second_form=None):
         """Return a Future for the stops. All HTTP calls run in a daemon thread."""
         forms = (form,) if second_form is None else (form, second_form)
 
+        def run(client):
+            stops = []
+            for leg_form in forms:
+                if is_cancelled():
+                    raise CancelledError()
+                source = leg_form["source"]
+                if str(source).casefold() == str(leg_form["destination"]).casefold():
+                    continue
+                leg = client.poll(client.start_plot(leg_form), is_cancelled)
+                stops.extend(leg[1:] if stops else leg)
+            return stops or [{"name": str(form["source"]), "distance": 0}]
+
+        return self._start_plot_worker(run, is_cancelled)
+
+    def plot_carrier(self, source, destination, used_capacity, is_cancelled, *, fuel_level=None):
+        """Plot one carrier leg. System names and id64s are both accepted here."""
+        source = source.strip() if isinstance(source, str) else source
+        destination = destination.strip() if isinstance(destination, str) else destination
+        if source in (None, "") or destination in (None, ""):
+            raise ValueError("Both carrier route endpoints are required")
+        if str(source).casefold() == str(destination).casefold():
+            raise ValueError("Carrier source and destination must be different")
+        if type(used_capacity) is not int or not 0 <= used_capacity <= PLAYER_CARRIER_CAPACITY:
+            raise ValueError("Invalid player carrier used capacity")
+        form = {
+            "source": source,
+            "destinations": [destination],
+            "capacity": PLAYER_CARRIER_CAPACITY,
+            "mass": 25_000,
+            "capacity_used": used_capacity,
+            "calculate_starting_fuel": int(fuel_level is None),
+        }
+        if fuel_level is not None:
+            form.update(fuel_loaded=fuel_level, tritium_stored=0)
+
+        def run(client):
+            return client.poll(client.start_plot(form, carrier=True), is_cancelled, carrier=True)
+
+        return self._start_plot_worker(run, is_cancelled)
+
+    def _start_plot_worker(self, run, is_cancelled):
         def worker():
             if not future.set_running_or_notify_cancel():
                 return
@@ -365,20 +434,11 @@ class RoutePlanner:
                 if is_cancelled():
                     raise CancelledError()
                 with requests.Session() as session:
-                    client = SpanshRouteClient(session)
-                    stops = []
-                    for leg_form in forms:
-                        if is_cancelled():
-                            raise CancelledError()
-                        source = leg_form["source"]
-                        if str(source).casefold() == str(leg_form["destination"]).casefold():
-                            continue
-                        leg = client.poll(client.start_plot(leg_form), is_cancelled)
-                        stops.extend(leg[1:] if stops else leg)
+                    stops = run(SpanshRouteClient(session))
             except Exception as error:
                 future.set_exception(error)
             else:
-                future.set_result(stops or [{"name": str(form["source"]), "distance": 0}])
+                future.set_result(stops)
 
         with self._plot_lock:
             if self._plot is not None and not self._plot.done():
@@ -392,16 +452,89 @@ class RoutePlanner:
         self.active_route = route
 
     def set_route(self, stops, source_view):
-        self._save_route({
+        self._save_route(self._new_route(stops, source_view))
+
+    @staticmethod
+    def _new_route(stops, source_view):
+        return {
             "stops": stops,
             "current_index": 0,
             "source_view": source_view,
             "time": time.time(),
             "off_route": False,
-        })
+        }
 
     def clear_route(self):
         self._save_route(None)
+
+    def _save_carrier_route(self, route):
+        update_config_value(_ACTIVE_CARRIER_ROUTE_KEY, route)
+        self.active_carrier_route = route
+
+    def set_carrier_route(self, stops):
+        self._save_carrier_route(self._new_route(stops, "route"))
+
+    def clear_carrier_route(self):
+        self._save_carrier_route(None)
+
+    def sync_carrier_progress(self, snapshot):
+        """Apply journal progress and return the delay until a pending jump can advance."""
+        route = self.active_carrier_route
+        if not route or snapshot is None:
+            return None
+        (destination, departure), confirmation, completed = snapshot
+        index = route["current_index"]
+        stops = route["stops"]
+        off_route = route["off_route"]
+        applied = route.get("applied_request")
+        applied_departure = _carrier_timestamp(applied["departure_time"]) if applied else None
+        confirmed_at = route.get("confirmed_at", 0)
+        earliest = math.floor(route["time"])
+        pending = {"destination": destination, "departure_time": departure}
+        departure_at = _carrier_timestamp(departure)
+        due_at = departure_at + 300 if departure_at is not None else None
+
+        if completed:
+            timestamp, arrived_destination, arrived_departure = completed
+            arrived_at = _carrier_timestamp(timestamp)
+            if arrived_at is not None and arrived_at >= earliest and arrived_at > confirmed_at:
+                applied = {"destination": arrived_destination, "departure_time": arrived_departure}
+
+        observed_at = _carrier_timestamp(confirmation.get("timestamp")) if confirmation else None
+        # A delayed pre-departure location cannot undo an advance made by the timer.
+        if (observed_at is not None and observed_at > confirmed_at
+                and observed_at >= earliest
+                and (observed_at >= (applied_departure or 0) or confirmation["event"] == "CarrierJump")):
+            confirmed_at = observed_at
+            match = next((i for i, stop in enumerate(stops) if _matches_stop(confirmation, stop)), None)
+            off_route = match is None
+            if match is not None:
+                index = match
+            if destination and due_at is not None:
+                target = next((stop for stop in stops if stop["name"].casefold() == destination.casefold()),
+                              {"name": destination})
+                if _matches_stop(confirmation, target) or observed_at >= due_at:
+                    applied = pending
+
+        delay = None
+        if destination and due_at is not None and pending != applied:
+            later = next((i for i in range(index + 1, len(stops))
+                          if _matches_stop({"StarSystem": destination}, stops[i])), None)
+            if later is not None:
+                remaining = due_at - time.time()
+                if remaining > 0:
+                    delay = remaining
+                else:
+                    index, off_route, applied = later, False, pending
+
+        updated = {**route, "current_index": index, "off_route": off_route}
+        if applied is not None:
+            updated["applied_request"] = applied
+        if confirmed_at:
+            updated["confirmed_at"] = confirmed_at
+        if updated != route:
+            self._save_carrier_route(updated)
+        return delay
 
     def handle_journal_events(self, events):
         for event in events:
