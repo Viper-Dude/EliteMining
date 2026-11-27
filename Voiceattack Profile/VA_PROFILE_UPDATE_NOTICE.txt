@@ -1,12 +1,12 @@
 ============================================================
-  EliteMining v5.7.4 — VoiceAttack Profile Update 
+  EliteMining v5.7.5 — VoiceAttack Profile Update 
 ============================================================
 
-This release includes an updated VoiceAttack profile (v5.7.4).
+This release includes an updated VoiceAttack profile (v5.7.5).
 
 What's changed:
-- Added Plot route command to stop all profile and the reset variables commands.
-- Minor timer adjustment for some mining commands.
+- Toggle and power voice commands are simpler: say "Enable" or "Disable" to change a setting, "Say settings for" to hear it, and choose Balanced, Max Engines, or Max Shields for your power after laser mining.
+- The "Import settings" voice command is removed, because settings already sync automatically.
 
 Keep the VoiceAttack profile option ticked on the next page to install the updated
 profile. Follow the app's profile update instructions to import it into VoiceAttack.

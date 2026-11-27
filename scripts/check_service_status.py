@@ -1,8 +1,12 @@
 import ast
+import ctypes
+from ctypes import wintypes
 import json
 from pathlib import Path
 import sys
+import tempfile
 import tkinter as tk
+import threading
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
@@ -11,9 +15,20 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'app'))
 
 import requests
+import config
 import service_status
 from marketplace_api import MarketplaceAPI
 from system_finder_api import SystemFinderAPI
+
+
+def setUpModule():
+    directory = tempfile.TemporaryDirectory()
+    unittest.addModuleCleanup(directory.cleanup)
+    config_file = Path(directory.name) / 'config.json'
+    config_file.write_text('{}', encoding='utf-8')
+    config_patch = patch.object(config, 'CONFIG_FILE', str(config_file))
+    config_patch.start()
+    unittest.addModuleCleanup(config_patch.stop)
 
 
 class ServiceStatusChecks(unittest.TestCase):
@@ -105,12 +120,12 @@ class ServiceStatusChecks(unittest.TestCase):
                 SystemFinderAPI.search_systems('Sol')
         self.callback.assert_called_once_with('spansh', 'offline')
 
-    def queue_method(self):
-        tree = ast.parse((ROOT / 'app/main.py').read_text(encoding='utf-8-sig'))
+    def load_method(self, filename, method_name):
+        tree = ast.parse((ROOT / filename).read_text(encoding='utf-8-sig'))
         node = next(n for n in ast.walk(tree)
-                    if isinstance(n, ast.FunctionDef) and n.name == '_queue_search_service_status')
-        namespace = {'tk': tk}
-        exec(compile(ast.Module(body=[node], type_ignores=[]), 'app/main.py', 'exec'), namespace)
+                    if isinstance(n, ast.FunctionDef) and n.name == method_name)
+        namespace = {'tk': tk, 'threading': threading}
+        exec(compile(ast.Module(body=[node], type_ignores=[]), filename, 'exec'), namespace)
         return namespace[node.name]
 
     def test_status_updates_wait_for_ui_thread_and_use_existing_updaters(self):
@@ -118,7 +133,7 @@ class ServiceStatusChecks(unittest.TestCase):
         app = SimpleNamespace(after=lambda delay, callback: queued.append((delay, callback)),
                               _update_market_api_status=Mock(),
                               ring_finder=SimpleNamespace(_update_spansh_status=Mock()))
-        queue = self.queue_method()
+        queue = self.load_method('app/main.py', '_queue_search_service_status')
         queue(app, 'market', 'offline')
         queue(app, 'spansh', 'online')
         app._update_market_api_status.assert_not_called()
@@ -130,9 +145,41 @@ class ServiceStatusChecks(unittest.TestCase):
         app.ring_finder._update_spansh_status.assert_called_once_with('online')
 
     def test_shutdown_does_not_break_requests(self):
+        queue = self.load_method('app/main.py', '_queue_search_service_status')
         for error in (RuntimeError(), tk.TclError()):
             app = SimpleNamespace(after=Mock(side_effect=error))
-            self.queue_method()(app, 'market', 'online')
+            queue(app, 'market', 'online')
+
+    def test_eddn_timeout_reaches_one_shot_callback_as_offline(self):
+        check = self.load_method('app/ring_finder.py', '_check_eddn_status')
+        queued = []
+        ring_finder = SimpleNamespace(parent=SimpleNamespace(after=lambda delay, cb: queued.append(cb)))
+        with patch('requests.get', side_effect=requests.ReadTimeout), \
+                patch.object(threading, 'Thread', side_effect=lambda target, daemon: SimpleNamespace(start=target)):
+            check(ring_finder, self.callback)
+        self.callback.assert_not_called()
+        self.assertEqual(len(queued), 1)
+        queued[0]()
+        self.callback.assert_called_once_with('offline')
+
+    def test_ardent_one_shot_does_not_start_a_periodic_timer(self):
+        check = self.load_method('app/main.py', '_check_market_api_status')
+        publish = Mock()
+        app = SimpleNamespace(after=Mock(), _update_market_api_status=publish,
+                              _check_market_api_status=Mock())
+        with patch('requests.get', return_value=self.response()), \
+                patch.object(threading, 'Thread', side_effect=lambda target, daemon: SimpleNamespace(start=target)):
+            check(app, self.callback)
+            self.assertEqual([call.args[0] for call in app.after.call_args_list], [0])
+            app.after.call_args.args[1]()
+            self.callback.assert_called_once_with('online')
+            publish.assert_not_called()
+
+            app.after.reset_mock()
+            check(app)
+            self.assertEqual([call.args[0] for call in app.after.call_args_list], [0, 300_000])
+            app.after.call_args_list[0].args[1]()
+            publish.assert_called_once_with('online')
 
     def test_footer_placement_and_status_in_both_languages_and_all_themes(self):
         source = (ROOT / 'app/main.py').read_text(encoding='utf-8-sig')
@@ -205,6 +252,83 @@ class ServiceStatusChecks(unittest.TestCase):
                         patch('session_statistics_panel.scaled_font', return_value=('Segoe UI', 9)):
                     SessionStatisticsPanel._show_database(panel)
                 panel.database_summary.configure.assert_called_once_with(text=expected)
+
+
+class ServiceWakeChecks(unittest.TestCase):
+    def setUp(self):
+        self.timers = {}
+        self.checks = [(Mock(), Mock()) for _ in range(3)]
+        self.wake = service_status.ServiceWakeChecks(self.timers.__setitem__, self.checks)
+
+    def test_checks_all_at_ten_seconds_and_only_failures_at_thirty(self):
+        self.wake.resume()
+        self.assertEqual(set(self.timers), {10_000, 30_000})
+        for probe, publish in self.checks:
+            probe.assert_not_called()
+            publish.assert_not_called()
+
+        self.timers[10_000]()
+        for (probe, publish), status in zip(self.checks, ('online', 'offline', 'online')):
+            self.assertEqual(probe.call_count, 1)
+            probe.call_args.args[0](status)
+            publish.assert_called_once_with(status)
+
+        self.timers[30_000]()
+        self.assertEqual([probe.call_count for probe, _ in self.checks], [1, 2, 1])
+        probe, publish = self.checks[1]
+        probe.call_args.args[0]('online')
+        publish.assert_called_with('online')
+
+    def test_late_failure_retries_once_without_repeating_an_in_flight_check(self):
+        self.wake.resume()
+        self.timers[10_000]()
+        self.timers[30_000]()
+        probe, publish = self.checks[0]
+        self.assertEqual(probe.call_count, 1)
+        probe.call_args.args[0]('offline')
+        self.assertEqual(probe.call_count, 2)
+        probe.call_args.args[0]('offline')
+        self.assertEqual(probe.call_count, 2)
+        self.assertEqual(publish.call_count, 2)
+
+    def test_suspend_and_new_wake_ignore_old_results_and_retry_timer(self):
+        self.wake.resume()
+        self.timers[10_000]()
+        old_retry = self.timers[30_000]
+        probe, publish = self.checks[0]
+        old_result = probe.call_args.args[0]
+        self.wake.suspend()
+        self.wake.resume()
+        old_result('offline')
+        old_retry()
+        publish.assert_not_called()
+        self.assertEqual(probe.call_count, 1)
+
+    @unittest.skipUnless(sys.platform == 'win32', 'Windows power messages require Windows')
+    def test_windows_suspend_and_resume_messages_reach_the_app(self):
+        from windows_resume import watch_windows_resume
+
+        root = tk.Tk()
+        try:
+            root.attributes('-alpha', 0)
+            root.update_idletasks()
+            suspend, resume = Mock(), Mock()
+            callback = watch_windows_resume(root, resume, suspend)
+            self.assertIsNotNone(callback)
+            user32 = ctypes.WinDLL('user32')
+            user32.GetAncestor.argtypes = (wintypes.HWND, wintypes.UINT)
+            user32.GetAncestor.restype = wintypes.HWND
+            user32.SendMessageW.argtypes = (wintypes.HWND, wintypes.UINT, ctypes.c_size_t, ctypes.c_ssize_t)
+            user32.SendMessageW.restype = ctypes.c_ssize_t
+            hwnd = user32.GetAncestor(root.winfo_id(), 2)
+            self.assertNotEqual(hwnd, root.winfo_id())
+            user32.SendMessageW(hwnd, 0x0218, 0x0004, 0)
+            user32.SendMessageW(hwnd, 0x0218, 0x0012, 0)
+            user32.SendMessageW(hwnd, 0x0218, 0x0007, 0)
+            suspend.assert_called_once_with()
+            resume.assert_called_once_with()
+        finally:
+            root.destroy()
 
 
 if __name__ == '__main__':

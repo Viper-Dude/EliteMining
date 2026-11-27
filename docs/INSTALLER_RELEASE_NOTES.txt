@@ -1,8 +1,6 @@
-﻿What's new in EliteMining v5.7.4
+﻿What's new in EliteMining v5.7.5
 
 New Features & Improvements
-- Added a fleet carrier jump timer and cooldown timer.
-- Added reverse route options for the Ship and Fleet Carrier route tabs.
+- Choose Balanced, Max Engines, or Max Shields for your ship's power after laser mining.
 
 Bug Fixes
-- The current stop on a Fleet Carrier route now shows the actual fuel left once the game reports it.

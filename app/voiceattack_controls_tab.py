@@ -464,7 +464,6 @@ class VoiceAttackControlsTabMixin:
             "Night Vision": "voiceattack.help_night_vision",
             "FSD Jump Sequence": "voiceattack.help_fsd_jump",
             "Open System Map": "voiceattack.help_open_system_map",
-            "Power Settings": "voiceattack.help_power",
             "Prospector Sequence": "voiceattack.help_prospector_sequence",
             "Continuous Prospector Sequence": "voiceattack.help_continuous_prospector_sequence",
             "Prospector Sound Effect": "voiceattack.help_prospector_sound",
@@ -755,6 +754,12 @@ class VoiceAttackControlsTabMixin:
 
             r += 1
         
+        ttk.Label(
+            scrollable_frame, text=t('voiceattack.section_cargo_scoop_power'),
+            font=self._scaled_font(10, "bold"),
+        ).grid(row=r, column=0, sticky="w", pady=(10, 2))
+        r += 1
+
         # Cargo Scoop toggle
         if "Cargo Scoop" in TOGGLES:
             name = "Cargo Scoop"
@@ -807,27 +812,23 @@ class VoiceAttackControlsTabMixin:
                 ToolTip(cargoscoop_label, cargoscoop_help)
             r += 1
         
-        # Power Settings toggle
-        if "Power Settings" in TOGGLES:
-            name = "Power Settings"
-            _fname, helptext = TOGGLES[name]
-            
-            rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
-            rowf.grid(row=r, column=0, sticky="w", pady=2)
-            
-            checkbox = ThemedCheckbutton(rowf, text=name, variable=self.toggle_vars[name], 
-                                    bg=_toggle_bg, fg=_toggle_fg, selectcolor=_toggle_bg, 
-                                    activebackground=_toggle_bg, activeforeground=_toggle_fg, 
-                                    highlightthickness=0, bd=0, font=self._scaled_font(9), 
-                                    padx=4, pady=2, anchor="w")
-            checkbox.pack(side="left")
-            self.toggle_checkboxes[name] = checkbox
-            self.toggle_vars[name].trace_add("write", lambda *args, n=name: self._save_toggle(n))
-            
-            display_help = t(toggle_help_translations.get(name, name)) if name in toggle_help_translations else helptext
-            ToolTip(checkbox, display_help)
-            
-            r += 1
+        name = "Power Settings"
+        rowf = ttk.Frame(scrollable_frame, style="Dark.TFrame")
+        rowf.grid(row=r, column=0, sticky="w", pady=2)
+        label = ttk.Label(rowf, text=t("voiceattack.toggle_power"))
+        label.pack(side="left", padx=(4, 8))
+        power_selector = SegmentedSelector(
+            rowf, [(0, t("voiceattack.power_balanced")), (1, t("voiceattack.power_max_engines")),
+                   (2, t("voiceattack.power_max_shields"))], self.toggle_vars[name],
+            bg=ttk.Style(rowf).lookup("Dark.TFrame", "background"), track=self.theme_colors["btn_bg"],
+            fg=self.theme_colors["fg"], accent=slider_colors(self.current_theme)["accent"],
+            font=self._scaled_font(8), scale=self._scaled_px(100) / 100)
+        power_selector.pack(side="left")
+        self._ship_diff_widgets.append((power_selector, "outline", "", (("Toggles", name),)))
+        self.toggle_vars[name].trace_add("write", lambda *args, n=name: self._save_toggle(n))
+        ToolTip(label, t("voiceattack.help_power"))
+        ToolTip(power_selector, t("voiceattack.help_power"))
+        r += 1
         
         # ============================================================
         # PROSPECTOR SUB-SECTION

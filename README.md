@@ -930,12 +930,25 @@ Configure how many times the laser mining extra sequence runs:
 | Disable cargo text overlay | Turn off the cargo status overlay |
 
 ### Settings Control
-Enable, disable, or check the status of 15 EliteMining settings by voice. Spoken feedback and VoiceAttack log messages use the same "enabled" / "disabled" wording.
-| Voice Command | Action |
-|---------------|--------|
-| Enable cargo scoop | Turn the setting on |
-| Toggle off cargo scoop retraction during a reset mining sequence | Turn the setting off |
-| What is the cargo scoop status? | Hear whether the setting is on or off |
+Turn 15 EliteMining settings on or off, or hear how they are set, by voice. "Turn on ..." / "Turn off ..." and "Check ... status" phrases also work.
+
+| Setting | Turn on | Turn off | Hear the setting |
+|---------|---------|----------|------------------|
+| Cargo scoop retraction | Enable retraction of cargo scoop | Disable retraction of cargo scoop | Say settings for cargo scoop |
+| Auto deselect prospector | Enable auto deselect prospector | Disable auto deselect prospector | Say settings for auto deselect prospector |
+| Return to pulse wave analyser | Enable return to pulse wave analyser | Disable return to pulse wave analyser | Say settings for pulse wave analyser |
+| Target prospector | Enable target prospector | Disable target prospector | Say settings for target prospector |
+| Auto night vision | Enable auto night vision | Disable auto night vision | Say settings for night vision |
+| Repeated mining cycles | Enable repeated mining cycles | Disable repeated mining cycles | Say settings for repeated mining cycles |
+| Headtracker docking control | Enable headtracker docking control | Disable headtracker docking control | Say settings for headtracker |
+| Auto honk | Enable auto honk | Disable auto honk | Say settings for auto honk |
+| FSD jump sequence | Enable FSD jump sequence | Disable FSD jump sequence | Say settings for FSD jump sequence |
+| Open system map | Enable open system map | Disable open system map | Say settings for open system map |
+| Thrust up | Enable thrust up | Disable thrust up | Say settings for thrust up |
+| Prospector sequence | Enable prospector sequence | Disable prospector sequence | Say settings for prospector sequence |
+| Prospector sound effect | Enable prospector sound effect | Disable prospector sound effect | Say settings for prospector sound effect |
+| Continuous pulse wave analyser | Enable continuous pulse wave analyser | Disable continuous pulse wave analyser | Say settings for continuous pulse wave analyser |
+| Continuous prospector sequence | Enable continuous prospector sequence | Disable continuous prospector sequence | Say settings for continuous prospector sequence |
 
 > 💡 **Tip:** The VoiceAttack profile contains many more commands including firegroup assignments, status checks, and custom sequences. To see all available commands:
 > 1. Open VoiceAttack and export EliteMining profile

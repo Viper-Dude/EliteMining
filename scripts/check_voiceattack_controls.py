@@ -14,6 +14,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'app'))
+from ui.stepper import Stepper
 from va_keybind_applier import COMMAND_ELEMENT_ORDER
 
 
@@ -35,22 +36,26 @@ class VoiceAttackProfileChecks(unittest.TestCase):
         profiles = list((ROOT / 'Voiceattack Profile').glob('EliteMining v*-Profile.vap'))
         self.assertEqual(len(profiles), 1, profiles)
         profile = ET.parse(profiles[0])
-        commands = profile.findall(".//Command[CommandString='Plot next waypoint']")
+        commands = [c for c in profile.iter('Command')
+                    if (c.findtext('CommandString') or '').split(';')[0] == 'Plot next waypoint']
         self.assertEqual(len(commands), 1)
         command = commands[0]
         tags = [element.tag for element in command]
         self.assertEqual(tags, [tag for tag in COMMAND_ELEMENT_ORDER if tag in tags])
 
         actions = command.findall('ActionSequence/CommandAction')
-        self.assertEqual([action.findtext('ActionType') for action in actions[:8]], [
+        for flag in (actions[0], actions[-1]):
+            self.assertEqual(flag.findtext('ActionType'), 'BooleanSet')
+            self.assertEqual(flag.findtext('Context'), 'plotRoute')
+        self.assertEqual([action.findtext('ActionType') for action in actions[1:9]], [
             'ConditionStart', 'TextSet', 'ConditionElse', 'TextSet', 'ConditionEnd',
             'ConditionStart', 'Say', 'ConditionElse',
         ])
-        self.assertEqual(actions[0].findtext('ConditionStartNameFrom'), '~passedText1')
-        self.assertEqual(actions[1].findtext('Context4'),
+        self.assertEqual(actions[1].findtext('ConditionStartNameFrom'), '~passedText1')
+        self.assertEqual(actions[2].findtext('Context4'),
                          r'{VA_APPS}\EliteMining\Variables\routeNextSystem.txt')
-        self.assertEqual(actions[3].findtext('Context4'), '{TXT:~passedText1}')
-        self.assertEqual(actions[6].findtext('Context'), 'No route')
+        self.assertEqual(actions[4].findtext('Context4'), '{TXT:~passedText1}')
+        self.assertEqual(actions[7].findtext('Context'), 'No route')
         self.assertEqual(command.findtext('UseProcessOverride'), 'true')
         self.assertEqual(command.findtext('ProcessOverride'), 'EliteDangerous64.exe')
 
@@ -63,7 +68,7 @@ class VoiceAttackProfileChecks(unittest.TestCase):
         self.assertTrue(all(action.findtext('X') == '1' for action in keys))
         self.assertEqual(keys[-2].findtext('Duration'), '1')
         close_index = actions.index(keys[-1])
-        plot_pause = actions[close_index - 2]
+        plot_pause = actions[actions.index(keys[-2]) - 1]
         self.assertEqual(plot_pause.findtext('ActionType'), 'Pause')
         self.assertEqual(plot_pause.findtext('Duration'), '2')
         close_check = actions[close_index - 1]
@@ -324,23 +329,14 @@ class VoiceAttackChecks(unittest.TestCase):
         keywords = {k.arg: ast.unparse(k.value) for k in call.keywords}
         self.assertEqual(keywords.get('command'), 'self._save_thrust_open')
 
-        # Load the stepper and its colour helper without importing the ui package (it needs the real config)
-        shapes = types.ModuleType('ui.smooth_shapes')
-        exec((ROOT / 'app/ui/smooth_shapes.py').read_text(encoding='utf-8'), shapes.__dict__)
-        slider = types.ModuleType('ui.themed_slider')
-        stepper_ns = {}
-        with patch.dict(sys.modules, {'ui': types.ModuleType('ui'), 'ui.smooth_shapes': shapes,
-                                      'ui.themed_slider': slider}):
-            exec((ROOT / 'app/ui/themed_slider.py').read_text(encoding='utf-8'), slider.__dict__)
-            exec((ROOT / 'app/ui/stepper.py').read_text(encoding='utf-8'), stepper_ns)
-        Stepper = stepper_ns['Stepper']
         root = tk.Tk()
         root.withdraw()
         self.addCleanup(root.destroy)
         var = tk.DoubleVar(master=root, value=1.0)
         saves = []
-        stepper = Stepper(root, ast.literal_eval(call.args[1]), ast.literal_eval(call.args[2]), var,
-                          increment=0.1, command=lambda: saves.append(var.get()))
+        with patch('ui.stepper.load_theme', return_value='dark_gray'):
+            stepper = Stepper(root, ast.literal_eval(call.args[1]), ast.literal_eval(call.args[2]), var,
+                              increment=0.1, command=lambda: saves.append(var.get()))
         stepper._on_wheel(types.SimpleNamespace(delta=-120))
         self.assertEqual(saves, [1.0])
 

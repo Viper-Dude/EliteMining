@@ -19,7 +19,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 from ui.striped_treeview import StripedTreeview
 from ui.themed_checkbox import ThemedCheckbutton, ThemedRadiobutton
-from ui.theme import modern_color
+from ui.theme import MODERN_BACKGROUND_REMAP, modern_color
 from ui.color_swatches import ColorSwatchPicker
 from ui.segmented_selector import SegmentedSelector
 from ui.stepper import Stepper
@@ -172,7 +172,7 @@ from overlays import (
 
 
 APP_TITLE = "EliteMining"
-APP_VERSION = "v5.7.4"
+APP_VERSION = "v5.7.5"
 PRESET_INDENT = "   "  # spaces used to indent preset names
 
 LOG_FILE = os.path.join(os.path.expanduser("~"), "EliteMining.log")
@@ -287,6 +287,8 @@ from voiceattack_controls_tab import VoiceAttackControlsTabMixin
 from commodity_market_tab import CommodityMarketTabMixin
 from distance_calculator_tab import DistanceCalculatorTabMixin
 from star_systems_tab import StarSystemsTabMixin
+from service_status import ServiceWakeChecks
+from windows_resume import watch_windows_resume
 
 class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMarketTabMixin, DistanceCalculatorTabMixin, StarSystemsTabMixin):
     def _set_dark_title_bar(self):
@@ -604,7 +606,7 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
             self.option_add("*TCombobox*Listbox.selectBackground", theme["selection_bg"])
             self.option_add("*TCombobox*Listbox.selectForeground", theme["selection_fg"])
 
-        self.title(f"{APP_TITLE} — {APP_VERSION}")
+        self.title(APP_TITLE)
         self.resizable(True, True)
         self.minsize(1050, 680)  # Minimum width to fit all status bar info
         
@@ -1038,6 +1040,7 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
         self.after(300, self._reinitialize_sash_positions)
         # Apply stay-on-top AFTER splash is gone and window is fully visible
         self.after(500, self._apply_stay_on_top_after_init)
+        self._watch_service_wake()
 
     def _cleanup_legacy_files(self):
         """Remove legacy files from older versions that are no longer used"""
@@ -1278,7 +1281,7 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
             from PIL import Image, ImageTk
             from path_utils import get_images_dir
             logo_path = os.path.join(get_images_dir(), "EliteMining_txt_logo_transp_resize.png")
-            if os.path.exists(logo_path) and _info_theme not in ("modern", "modern_slate", "modern_orange"):  # Modern footer starts at the CMDR text
+            if os.path.exists(logo_path) and _info_theme not in ("modern", "modern_slate", "modern_orange"):
                 logo_img = Image.open(logo_path)
                 # Resize to fit status bar height (smaller to avoid stretched look)
                 target_height = 16
@@ -1292,7 +1295,10 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
             print(f"Could not load status bar logo: {e}")
 
         # Labels for mixed colors (white labels, yellow values)
-        self.cmdr_label_prefix = tk.Label(info_frame, text=t('status_bar.cmdr'), fg="white", bg=_info_bg, font=_info_lbl_font)
+        self.cmdr_label_prefix = tk.Label(
+            info_frame, text=f"{APP_VERSION} | {t('status_bar.cmdr')}",
+            fg="white", bg=_info_bg, font=_info_lbl_font,
+        )
         self.cmdr_label_value = tk.Label(info_frame, text="", fg=_info_val, bg=_info_bg, font=self._scaled_font(9, "bold"))
         self.system_label_prefix = tk.Label(info_frame, text="", fg="white", bg=_info_bg, font=_info_lbl_font)
         self.system_label_value = tk.Label(info_frame, text="", fg=_info_val, bg=_info_bg, font=self._scaled_font(9, "bold"))
@@ -1972,11 +1978,6 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
                 action = parts[1] if len(parts) > 1 else ""
                 self._va_handle_session(action)
                 
-            elif cmd_type == "SETTINGS":
-                # Settings commands: SETTINGS:IMPORT, SETTINGS:APPLY
-                action = parts[1] if len(parts) > 1 else ""
-                self._va_handle_settings(action)
-                
             elif cmd_type == "ANNOUNCEMENT":
                 # Announcement presets: ANNOUNCEMENT:LOAD:1
                 action = parts[1] if len(parts) > 1 else ""
@@ -2103,17 +2104,6 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
             if hasattr(self.prospector_panel, '_session_cancel'):
                 self.prospector_panel._session_cancel()
                 self._set_status("Mining session cancelled")
-    
-    def _va_handle_settings(self, action: str):
-        """Handle settings commands (import/apply)"""
-        if action == "IMPORT":
-            if hasattr(self, '_import_all_from_txt'):
-                self._import_all_from_txt()
-                self._set_status("Imported settings from game")
-        elif action == "APPLY":
-            if hasattr(self, '_save_all_to_txt'):
-                self._save_all_to_txt()
-                self._set_status("Applied settings to game")
     
     def _va_handle_announcement_preset(self, action: str, num: int):
         """Handle announcement preset commands"""
@@ -6605,14 +6595,25 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
         except (RuntimeError, tk.TclError):
             pass
 
-    def _check_market_api_status(self):
-        """Check market API status in background and update indicator"""
+    def _watch_service_wake(self):
+        if sys.platform != 'win32':
+            return
+        wake_checks = ServiceWakeChecks(self.after, (
+            (self.ring_finder._check_spansh_status, self.ring_finder._update_spansh_status),
+            (self.ring_finder._check_eddn_status, self.ring_finder._update_eddn_status),
+            (self._check_market_api_status, self._update_market_api_status),
+        ))
+        self._service_wake_hook = watch_windows_resume(self, wake_checks.resume, wake_checks.suspend)
+
+    def _check_market_api_status(self, on_result=None):
+        """Check market API status, with an optional callback for a one-shot check."""
+        publish = on_result or self._update_market_api_status
         def _background_check():
             import requests
             def _schedule(status):
                 try:
-                    self.after(0, lambda: self._update_market_api_status(status))
-                except RuntimeError:
+                    self.after(0, lambda: publish(status))
+                except (RuntimeError, tk.TclError):
                     pass  # Tkinter loop already stopped — app is shutting down
             try:
                 # Test Ardent API
@@ -6630,7 +6631,8 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
                 _schedule("offline")
         
         threading.Thread(target=_background_check, daemon=True).start()
-        self.after(300000, self._check_market_api_status)
+        if on_result is None:
+            self.after(300000, self._check_market_api_status)
     
     def _update_market_api_status(self, status: str):
         self._update_footer_indicator('market', status)
@@ -8607,11 +8609,7 @@ class App(tk.Tk, ColumnVisibilityMixin, VoiceAttackControlsTabMixin, CommodityMa
             self._sidebar_frame.grid_propagate(True)
             self.main_paned.update_idletasks()
 
-    _MODERN_REMAP = {"#1e1e1e": modern_color("#14171B"), "#1a1a1a": modern_color("#14171B"), "#2d2d2d": modern_color("#1D2228"), "#2b2b2b": modern_color("#1D2228"),
-                     "#252525": modern_color("#1D2228"), "#282828": modern_color("#1D2228"), "#2a2a2a": modern_color("#1D2228"),
-                     "#444444": modern_color("#343B44"), "#333333": modern_color("#2A3038"), "#3a3a3a": modern_color("#2A3038"),
-                     "#2e2e2e": modern_color("#232A31"), "#4a4a4a": modern_color("#323941"),
-                     "#2c3e50": modern_color("#1D2228"), "#34495e": modern_color("#2A3038")}
+    _MODERN_REMAP = {old: modern_color(new) for old, new in MODERN_BACKGROUND_REMAP.items()}
     _MODERN_CONTENT_CLASSES = ("Text", "Listbox", "Entry", "Spinbox")
     _MODERN_RECOLOR_CLASSES = ("Frame", "Label", "Labelframe", "Checkbutton", "Radiobutton", "Canvas",
                                "Text", "Listbox", "Entry", "Spinbox", "Toplevel", "Scale", "Message", "Menubutton")

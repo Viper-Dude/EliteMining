@@ -1874,14 +1874,15 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Mer
         # Run in background thread so it doesn't block UI
         threading.Thread(target=warmup, daemon=True).start()
     
-    def _check_spansh_status(self):
+    def _check_spansh_status(self, on_result=None):
         """Check Spansh API status in background and update indicator"""
+        publish = on_result or self._update_spansh_status
         def _background_check():
             import requests
             def _schedule(status):
                 try:
-                    self.parent.after(0, lambda: self._update_spansh_status(status))
-                except RuntimeError:
+                    self.parent.after(0, lambda: publish(status))
+                except (RuntimeError, tk.TclError):
                     pass  # Tkinter loop already stopped — app is shutting down
             try:
                 # Test Spansh API with a minimal request
@@ -1914,22 +1915,21 @@ class RingFinder(RingFinderSearchMixin, BestMineralsMixin, AcquisitionMixin, Mer
         elif hasattr(top, '_update_footer_indicator'):
             top._update_footer_indicator('spansh', status_text, status_color)
 
-    def _check_eddn_status(self):
+    def _check_eddn_status(self, on_result=None):
         """Check EDDN gateway status in background and update indicator"""
+        publish = on_result or self._update_eddn_status
         def _background_check():
             import requests
             def _schedule(status):
                 try:
-                    self.parent.after(0, lambda: self._update_eddn_status(status))
-                except RuntimeError:
+                    self.parent.after(0, lambda: publish(status))
+                except (RuntimeError, tk.TclError):
                     pass
             try:
                 requests.get('https://eddn.edcd.io:4430/', timeout=10)
                 _schedule("online")
-            except requests.exceptions.ConnectionError:
+            except requests.exceptions.RequestException:
                 _schedule("offline")
-            except Exception:
-                _schedule("online")  # Any HTTP response means server is up
         threading.Thread(target=_background_check, daemon=True).start()
 
     def _update_eddn_status(self, status: str):

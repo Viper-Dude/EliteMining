@@ -1,6 +1,8 @@
 """Flat number stepper: [-] value [+] with wheel, arrow keys and press-and-hold (replaces tk.Spinbox)."""
 import tkinter as tk
 
+from config import load_theme
+from ui.theme import MODERN_BACKGROUND_REMAP, modern_color
 from ui.themed_slider import text_on
 
 
@@ -11,6 +13,9 @@ class Stepper(tk.Frame):
     def __init__(self, parent, from_, to, variable, increment=1, width=4, command=None, bg="#1e1e1e",
                  field_bg="#1e1e1e", button_bg="#3a3a3a", accent="#ff8c00", fg="#ffffff",
                  disabled="#666666", font=None, scale=1.0):
+        modern_bg = MODERN_BACKGROUND_REMAP.get(str(button_bg).lower())
+        if modern_bg is not None and load_theme() in ("modern", "modern_slate", "modern_orange"):
+            button_bg = modern_color(modern_bg)
         super().__init__(parent, bg=bg, highlightthickness=1, highlightbackground=button_bg,
                          highlightcolor=button_bg, bd=0)
         self._lo, self._hi, self._step = from_, to, increment

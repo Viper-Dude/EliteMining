@@ -210,6 +210,24 @@ _MODERN_ORANGE_COLORS.update({
 })
 
 
+MODERN_BACKGROUND_REMAP = {
+    "#1e1e1e": "#14171B",
+    "#1a1a1a": "#14171B",
+    "#2d2d2d": "#1D2228",
+    "#2b2b2b": "#1D2228",
+    "#252525": "#1D2228",
+    "#282828": "#1D2228",
+    "#2a2a2a": "#1D2228",
+    "#444444": "#343B44",
+    "#333333": "#2A3038",
+    "#3a3a3a": "#2A3038",
+    "#2e2e2e": "#232A31",
+    "#4a4a4a": "#323941",
+    "#2c3e50": "#1D2228",
+    "#34495e": "#2A3038",
+}
+
+
 def modern_color(color: str) -> str:
     """Resolve legacy Modern colors for the selected Modern palette."""
     from config import load_theme

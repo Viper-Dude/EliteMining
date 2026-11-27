@@ -45,7 +45,7 @@ TOGGLES = {
     "Night Vision": ("nightvisionToggle.txt", "Auto-enables on mining start/reset. Turns off on 'Clear and Jump'."),
     "FSD Jump Sequence": ("FsdSeqToggle.txt", "Auto-jumps to the next system after each FSD jump. Optionally opens the system map first."),
     "Open System Map": ("toggleSystem.txt", "Open/close the system map as part of the FSD Jump Sequence."),
-    "Power Settings": ("powersettingsToggle.txt", "Enable = Max power to engines, disable = balance power when laser mining is completed."),
+    "Power Settings": ("powersettingsToggle.txt", "Choose how power is distributed when laser mining ends."),
     "Prospector Sequence": ("prospectorSeq.txt", "Enable prospector sequence features (master control for Target Prospector and Thrust Up)."),
     "Continuous Prospector Sequence": ("ContProspectorSeq.txt", "Keep repeating the prospector sequence continuously."),
     "Prospector Sound Effect": ("soundeffectToggle.txt", "Play sound effect when prospector sequence is ready for firing next prospector."),
