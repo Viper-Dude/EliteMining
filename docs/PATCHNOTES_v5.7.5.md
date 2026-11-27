@@ -3,9 +3,9 @@
 
 ## New Features & Improvements
 
-- **Mining Controls tab: - Power settings** Now support "Choose Balanced, Max Engines, or Max Shields" for your ship's power after laser mining.
-
 - Find spoken commands in the new Voice Commands tab in VoiceAttack.
+
+- **Mining Controls tab: - Power settings** Now support "Choose Balanced, Max Engines, or Max Shields" for your ship's power after laser mining.
 
 ## Bug Fixes
 
