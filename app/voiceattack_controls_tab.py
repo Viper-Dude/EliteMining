@@ -15,6 +15,7 @@ from ui.stepper import Stepper
 from ui.themed_checkbox import ThemedCheckbutton
 from ui.themed_slider import ThemedSlider, slider_colors
 from ui.tooltip import ToolTip
+from va_reference_tab import VoiceCommandsTab
 
 
 class VoiceAttackControlsTabMixin:
@@ -45,6 +46,11 @@ class VoiceAttackControlsTabMixin:
         voice_feedback_tab = ttk.Frame(self.voiceattack_notebook, padding=8)
         self._build_voice_feedback_tab(voice_feedback_tab)
         self.voiceattack_notebook.add(voice_feedback_tab, text=t('voiceattack.section_voice_feedback'))
+
+        voice_commands_tab = VoiceCommandsTab(
+            self.voiceattack_notebook, lambda: self._newest_shipped_va_profile(include_dev_profile=True)
+        )
+        self.voiceattack_notebook.add(voice_commands_tab, text=t('voiceattack.reference_tab'))
 
     def _build_voice_feedback_tab(self, frame: ttk.Frame) -> None:
         """Voice Feedback sub-tab: voice toggles, volume/balance, per-event sound selection"""

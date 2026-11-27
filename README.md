@@ -291,6 +291,13 @@ Plays a sound or spoken voice for mining events, such as starting or resetting t
 
 <img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/voice_feedback.png" width="900"><br>
 
+### Voice Commands
+
+Lists every voice command in the EliteMining profile, so you can look up what to say without opening VoiceAttack. Pick a group to browse, or type in Search to find a command in any group. Click a command to see what it does and the other ways you can say it.
+
+<img src="https://github.com/Viper-Dude/EliteMining/blob/main/Screenshot/voice_commands.png" width="900"><br>
+*Voice Commands list with what each command does and its other phrases.*
+
 [Back to Top](#top)
 
 ---

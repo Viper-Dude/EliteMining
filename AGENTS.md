@@ -41,6 +41,7 @@
 
 - Dialogs: call `withdraw()` right after `tk.Toplevel()`, never use `transient()`, and center with `center_window()`. Prefer `centered_info_dialog` / `centered_yesno_dialog`. Dialogs with child popups must not run the `keep_on_top` lift loop over them.
 - New widgets take colours from the active theme (`load_theme()` / `get_theme_colors()`), never defaults. Gate Modern-only changes on all three of `modern`, `modern_slate` and `modern_orange`.
+- Focus for new filters and text fields: clear automatic text selection when opening or re-entering a tab and clear lingering highlights on focus loss or after choosing a dropdown value. For nested tabs, handle `<<NotebookTabChanged>>` on their notebook and clear the selection again after 50 ms if Tk restores it. Preserve keyboard navigation and deliberate text selection while editing.
 - There is no status bar; `_set_status()` only logs. Show transient feedback beside the controls with `_show_notice(label, msg)`.
 - UI wording: plain player language with no jargon (rank, query, scope) and no slash labels like "Mine/Sell".
 - "Enable Text Overlay" is the master switch for every overlay, including Auto Prices. Never resize a live TextOverlay with `geometry()`; rebuild it via `show_message()`/`reinstate()`.

@@ -11403,7 +11403,7 @@ Your keybinds will need to be reconfigured manually."""
             )
         )
     
-    def _newest_shipped_va_profile(self):
+    def _newest_shipped_va_profile(self, *, include_dev_profile=False):
         """Newest 'EliteMining v*-Profile.vap' in the EliteMining folder, or None"""
         import glob
         from va_profile_parser import VAProfileParser
@@ -11419,7 +11419,10 @@ Your keybinds will need to be reconfigured manually."""
             except (AttributeError, ValueError):
                 return ()
 
-        files = glob.glob(os.path.join(folder, "EliteMining v*-Profile.vap"))
+        pattern = "EliteMining v*-Profile.vap"
+        files = glob.glob(os.path.join(folder, pattern))
+        if not files and include_dev_profile and not getattr(sys, "frozen", False):
+            files = glob.glob(os.path.join(folder, "Voiceattack Profile", pattern))
         return max(files, key=key) if files else None
 
     def _manual_va_keybind_preserve(self):
