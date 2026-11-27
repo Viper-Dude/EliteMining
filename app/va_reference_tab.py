@@ -15,6 +15,7 @@ from va_phrase_reference import GROUPS, ReferenceEntry, ReferenceRow, load_refer
 
 log = logging.getLogger(__name__)
 _WIDTHS_KEY = "va_reference_column_widths"
+_SEARCH_WIDTHS_KEY = "va_reference_search_column_widths"
 _COLUMN_WIDTHS = {"say_this": 470, "other_ways": 105, "group": 160}
 
 
@@ -52,13 +53,18 @@ class VoiceCommandsTab(ttk.Frame):
         self._tree = StripedTreeview(table, columns=self._columns, displaycolumns=self._columns[:2],
                                      show="headings", selectmode="browse", height=10)
         heading_font = tkfont.Font(root=self, font=scaled_font(9, "bold"))
-        saved_widths = _load_cfg().get(_WIDTHS_KEY) or {}
-        self._widths = {}
+        cfg = _load_cfg()
+        saved_widths = cfg.get(_WIDTHS_KEY) or {}
+        saved_search_widths = cfg.get(_SEARCH_WIDTHS_KEY) or {}
+        self._widths = {_WIDTHS_KEY: {}, _SEARCH_WIDTHS_KEY: {}}
+        self._widths_key = _WIDTHS_KEY
+        self._resize_start = None
         for column, default in _COLUMN_WIDTHS.items():
             label = t(f"voiceattack.reference_{column}")
             min_width = heading_font.measure(label) + scaled_px(24)
             width = max(min_width, saved_widths.get(column, scaled_px(default)))
-            self._widths[column] = width
+            self._widths[_WIDTHS_KEY][column] = width
+            self._widths[_SEARCH_WIDTHS_KEY][column] = max(min_width, saved_search_widths.get(column, width))
             self._tree.heading(column, text=label, anchor="w")
             self._tree.column(column, width=width, minwidth=min_width, anchor="w", stretch=False)
 
@@ -69,6 +75,7 @@ class VoiceCommandsTab(ttk.Frame):
         vertical.grid(row=0, column=1, sticky="ns")
         horizontal.grid(row=1, column=0, sticky="ew")
         self._tree.bind("<<TreeviewSelect>>", self._show_details)
+        self._tree.bind("<ButtonPress-1>", self._start_resize, add="+")
         self._tree.bind("<ButtonRelease-1>", self._save_widths, add="+")
 
         theme = get_theme_colors(load_theme())
@@ -151,7 +158,9 @@ class VoiceCommandsTab(ttk.Frame):
 
     def _refresh_rows(self, *args):
         search = self._search.get().strip()
-        self._tree.configure(displaycolumns=self._columns if search else self._columns[:2])
+        widths_key = _SEARCH_WIDTHS_KEY if search else _WIDTHS_KEY
+        if widths_key != self._widths_key:
+            self._apply_column_layout(widths_key)
         self._tree.delete(*self._tree.get_children())
         self._row_details.clear()
         self._tree.xview_moveto(0)
@@ -184,8 +193,36 @@ class VoiceCommandsTab(ttk.Frame):
         self._details.yview_moveto(0)
         self._details.configure(state="disabled")
 
+    def _apply_column_layout(self, widths_key):
+        self._widths_key = widths_key
+        self._resize_start = None
+        widths = self._widths[widths_key].copy()
+        columns = self._columns[:2]
+        if widths_key == _SEARCH_WIDTHS_KEY:
+            columns = self._columns
+            # Reserve room for Group without saving the fitted widths as a manual resize.
+            overflow = sum(widths.values()) - self._tree.winfo_width() + scaled_px(4)
+            for column in columns:
+                if overflow <= 0:
+                    break
+                minimum = self._tree.column(column, "minwidth")
+                reduction = min(overflow, widths[column] - minimum)
+                widths[column] -= reduction
+                overflow -= reduction
+
+        self._tree.configure(displaycolumns=columns)
+        for column in columns:
+            self._tree.column(column, width=widths[column])
+
+    def _start_resize(self, event):
+        if self._tree.identify_region(event.x, event.y) == "separator":
+            self._resize_start = {column: self._tree.column(column, "width") for column in self._columns}
+
     def _save_widths(self, event):
+        if self._resize_start is None:
+            return
         widths = {column: self._tree.column(column, "width") for column in self._columns}
-        if widths != self._widths:
-            self._widths = widths
-            update_config_value(_WIDTHS_KEY, widths)
+        if widths != self._resize_start:
+            self._widths[self._widths_key] = widths
+            update_config_value(self._widths_key, widths)
+        self._resize_start = None
